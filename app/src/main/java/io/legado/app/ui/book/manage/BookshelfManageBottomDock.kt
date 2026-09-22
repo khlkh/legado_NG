@@ -35,9 +35,11 @@ import io.legado.app.ui.design.theme.NgTheme
 private const val CACHE_ACTION_ID = 0x56200001
 private const val EXPORT_CONTENT_ACTION_ID = 0x56200002
 private const val GROUP_ACTION_ID = 0x56200003
+private const val UPDATE_COVER_ACTION_ID = 0x56200010
 
 internal enum class BookshelfManageDockAction {
     CACHE,
+    UPDATE_COVER,
     EXPORT_CONTENT,
     GROUP,
     EXPORT_SOURCE,
@@ -145,6 +147,11 @@ private fun dockMoreItems(): List<NgExpandableActionMenuItem> = listOf(
         iconRes = R.drawable.ic_bookshelf_action_download,
     ),
     NgExpandableActionMenuItem(
+        itemId = UPDATE_COVER_ACTION_ID,
+        titleRes = R.string.update_book_cover,
+        iconRes = R.drawable.ic_image,
+    ),
+    NgExpandableActionMenuItem(
         itemId = EXPORT_CONTENT_ACTION_ID,
         titleRes = R.string.export,
         iconRes = R.drawable.ic_bookshelf_action_upload,
@@ -197,6 +204,7 @@ private fun dockMoreItems(): List<NgExpandableActionMenuItem> = listOf(
 private fun NgExpandableActionMenuItem.toDockAction(): BookshelfManageDockAction {
     return when (itemId) {
         CACHE_ACTION_ID -> BookshelfManageDockAction.CACHE
+        UPDATE_COVER_ACTION_ID -> BookshelfManageDockAction.UPDATE_COVER
         EXPORT_CONTENT_ACTION_ID -> BookshelfManageDockAction.EXPORT_CONTENT
         GROUP_ACTION_ID -> BookshelfManageDockAction.GROUP
         R.id.menu_export_selection -> BookshelfManageDockAction.EXPORT_SOURCE

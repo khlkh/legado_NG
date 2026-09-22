@@ -25,6 +25,7 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.model.CacheBook
+import io.legado.app.model.localBook.LocalBook
 import io.legado.app.service.ExportBookService
 import io.legado.app.ui.book.group.GroupManageDialog
 import io.legado.app.ui.book.info.BookInfoActivity
@@ -44,12 +45,14 @@ import io.legado.app.utils.startService
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.max
 
 /** 书架管理。页面宿主、列表、选择与拖排均使用 Compose。 */
@@ -272,6 +275,7 @@ class BookshelfManageActivity :
                 cacheBook(book, 0, book.lastChapterIndex)
             }
 
+            BookshelfManageDockAction.UPDATE_COVER -> updateBookCovers(selected)
             BookshelfManageDockAction.EXPORT_CONTENT -> showExportSettings(selected)
             BookshelfManageDockAction.GROUP -> BookshelfBookGroupSheet(this, selected).show()
             BookshelfManageDockAction.EXPORT_SOURCE -> exportBookSources(selected)
@@ -299,6 +303,32 @@ class BookshelfManageActivity :
 
     private fun clearSelectedBookGroups(books: List<Book>) {
         viewModel.updateBook(*books.map { it.copy(group = 0L) }.toTypedArray())
+    }
+
+    private fun updateBookCovers(books: List<Book>) {
+        val localBooks = books.filter { it.isLocal }
+        if (localBooks.isEmpty()) {
+            toastOnUi(R.string.update_book_cover_no_local)
+            return
+        }
+        toastOnUi("正在更新 ${localBooks.size} 本本地书封面…")
+        lifecycleScope.launch(IO) {
+            var success = 0
+            var failed = 0
+            localBooks.forEach { book ->
+                kotlin.runCatching {
+                    LocalBook.upCover(book)
+                }.onSuccess {
+                    success++
+                }.onFailure {
+                    failed++
+                    AppLog.put("更新封面失败：${book.name}\n${it.localizedMessage}", it)
+                }
+            }
+            withContext(Main) {
+                toastOnUi("封面更新完成：成功 $success 本，失败 $failed 本")
+            }
+        }
     }
 
     private fun openBook(book: Book) {
