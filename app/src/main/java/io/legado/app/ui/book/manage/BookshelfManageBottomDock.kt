@@ -147,11 +147,6 @@ private fun dockMoreItems(): List<NgExpandableActionMenuItem> = listOf(
         iconRes = R.drawable.ic_bookshelf_action_download,
     ),
     NgExpandableActionMenuItem(
-        itemId = UPDATE_COVER_ACTION_ID,
-        titleRes = R.string.update_book_cover,
-        iconRes = R.drawable.ic_image,
-    ),
-    NgExpandableActionMenuItem(
         itemId = EXPORT_CONTENT_ACTION_ID,
         titleRes = R.string.export,
         iconRes = R.drawable.ic_bookshelf_action_upload,
@@ -185,6 +180,11 @@ private fun dockMoreItems(): List<NgExpandableActionMenuItem> = listOf(
         itemId = R.id.menu_remove_to_group,
         titleRes = R.string.set_ungrouped,
         iconRes = R.drawable.ic_folder_open
+    ),
+    NgExpandableActionMenuItem(
+        itemId = UPDATE_COVER_ACTION_ID,
+        titleRes = R.string.update_book_cover,
+        iconRes = R.drawable.ic_image,
     ),
     NgExpandableActionMenuItem(
         itemId = R.id.menu_clear_cache,
