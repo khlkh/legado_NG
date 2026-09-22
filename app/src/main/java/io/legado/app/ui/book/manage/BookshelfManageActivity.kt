@@ -37,6 +37,7 @@ import io.legado.app.utils.SelectDirectoryContract
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.observeEvent
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.share
 import io.legado.app.utils.showDialogFragment
@@ -311,22 +312,25 @@ class BookshelfManageActivity :
             toastOnUi(R.string.update_book_cover_no_local)
             return
         }
-        toastOnUi("正在更新 ${localBooks.size} 本本地书封面…")
+        val ignoredOnline = books.size - localBooks.size
+        if (ignoredOnline > 0) {
+            toastOnUi(getString(R.string.update_book_cover_online_ignored, ignoredOnline))
+        }
+        toastOnUi(getString(R.string.update_book_cover_start, localBooks.size))
         lifecycleScope.launch(IO) {
             var success = 0
             var failed = 0
             localBooks.forEach { book ->
-                kotlin.runCatching {
-                    LocalBook.upCover(book)
-                }.onSuccess {
+                if (LocalBook.upCover(book)) {
                     success++
-                }.onFailure {
+                } else {
                     failed++
-                    AppLog.put("更新封面失败：${book.name}\n${it.localizedMessage}", it)
+                    AppLog.put("更新封面失败：${book.name}")
                 }
             }
             withContext(Main) {
-                toastOnUi("封面更新完成：成功 $success 本，失败 $failed 本")
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
+                toastOnUi(getString(R.string.update_book_cover_done, success, failed))
             }
         }
     }

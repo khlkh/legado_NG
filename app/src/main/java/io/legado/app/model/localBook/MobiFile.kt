@@ -58,9 +58,8 @@ class MobiFile(var book: Book) {
         }
 
         @Synchronized
-        override fun upCover(book: Book) {
-            //构造 MobiFile 时 init 会调用 upBookCover(true)，封面缺失时自动重新提取
-            getMFile(book)
+        override fun upCover(book: Book): Boolean {
+            return getMFile(book).upCover()
         }
 
         fun clear() {
@@ -277,14 +276,18 @@ class MobiFile(var book: Book) {
         return kf8Book.getResourceByHref(href)?.inputStream()
     }
 
-    private fun upBookCover(fastCheck: Boolean = false) {
-        try {
+    fun upCover(): Boolean {
+        return upBookCover(fastCheck = false)
+    }
+
+    private fun upBookCover(fastCheck: Boolean = false): Boolean {
+        return try {
             mobiBook?.let {
                 if (book.coverUrl.isNullOrEmpty()) {
                     book.coverUrl = LocalBook.getCoverPath(book)
                 }
                 if (fastCheck && File(book.coverUrl!!).exists()) {
-                    return
+                    return true
                 }
                 it.getCover()?.let { bytes ->
                     val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
@@ -294,10 +297,12 @@ class MobiFile(var book: Book) {
                         out.flush()
                     }
                 }
-            }
+                File(book.coverUrl!!).exists()
+            } ?: false
         } catch (e: Exception) {
             AppLog.put("加载书籍封面失败\n${e.localizedMessage}", e)
             e.printOnDebug()
+            false
         }
     }
 

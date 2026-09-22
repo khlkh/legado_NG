@@ -49,9 +49,8 @@ class UmdFile(var book: Book) {
         }
 
         @Synchronized
-        override fun upCover(book: Book) {
-            //构造 UmdFile 时 init 会调用 upBookCover(true)，封面缺失时自动重新提取
-            getUFile(book)
+        override fun upCover(book: Book): Boolean {
+            return getUFile(book).upCover()
         }
     }
 
@@ -74,19 +73,25 @@ class UmdFile(var book: Book) {
         return UmdReader().read(input)
     }
 
-    private fun upBookCover(fastCheck: Boolean = false) {
-        try {
+    fun upCover(): Boolean {
+        return upBookCover(fastCheck = false)
+    }
+
+    private fun upBookCover(fastCheck: Boolean = false): Boolean {
+        return try {
             umdBook?.let {
                 if (book.coverUrl.isNullOrEmpty()) {
                     book.coverUrl = LocalBook.getCoverPath(book)
                 }
                 if (fastCheck && File(book.coverUrl!!).exists()) {
-                    return
+                    return true
                 }
                 FileUtils.writeBytes(book.coverUrl!!, it.cover.coverData)
-            }
+                true
+            } ?: false
         } catch (e: Exception) {
             e.printOnDebug()
+            false
         }
     }
 

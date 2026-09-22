@@ -9,6 +9,7 @@ import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.constant.AppConst.androidId
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
@@ -51,6 +52,7 @@ import io.legado.app.utils.getSharedPreferences
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.openInputStream
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
@@ -402,23 +404,41 @@ object Restore {
         }
     }
 
+    private var coverRebuildJob: Coroutine<Unit>? = null
+
     private fun rebuildLocalBookCoversAsync(books: List<Book>) {
         if (books.isEmpty()) return
-        Coroutine.async(context = IO) {
+        coverRebuildJob?.cancel()
+        coverRebuildJob = Coroutine.async(context = IO) {
             var success = 0
             var failed = 0
             books.forEach { book ->
-                kotlin.runCatching {
-                    LocalBook.upCover(book)
-                }.onSuccess {
+                val coverFile = book.coverUrl?.takeIf { it.isNotBlank() }?.let(::File)
+                if (coverFile?.exists() == true) {
+                    //已有封面文件则跳过，仅补缺失
+                    return@forEach
+                }
+                if (!book.customCoverUrl.isNullOrBlank()) {
+                    //自定义封面优先显示，无需重建自动封面
+                    return@forEach
+                }
+                if (LocalBook.upCover(book)) {
                     success++
-                }.onFailure {
+                } else {
                     failed++
-                    AppLog.put("恢复后重建封面失败：${book.name}\n${it.localizedMessage}", it)
+                    AppLog.put("恢复后重建封面失败：${book.name}")
                 }
             }
-            if (failed > 0) {
+            if (success > 0 || failed > 0) {
                 AppLog.put("恢复后封面重建完成：成功 $success 本，失败 $failed 本")
+            }
+            if (success > 0) {
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
+            }
+            if (failed > 0) {
+                withContext(Main) {
+                    appCtx.toastOnUi(appCtx.getString(R.string.restore_cover_rebuild_done, success, failed))
+                }
             }
         }
     }

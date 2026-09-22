@@ -291,13 +291,14 @@ object LocalBook {
         }
     }
 
-    /** 仅重新提取本地书封面（封面文件缺失时写回缓存目录） */
-    fun upCover(book: Book) {
-        when {
+    /** 重新提取本地书封面并写回缓存目录，返回是否成功（不支持的格式返回 false） */
+    fun upCover(book: Book): Boolean {
+        return when {
             book.isEpub -> EpubFile.upCover(book)
             book.isUmd -> UmdFile.upCover(book)
             book.isPdf -> PdfFile.upCover(book)
             book.isMobi -> MobiFile.upCover(book)
+            else -> false
         }
     }
 

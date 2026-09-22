@@ -46,9 +46,8 @@ class PdfFile(var book: Book) {
         }
 
         @Synchronized
-        override fun upCover(book: Book) {
-            //构造 PdfFile 时 init 会调用 upBookCover(true)，封面缺失时自动重新提取
-            getPFile(book)
+        override fun upCover(book: Book): Boolean {
+            return getPFile(book).upCover()
         }
 
         @Synchronized
@@ -197,23 +196,29 @@ class PdfFile(var book: Book) {
         return chapterList
     }
 
-    private fun upBookCover(fastCheck: Boolean = false) {
-        try {
+    fun upCover(): Boolean {
+        return upBookCover(fastCheck = false)
+    }
+
+    private fun upBookCover(fastCheck: Boolean = false): Boolean {
+        return try {
             pdfRenderer?.let { renderer ->
                 if (book.coverUrl.isNullOrEmpty()) {
                     book.coverUrl = LocalBook.getCoverPath(book)
                 }
                 if (fastCheck && File(book.coverUrl!!).exists()) {
-                    return
+                    return true
                 }
                 FileOutputStream(FileUtils.createFileIfNotExist(book.coverUrl!!)).use { out ->
                     openPdfPage(renderer, 0)?.compress(Bitmap.CompressFormat.JPEG, 90, out)
                     out.flush()
                 }
-            }
+                File(book.coverUrl!!).exists()
+            } ?: false
         } catch (e: Exception) {
             AppLog.put("加载书籍封面失败\n${e.localizedMessage}", e)
             e.printOnDebug()
+            false
         }
     }
 

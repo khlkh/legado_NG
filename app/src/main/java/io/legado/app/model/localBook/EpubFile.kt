@@ -73,9 +73,8 @@ class EpubFile(var book: Book) {
         }
 
         @Synchronized
-        override fun upCover(book: Book) {
-            //构造 EpubFile 时 init 会调用 upBookCover(true)，封面缺失时自动重新提取
-            getEFile(book)
+        override fun upCover(book: Book): Boolean {
+            return getEFile(book).upCover()
         }
 
         fun clear() {
@@ -263,14 +262,18 @@ class EpubFile(var book: Book) {
         return epubBook?.resources?.getByHref(abHref)?.inputStream
     }
 
-    private fun upBookCover(fastCheck: Boolean = false) {
-        try {
+    fun upCover(): Boolean {
+        return upBookCover(fastCheck = false)
+    }
+
+    private fun upBookCover(fastCheck: Boolean = false): Boolean {
+        return try {
             epubBook?.let {
                 if (book.coverUrl.isNullOrEmpty()) {
                     book.coverUrl = LocalBook.getCoverPath(book)
                 }
                 if (fastCheck && File(book.coverUrl!!).exists()) {
-                    return
+                    return true
                 }
                 /*部分书籍DRM处理后，封面获取异常，待优化*/
                 it.coverImage?.inputStream?.use { input ->
@@ -280,10 +283,12 @@ class EpubFile(var book: Book) {
                     out.flush()
                     out.close()
                 } ?: AppLog.putDebug("Epub: 封面获取为空. path: ${book.bookUrl}")
-            }
+                File(book.coverUrl!!).exists()
+            } ?: false
         } catch (e: Throwable) {
             AppLog.put("加载书籍封面失败\n${e.localizedMessage}", e)
             e.printOnDebug()
+            false
         }
     }
 
