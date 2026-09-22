@@ -291,13 +291,16 @@ object LocalBook {
         }
     }
 
-    /** 重新提取本地书封面并写回缓存目录，返回是否成功（不支持的格式返回 false） */
-    fun upCover(book: Book): Boolean {
+    fun canExtractCover(book: Book): Boolean =
+        book.isEpub || book.isUmd || book.isPdf || book.isMobi
+
+    /** 重新提取本地书封面并写回缓存目录，返回本次是否写出成功（不支持的格式返回 false） */
+    fun upCover(book: Book, force: Boolean = false): Boolean {
         return when {
-            book.isEpub -> EpubFile.upCover(book)
-            book.isUmd -> UmdFile.upCover(book)
-            book.isPdf -> PdfFile.upCover(book)
-            book.isMobi -> MobiFile.upCover(book)
+            book.isEpub -> EpubFile.upCover(book, force)
+            book.isUmd -> UmdFile.upCover(book, force)
+            book.isPdf -> PdfFile.upCover(book, force)
+            book.isMobi -> MobiFile.upCover(book, force)
             else -> false
         }
     }

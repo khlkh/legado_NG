@@ -58,8 +58,13 @@ class MobiFile(var book: Book) {
         }
 
         @Synchronized
-        override fun upCover(book: Book): Boolean {
-            return getMFile(book).upCover()
+        override fun upCover(book: Book, force: Boolean): Boolean {
+            val file = getMFile(book)
+            if (!force) {
+                //init 已按 fastCheck=true 补写缺失封面，这里仅报告结果
+                return File(book.coverUrl ?: LocalBook.getCoverPath(book)).exists()
+            }
+            return file.upCover()
         }
 
         fun clear() {
@@ -289,15 +294,18 @@ class MobiFile(var book: Book) {
                 if (fastCheck && File(book.coverUrl!!).exists()) {
                     return true
                 }
+                var written = false
                 it.getCover()?.let { bytes ->
                     val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    val file = FileUtils.createFileIfNotExist(book.coverUrl!!)
-                    FileOutputStream(file).use { out ->
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-                        out.flush()
+                    if (bitmap != null) {
+                        val file = FileUtils.createFileIfNotExist(book.coverUrl!!)
+                        FileOutputStream(file).use { out ->
+                            written = bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                            out.flush()
+                        }
                     }
                 }
-                File(book.coverUrl!!).exists()
+                written
             } ?: false
         } catch (e: Exception) {
             AppLog.put("加载书籍封面失败\n${e.localizedMessage}", e)

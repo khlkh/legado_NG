@@ -3,6 +3,7 @@ package io.legado.app.ui.book.manage
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.referentialEqualityPolicy
@@ -52,6 +53,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.max
@@ -83,6 +85,7 @@ class BookshelfManageActivity :
     private var deleteOriginal by mutableStateOf(false)
     private var batchChangeSourceRunning by mutableStateOf(false)
     private var batchChangeSourceProgress by mutableStateOf("")
+    private var coverRevision by mutableIntStateOf(0)
     private var exportedSourceUri by mutableStateOf<String?>(null)
     private val exportBookPathKey = "exportBookPath"
     private var pendingExportBooks: List<Book> = emptyList()
@@ -124,6 +127,9 @@ class BookshelfManageActivity :
         observeEvent<Pair<Book, BookChapter>>(EventBus.SAVE_CONTENT) { (book, chapter) ->
             viewModel.addCachedChapter(book.bookUrl, chapter.url)
         }
+        observeEvent<String>(EventBus.BOOKSHELF_REFRESH) {
+            coverRevision++
+        }
     }
 
     private fun initContent() {
@@ -139,6 +145,7 @@ class BookshelfManageActivity :
                     books = visibleBooks,
                     selectedBookUrls = selectedBookUrls,
                     cachedChapterCounts = cachedChapterCounts,
+                    coverRevision = coverRevision,
                     deleteDialogVisible = deleteDialogVisible,
                     deleteOriginal = deleteOriginal,
                     batchChangeSourceRunning = batchChangeSourceRunning,
@@ -307,21 +314,23 @@ class BookshelfManageActivity :
     }
 
     private fun updateBookCovers(books: List<Book>) {
-        val localBooks = books.filter { it.isLocal }
-        if (localBooks.isEmpty()) {
+        val extractable = books.filter { it.isLocal && LocalBook.canExtractCover(it) && it.customCoverUrl.isNullOrBlank() }
+        if (extractable.isEmpty()) {
             toastOnUi(R.string.update_book_cover_no_local)
             return
         }
-        val ignoredOnline = books.size - localBooks.size
-        if (ignoredOnline > 0) {
-            toastOnUi(getString(R.string.update_book_cover_online_ignored, ignoredOnline))
+        val ignored = books.size - extractable.size
+        if (ignored > 0) {
+            toastOnUi(getString(R.string.update_book_cover_start_ignored, extractable.size, ignored))
+        } else {
+            toastOnUi(getString(R.string.update_book_cover_start, extractable.size))
         }
-        toastOnUi(getString(R.string.update_book_cover_start, localBooks.size))
         lifecycleScope.launch(IO) {
             var success = 0
             var failed = 0
-            localBooks.forEach { book ->
-                if (LocalBook.upCover(book)) {
+            extractable.forEach { book ->
+                ensureActive()
+                if (LocalBook.upCover(book, force = true)) {
                     success++
                 } else {
                     failed++

@@ -46,8 +46,13 @@ class PdfFile(var book: Book) {
         }
 
         @Synchronized
-        override fun upCover(book: Book): Boolean {
-            return getPFile(book).upCover()
+        override fun upCover(book: Book, force: Boolean): Boolean {
+            val file = getPFile(book)
+            if (!force) {
+                //init 已按 fastCheck=true 补写缺失封面，这里仅报告结果
+                return File(book.coverUrl ?: LocalBook.getCoverPath(book)).exists()
+            }
+            return file.upCover()
         }
 
         @Synchronized
@@ -209,11 +214,14 @@ class PdfFile(var book: Book) {
                 if (fastCheck && File(book.coverUrl!!).exists()) {
                     return true
                 }
-                FileOutputStream(FileUtils.createFileIfNotExist(book.coverUrl!!)).use { out ->
-                    openPdfPage(renderer, 0)?.compress(Bitmap.CompressFormat.JPEG, 90, out)
-                    out.flush()
+                var written = false
+                openPdfPage(renderer, 0)?.let { page ->
+                    FileOutputStream(FileUtils.createFileIfNotExist(book.coverUrl!!)).use { out ->
+                        written = page.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                        out.flush()
+                    }
                 }
-                File(book.coverUrl!!).exists()
+                written
             } ?: false
         } catch (e: Exception) {
             AppLog.put("加载书籍封面失败\n${e.localizedMessage}", e)

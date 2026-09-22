@@ -57,6 +57,7 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -413,6 +414,11 @@ object Restore {
             var success = 0
             var failed = 0
             books.forEach { book ->
+                ensureActive()
+                if (!LocalBook.canExtractCover(book)) {
+                    //TXT 等格式无法提取封面，跳过
+                    return@forEach
+                }
                 val coverFile = book.coverUrl?.takeIf { it.isNotBlank() }?.let(::File)
                 if (coverFile?.exists() == true) {
                     //已有封面文件则跳过，仅补缺失
