@@ -33,6 +33,7 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadHighlightRuleStore
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 import io.legado.app.model.BookCover
 import io.legado.app.model.localBook.LocalBook
@@ -51,6 +52,7 @@ import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.openInputStream
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -134,6 +136,7 @@ object Restore {
                     book.coverUrl = LocalBook.getCoverPath(book)
                 }
             val newBooks = arrayListOf<Book>()
+            val restoredLocalBooks = arrayListOf<Book>()
             val ignoreLocalBook = BackupConfig.ignoreLocalBook
             it.forEach { book ->
                 if (ignoreLocalBook && book.isLocal) {
@@ -148,8 +151,12 @@ object Restore {
                 } else {
                     newBooks.add(book)
                 }
+                if (book.isLocal) {
+                    restoredLocalBooks.add(book)
+                }
             }
             appDb.bookDao.insert(*newBooks.toTypedArray())
+            rebuildLocalBookCoversAsync(restoredLocalBooks)
         }
         fileToListT<Bookmark>(path, "bookmark.json")?.let {
             appDb.bookmarkDao.insert(*it.toTypedArray())
@@ -392,6 +399,27 @@ object Restore {
                 LauncherIconHelp.changeIcon(appCtx.getPrefString(PreferKey.launcherIcon))
             }
             ThemeConfig.applyDayNight(appCtx)
+        }
+    }
+
+    private fun rebuildLocalBookCoversAsync(books: List<Book>) {
+        if (books.isEmpty()) return
+        Coroutine.async(context = IO) {
+            var success = 0
+            var failed = 0
+            books.forEach { book ->
+                kotlin.runCatching {
+                    LocalBook.upCover(book)
+                }.onSuccess {
+                    success++
+                }.onFailure {
+                    failed++
+                    AppLog.put("恢复后重建封面失败：${book.name}\n${it.localizedMessage}", it)
+                }
+            }
+            if (failed > 0) {
+                AppLog.put("恢复后封面重建完成：成功 $success 本，失败 $failed 本")
+            }
         }
     }
 

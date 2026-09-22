@@ -46,6 +46,12 @@ class PdfFile(var book: Book) {
         }
 
         @Synchronized
+        override fun upCover(book: Book) {
+            //构造 PdfFile 时 init 会调用 upBookCover(true)，封面缺失时自动重新提取
+            getPFile(book)
+        }
+
+        @Synchronized
         override fun getChapterList(book: Book): ArrayList<BookChapter> {
             return getPFile(book).getChapterList()
         }

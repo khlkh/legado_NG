@@ -291,6 +291,16 @@ object LocalBook {
         }
     }
 
+    /** 仅重新提取本地书封面（封面文件缺失时写回缓存目录） */
+    fun upCover(book: Book) {
+        when {
+            book.isEpub -> EpubFile.upCover(book)
+            book.isUmd -> UmdFile.upCover(book)
+            book.isPdf -> PdfFile.upCover(book)
+            book.isMobi -> MobiFile.upCover(book)
+        }
+    }
+
     /* 导入压缩包内的书籍 */
     fun importArchiveFile(
         archiveFileUri: Uri,
