@@ -220,6 +220,7 @@ internal data class ReadStyleActions(
     val onCancelHighlightSelection: () -> Unit,
     val onConfirmHighlightSelection: () -> Unit,
     val onBack: () -> Unit,
+    val onEditorThemeModeToggle: () -> Unit,
     val onPresetNameChanged: (String) -> Unit,
     val onTextColorChanged: (Int) -> Unit,
     val onBackgroundColorChanged: (Int) -> Unit,
@@ -901,6 +902,7 @@ private fun EditorPage(
             contentColor = contentColor,
             accentColor = accentColor,
             onBack = actions.onBack,
+            onModeToggle = actions.onEditorThemeModeToggle,
         )
         LazyColumn(
             modifier = Modifier
@@ -1074,6 +1076,7 @@ private fun EditorHeader(
     contentColor: Color,
     accentColor: Color,
     onBack: () -> Unit,
+    onModeToggle: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -1110,6 +1113,7 @@ private fun EditorHeader(
                 .padding(start = 12.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(Color(NgTheme.colors.surface).copy(alpha = 0.34f))
+                .clickable(role = Role.Switch, onClick = onModeToggle)
                 .padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -1125,7 +1129,7 @@ private fun EditorHeader(
                     1 -> Icons.Rounded.DarkMode
                     else -> Icons.Rounded.LightMode
                 },
-                contentDescription = null,
+                contentDescription = stringResource(R.string.read_style_toggle_theme_mode),
                 modifier = Modifier.size(16.dp),
                 tint = accentColor,
             )

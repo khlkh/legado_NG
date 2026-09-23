@@ -189,6 +189,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
 
     override fun onDismiss(dialog: DialogInterface) {
         super.onDismiss(dialog)
+        clearEditorThemeOverride()
         ReadBookConfig.save()
         (activity as ReadBookActivity).bottomDialog--
         if (openTipConfigAfterDismiss) {
@@ -256,6 +257,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
         onCancelHighlightSelection = ::clearHighlightSelection,
         onConfirmHighlightSelection = ::confirmHighlightSelection,
         onBack = ::navigateBack,
+        onEditorThemeModeToggle = ::toggleEditorThemeMode,
         onPresetNameChanged = { value ->
             ReadBookConfig.durConfig.name = value
             updateEditorState {
@@ -559,7 +561,21 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
         creatingPreset = isNew
         changeBgTextConfig(index)
         page = ReadStylePage.EDIT
+        ReadBookConfig.setNightThemeOverride(null)
         refreshUi()
+    }
+
+    private fun toggleEditorThemeMode() {
+        val currentNight = ReadBookConfig.isNightTheme
+        ReadBookConfig.setNightThemeOverride(!currentNight)
+        refreshUi()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
+    }
+
+    private fun clearEditorThemeOverride() {
+        if (ReadBookConfig.setNightThemeOverride(null)) {
+            postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
+        }
     }
 
     private fun navigateTo(target: ReadStylePage) {
@@ -651,6 +667,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
 
             page == ReadStylePage.EDIT -> {
                 page = ReadStylePage.PRESET
+                clearEditorThemeOverride()
                 refreshUi()
             }
         }

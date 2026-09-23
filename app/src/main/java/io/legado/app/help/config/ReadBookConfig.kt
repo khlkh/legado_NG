@@ -407,13 +407,28 @@ object ReadBookConfig {
         PageAnim.coverPageAnim -> PageAnim.coverPageAnim
         else -> PageAnim.scrollPageAnim
     }
+    private var nightThemeOverride: Boolean? = null
+
     var isNightTheme = appCtx.getPrefBoolean(PreferKey.readNightTheme, false)
+        get() = nightThemeOverride ?: field
         set(value) {
-            field = value
-            if (appCtx.getPrefBoolean(PreferKey.readNightTheme, false) != value) {
-                appCtx.putPrefBoolean(PreferKey.readNightTheme, value)
+            if (nightThemeOverride != null) {
+                //编辑预设期间只做临时预览，不写入持久化配置
+                nightThemeOverride = value
+            } else {
+                field = value
+                if (appCtx.getPrefBoolean(PreferKey.readNightTheme, false) != value) {
+                    appCtx.putPrefBoolean(PreferKey.readNightTheme, value)
+                }
             }
         }
+
+    /** 设置夜间主题临时覆盖；传入 null 恢复真实主题。返回是否发生变化。 */
+    fun setNightThemeOverride(value: Boolean?): Boolean {
+        val changed = nightThemeOverride != value
+        nightThemeOverride = value
+        return changed
+    }
 
     fun currentThemeMode(): ReadThemeMode = resolveReadThemeMode(
         storedMode = appCtx.getPrefString(PreferKey.readThemeMode),
