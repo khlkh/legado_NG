@@ -412,14 +412,9 @@ object ReadBookConfig {
     var isNightTheme = appCtx.getPrefBoolean(PreferKey.readNightTheme, false)
         get() = nightThemeOverride ?: field
         set(value) {
-            if (nightThemeOverride != null) {
-                //编辑预设期间只做临时预览，不写入持久化配置
-                nightThemeOverride = value
-            } else {
-                field = value
-                if (appCtx.getPrefBoolean(PreferKey.readNightTheme, false) != value) {
-                    appCtx.putPrefBoolean(PreferKey.readNightTheme, value)
-                }
+            field = value
+            if (appCtx.getPrefBoolean(PreferKey.readNightTheme, false) != value) {
+                appCtx.putPrefBoolean(PreferKey.readNightTheme, value)
             }
         }
 
@@ -432,7 +427,7 @@ object ReadBookConfig {
 
     fun currentThemeMode(): ReadThemeMode = resolveReadThemeMode(
         storedMode = appCtx.getPrefString(PreferKey.readThemeMode),
-        legacyNightTheme = isNightTheme,
+        legacyNightTheme = appCtx.getPrefBoolean(PreferKey.readNightTheme, false),
     )
 
     fun selectThemeMode(

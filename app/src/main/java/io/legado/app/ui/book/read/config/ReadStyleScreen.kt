@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -1113,7 +1114,12 @@ private fun EditorHeader(
                 .padding(start = 12.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(Color(NgTheme.colors.surface).copy(alpha = 0.34f))
-                .clickable(role = Role.Switch, onClick = onModeToggle)
+                .toggleable(
+                    value = mode == 1,
+                    role = Role.Switch,
+                ) {
+                    onModeToggle()
+                }
                 .padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
