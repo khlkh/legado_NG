@@ -2303,7 +2303,13 @@
     <string name="read_tip_position">%1$s · %2$s</string>
     <string name="read_tip_used_at">已用于%1$s</string>
     <string name="reading_presets">阅读预设</string>
-    <string name="read_style_only_this_book">预设仅用于本书</string>
+    <string name="read_style_only_this_book">自定义本书设置</string>
+    <string name="read_style_only_this_book_subtitle">改动只应用于本书，不随全局预设变化</string>
+    <string name="read_style_book_font">本书字体</string>
+    <string name="read_style_source_global">全局</string>
+    <string name="read_style_source_preset">固定基准</string>
+    <string name="read_style_source_this_book">本书</string>
+    <string name="read_style_reset_book_font">重置本书字体</string>
     <string name="read_style_this_book">本书</string>
     <string name="read_style_follow_global">跟随全局</string>
     <string name="create_style">＋ 新建</string>
@@ -2349,6 +2355,12 @@
     <string name="read_style_global_follow_app_color">跟随应用颜色</string>
     <string name="read_style_global_follow_app_color_managed">取色来源已由全局设置接管</string>
     <string name="read_style_global_color_style">全局色彩风格</string>
+    <string name="read_style_done">完成</string>
+    <string name="read_style_discard_changes">放弃修改</string>
+    <string name="read_style_unsaved_changes">未保存的修改</string>
+    <string name="read_style_keep_and_close">保留</string>
+    <string name="read_style_discard_and_close">放弃</string>
+    <string name="read_style_keep_editing">继续编辑</string>
     <string name="read_highlight_rules">高亮规则</string>
     <string name="read_highlight_summary">%1$d/%2$d 启用</string>
     <string name="read_highlight_select_rules">选择规则</string>

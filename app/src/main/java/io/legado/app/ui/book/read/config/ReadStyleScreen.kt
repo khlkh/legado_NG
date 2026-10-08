@@ -199,6 +199,9 @@ internal data class ReadStyleUiState(
     val editorInitialBackgroundType: Int?,
     val editorInitialBackgroundName: String?,
     val editorInitialBackground: ImageBitmap?,
+    val hasUnsavedChanges: Boolean = false,
+    val bookFont: String = "",
+    val bookFontSource: String = "",
 )
 
 internal data class ReadStyleActions(
@@ -269,6 +272,10 @@ internal data class ReadStyleActions(
     val onDeleteHighlight: () -> Unit,
     val onHighlightEnabledChanged: (Int, Boolean) -> Unit,
     val onReorderHighlights: (List<ReadHighlightRule>) -> Unit,
+    val onDone: () -> Unit,
+    val onDiscard: () -> Unit,
+    val onResetBookFontOverride: () -> Unit,
+    val onDismissRequest: () -> Unit,
 )
 
 @Composable
@@ -286,10 +293,12 @@ internal fun ReadStyleScreen(
         ReadStylePage.ADJUST,
         ReadStylePage.HIGHLIGHT,
     )
-    BackHandler(
-        enabled = page !in rootPages || state.highlightSelectionMode != HighlightSelectionMode.NONE,
-    ) {
-        actions.onBack()
+    BackHandler(enabled = true) {
+        if (page in rootPages && state.highlightSelectionMode == HighlightSelectionMode.NONE) {
+            actions.onDismissRequest()
+        } else {
+            actions.onBack()
+        }
     }
     NgGlassSurface(
         modifier = Modifier
@@ -336,7 +345,7 @@ internal fun ReadStyleScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(StandardPageHeight - (if (state.onlyThisBook) 155.6.dp else 0.dp)
-                            + (if (state.canUseBookStyle) 56.8.dp else 0.dp)
+                            + (if (state.canUseBookStyle) 62.8.dp else 0.dp)
                             + (if (state.isEpub) 56.8.dp else 0.dp)),
                 ) {
                     PresetPage(
@@ -428,7 +437,60 @@ internal fun ReadStyleScreen(
                     actions = actions,
                 )
             }
+
+            ReadStyleSessionBar(
+                hasUnsavedChanges = state.hasUnsavedChanges,
+                contentColor = contentColor,
+                onDiscard = actions.onDiscard,
+                onDone = actions.onDone,
+            )
         }
+    }
+}
+
+@Composable
+private fun ReadStyleSessionBar(
+    hasUnsavedChanges: Boolean,
+    contentColor: Color,
+    onDiscard: () -> Unit,
+    onDone: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (hasUnsavedChanges) {
+            Text(
+                text = "● " + stringResource(R.string.read_style_unsaved_changes),
+                color = contentColor.copy(alpha = 0.72f),
+                fontSize = 13.sp,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
+        Text(
+            text = stringResource(R.string.read_style_discard_changes),
+            color = if (hasUnsavedChanges) contentColor else contentColor.copy(alpha = 0.38f),
+            fontSize = 14.sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp))
+                .clickable(enabled = hasUnsavedChanges, onClick = onDiscard)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = stringResource(R.string.read_style_done),
+            color = Color(NgTheme.colors.onPrimary),
+            fontSize = 14.sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(NgTheme.colors.primary))
+                .clickable(onClick = onDone)
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+        )
     }
 }
 
@@ -489,12 +551,44 @@ private fun PresetPage(
     if (state.canUseBookStyle) {
         PresetSwitchRow(
             title = stringResource(R.string.read_style_only_this_book),
+            subtitle = stringResource(R.string.read_style_only_this_book_subtitle),
             iconRes = R.drawable.ic_bookshelf_dock_all,
             iconSize = 20.dp,
             checked = state.onlyThisBook,
             contentColor = contentColor,
             onCheckedChange = actions.onOnlyThisBookChanged,
         )
+        ReadDivider(contentColor)
+    }
+    if (state.onlyThisBook) {
+        Row(
+            Modifier.fillMaxWidth().height(56.dp)
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.read_style_book_font),
+                color = contentColor,
+                fontSize = 15.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = state.bookFont + if (state.bookFontSource.isNotBlank()) " · " + state.bookFontSource else "",
+                color = contentColor.copy(alpha = 0.72f),
+                fontSize = 13.sp,
+            )
+            if (state.bookFontSource == stringResource(R.string.read_style_source_this_book)) {
+                Spacer(Modifier.width(10.dp))
+                Icon(
+                    painter = painterResource(R.drawable.ic_restore),
+                    contentDescription = stringResource(R.string.read_style_reset_book_font),
+                    tint = contentColor,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clickable(role = Role.Button, onClick = actions.onResetBookFontOverride),
+                )
+            }
+        }
         ReadDivider(contentColor)
     }
     if (!state.onlyThisBook) {
@@ -676,11 +770,12 @@ private fun PresetSwitchRow(
     contentColor: Color,
     onCheckedChange: (Boolean) -> Unit,
     iconSize: Dp = 25.dp,
+    subtitle: String? = null,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(if (subtitle == null) 56.dp else 62.dp)
             .clickable { onCheckedChange(!checked) }
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -693,12 +788,22 @@ private fun PresetSwitchRow(
                 tint = contentColor,
             )
         }
-        Text(
-            text = title,
+        Column(
             modifier = Modifier.padding(start = 14.dp).weight(1f),
-            color = contentColor,
-            fontSize = 15.sp,
-        )
+        ) {
+            Text(
+                text = title,
+                color = contentColor,
+                fontSize = 15.sp,
+            )
+            subtitle?.let {
+                Text(
+                    text = it,
+                    color = contentColor.copy(alpha = 0.62f),
+                    fontSize = 11.5.sp,
+                )
+            }
+        }
         NgSwitchControl(
             checked = checked,
             onCheckedChange = onCheckedChange,

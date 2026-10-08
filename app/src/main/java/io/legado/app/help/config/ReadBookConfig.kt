@@ -96,11 +96,45 @@ object ReadBookConfig {
                 .onFailure { AppLog.put("保存本书预设失败", it) }
         }
     }
+    private var boundBook: Book = Book(bookUrl = "")
+    private val bookOverridesStore = BookReadStyleOverridesStore { bookUrl, overrides, legacy ->
+        globalExecutor.execute {
+            runCatching { appDb.bookDao.saveBookStyleOverrides(bookUrl, overrides, legacy) }
+                .onFailure { AppLog.put("保存本书覆盖失败", it) }
+        }
+    }
     val onlyThisBook: Boolean get() = bookStyle.config != null
     val canUseBookStyle: Boolean get() = bookStyle.isBound
     val floatingColorManagedGlobally: Boolean get() = !onlyThisBook && readFloatingFollowAppGlobally
 
-    fun bindBook(book: Book): Boolean = bookStyle.bind(book)
+    fun bindBook(book: Book): Boolean {
+        boundBook = book
+        return bookStyle.bind(book)
+    }
+
+    /** Phase 2d Gate B：首次成功提交本书编辑时物化基准（legacy → 显式 pinned basePreset）。 */
+    fun materializeBookBasePresetIfNeeded() {
+        bookOverridesStore.materializePinnedBaseIfNeeded(boundBook)
+    }
+
+    fun materializeBookFollowGlobal() {
+        bookOverridesStore.materializeFollowGlobal(boundBook)
+    }
+
+    /** Phase 2d Gate A：同时清 independentOverrides 与 independentReadStyle。 */
+    fun resetBookCustomization() {
+        bookOverridesStore.resetAll(boundBook)
+        bookStyle.followGlobal()
+    }
+
+    fun bookFontOverride(): String? = bookOverridesStore.current(boundBook)?.font?.default
+
+    fun clearBookFontOverride() {
+        bookOverridesStore.writeDefaultFont(boundBook, null)
+    }
+
+    fun bookFontOverrideSource(globalFont: String): ResolvedReadValue =
+        bookOverridesStore.effectiveDefaultFont(boundBook, globalFont)
 
     fun saveBookStyle(book: Book) = bookStyle.saveFor(book)
 
@@ -130,6 +164,13 @@ object ReadBookConfig {
         return configList.lastIndex
     }
 
+    /**
+     * 写入目的地审计（Phase 2c）：
+     * - 仅本书：写 bookStyle 副本（DB）。
+     * - 共享排版开：写当前预设，并同步覆写 [shareConfig]（见 setter）。
+     *   退役 shareLayout 时须删除该同步覆写，保证布局字段只写 [durConfig]。
+     * 颜色/背景读 [durConfig]，不受 shareLayout 影响。
+     */
     var durConfig
         get() = bookStyle.config ?: getConfig(styleSelect)
         set(value) {
@@ -138,6 +179,8 @@ object ReadBookConfig {
                 return
             }
             configList[styleSelect] = value
+            // Phase 2c 审计：此同步覆写是 shareLayout 写入耦合点。
+            // 退役 shareLayout 时必须移除，避免新稀疏写入被扩散为整份 shareConfig 覆写。
             if (shareLayout) {
                 shareConfig = value
             }
@@ -539,9 +582,18 @@ object ReadBookConfig {
         }
 
     var textFont: String
-        get() = config.textFont
+        get() = if (onlyThisBook) {
+            bookOverridesStore.current(boundBook)?.font?.default ?: config.textFont
+        } else {
+            config.textFont
+        }
         set(value) {
-            config.textFont = value
+            if (onlyThisBook) {
+                // 稀疏写入：直接更新 independentOverrides，不经过 config getter/durConfig setter
+                bookOverridesStore.writeDefaultFont(boundBook, value)
+            } else {
+                config.textFont = value
+            }
         }
 
     var titleFont: String
