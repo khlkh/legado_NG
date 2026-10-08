@@ -121,6 +121,129 @@ internal fun showReadConfirmDialog(
     }
 }
 
+/**
+ * 未保存确认框的动作路由：保证三个按钮互斥、且每个动作只生效一次。
+ * - [keep] / [discard]：先关闭确认框，再执行保留/放弃。
+ * - [cancel]：只关闭确认框并通知 [onCancelled]（抽屉复位、继续编辑），不回滚、不关闭配置界面。
+ * - [outsideDismiss]：点外部/返回关闭 = 取消；已点击过按钮时不再触发。
+ */
+internal class ReadUnsavedConfirmRouter(
+    private val dismiss: () -> Unit,
+    private val onKeep: () -> Unit,
+    private val onDiscard: () -> Unit,
+    private val onCancelled: (() -> Unit)?,
+) {
+    private var actionTaken = false
+
+    fun keep() {
+        if (actionTaken) return
+        actionTaken = true
+        dismiss()
+        onKeep()
+    }
+
+    fun discard() {
+        if (actionTaken) return
+        actionTaken = true
+        dismiss()
+        onDiscard()
+    }
+
+    fun cancel() {
+        if (actionTaken) return
+        actionTaken = true
+        dismiss()
+        onCancelled?.invoke()
+    }
+
+    fun outsideDismiss() {
+        if (!actionTaken) onCancelled?.invoke()
+    }
+}
+
+internal fun showReadUnsavedConfirmDialog(
+    context: Context,
+    title: String,
+    keepLabel: String,
+    discardLabel: String,
+    cancelLabel: String,
+    onKeep: () -> Unit,
+    onDiscard: () -> Unit,
+    onCancelled: (() -> Unit)? = null,
+    themeSnapshot: NgThemeSnapshot? = null,
+): ComponentDialog {
+    var router: ReadUnsavedConfirmRouter? = null
+    return showReadComposeDialog(
+        context = context,
+        onDismiss = { router?.outsideDismiss() },
+        themeSnapshot = themeSnapshot ?: ReadDrawerStyle.themeSnapshot(context),
+    ) { dismiss ->
+        val current = ReadUnsavedConfirmRouter(
+            dismiss = dismiss,
+            onKeep = onKeep,
+            onDiscard = onDiscard,
+            onCancelled = onCancelled,
+        )
+        router = current
+        ReadUnsavedConfirmDialogContent(
+            title = title,
+            keepLabel = keepLabel,
+            discardLabel = discardLabel,
+            cancelLabel = cancelLabel,
+            onKeep = current::keep,
+            onDiscard = current::discard,
+            onCancel = current::cancel,
+        )
+    }
+}
+
+@Composable
+internal fun ReadUnsavedConfirmDialogContent(
+    title: String,
+    keepLabel: String,
+    discardLabel: String,
+    cancelLabel: String,
+    onKeep: () -> Unit,
+    onDiscard: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    ReadConfigDialogSurface(
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            top = 20.dp,
+            end = 20.dp,
+            bottom = 16.dp,
+        ),
+    ) {
+        ReadConfigDialogTitle(title)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NgFormActionButton(
+                text = cancelLabel,
+                onClick = onCancel,
+                minimumWidth = 0.dp,
+            )
+            NgFormActionButton(
+                text = discardLabel,
+                onClick = onDiscard,
+                minimumWidth = 0.dp,
+                variant = NgButtonVariant.DANGER,
+            )
+            NgFormActionButton(
+                text = keepLabel,
+                onClick = onKeep,
+                minimumWidth = 0.dp,
+                variant = NgButtonVariant.SUCCESS,
+            )
+        }
+    }
+}
+
 @Composable
 internal fun ReadConfirmDialogContent(
     title: String,
