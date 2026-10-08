@@ -166,11 +166,9 @@ object ReadBookConfig {
     }
 
     /**
-     * 写入目的地审计（Phase 2c）：
+     * 写入目的地（shareLayout 退役后）：
      * - 仅本书：写 bookStyle 副本（DB）。
-     * - 共享排版开：写当前预设，并同步覆写 [shareConfig]（见 setter）。
-     *   退役 shareLayout 时须删除该同步覆写，保证布局字段只写 [durConfig]。
-     * 颜色/背景读 [durConfig]，不受 shareLayout 影响。
+     * - 全局：只写当前预设 [durConfig]；不再同步覆写 shareConfig。
      */
     var durConfig
         get() = bookStyle.config ?: getConfig(styleSelect)
@@ -180,11 +178,6 @@ object ReadBookConfig {
                 return
             }
             configList[styleSelect] = value
-            // Phase 2c 审计：此同步覆写是 shareLayout 写入耦合点。
-            // 退役 shareLayout 时必须移除，避免新稀疏写入被扩散为整份 shareConfig 覆写。
-            if (shareLayout) {
-                shareConfig = value
-            }
         }
 
     var isComic: Boolean = false
@@ -203,6 +196,8 @@ object ReadBookConfig {
         val hasStoredReadConfig = File(configFilePath).isFile
         initConfigs()
         initShareConfig()
+        // shareLayout 退役迁移：把 shareConfig 的排版字段写回每个预设，再关闭开关
+        migrateSharedLayoutIntoPresets()
         val legacyRuleGroups = configList.map { it.highlightRules } +
             listOf(shareConfig.highlightRules)
         ReadHighlightRuleStore.initialize(
@@ -255,6 +250,19 @@ object ReadBookConfig {
             }
         }
         shareConfig = c?.detachedCopy() ?: configList.lastOrNull()?.detachedCopy() ?: Config()
+    }
+
+    /**
+     * shareLayout 退役迁移：shareLayout=ON 的存量用户，其 shareConfig 排版字段对所有预设生效。
+     * 为保持渲染不变，把 shareConfig 的排版字段写回**每个** configList 预设（不是只写当前预设），
+     * 然后关闭开关；pref 残留值作为迁移标记（迁移后置 false，不重复执行）。
+     */
+    private fun migrateSharedLayoutIntoPresets() {
+        if (!shareLayout) return
+        val merged = mergeSharedLayoutIntoPresets(configList, shareConfig)
+        configList.clear()
+        configList.addAll(merged)
+        shareLayout = false
     }
 
     fun upBg(width: Int, height: Int) {
@@ -557,7 +565,7 @@ object ReadBookConfig {
     var hideStatusBar = appCtx.getPrefBoolean(PreferKey.hideStatusBar)
     var useZhLayout = appCtx.getPrefBoolean(PreferKey.useZhLayout)
 
-    val config get() = bookStyle.config ?: if (shareLayout) shareConfig else durConfig
+    val config get() = bookStyle.config ?: durConfig
 
     internal fun effectiveReadFloatingColor(
         preset: Config = durConfig,
@@ -912,8 +920,6 @@ object ReadBookConfig {
             exportConfig.showHeaderBackButton = shareConfig.showHeaderBackButton
             exportConfig.footerMode = shareConfig.footerMode
         }
-        return exportConfig
-    }
 
     fun import(byteArray: ByteArray): Config = importWithReport(byteArray).config
 
@@ -1524,4 +1530,17 @@ object ReadBookConfig {
 
     }
 
+}
+
+/**
+ * 把 shareConfig 的排版字段并入每个预设，保留各预设自己的外观（颜色/背景）。
+ * 与 [ReadBookConfig.Config.copyForBook] 的语义一致：layout 取 shareConfig，外观取预设。
+ * 注意：copyForBook 会清空 highlightRules（为本书副本语义设计），迁移必须保留——
+ * init 随后会把各预设的 legacy 高亮规则统一迁入 ReadHighlightRuleStore，清空即丢数据。
+ */
+internal fun mergeSharedLayoutIntoPresets(
+    presets: List<ReadBookConfig.Config>,
+    shareConfig: ReadBookConfig.Config,
+): List<ReadBookConfig.Config> = presets.map { preset ->
+    preset.copyForBook(shareConfig).copy(highlightRules = preset.highlightRules)
 }
