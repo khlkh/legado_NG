@@ -1039,7 +1039,13 @@ class TextChapterLayout(
         highlightContextOffset: Int = 0,
         positions: HighlightTextPositions,
     ) {
-        val charStyles = highlightMatcher.match(text, isTitle, highlightContext, highlightContextOffset)
+        val charStyles = if (ChapterProvider.hasScriptTypography()) {
+            ScriptFontStyleResolver.overlay(text, highlightMatcher.match(text, isTitle, highlightContext, highlightContextOffset)) {
+                ChapterProvider.scriptFontPath(it)
+            }
+        } else {
+            highlightMatcher.match(text, isTitle, highlightContext, highlightContextOffset)
+        }
         val widthsArray = allocateFloatArray(text.length)
         textPaint.getTextWidthsCompat(text, widthsArray, reviewCharWidth)
         remeasureHighlightFonts(text, charStyles, textPaint, widthsArray)
