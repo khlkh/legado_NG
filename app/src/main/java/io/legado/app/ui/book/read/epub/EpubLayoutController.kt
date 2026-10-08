@@ -13,7 +13,9 @@ import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.appDb
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isEpub
+import io.legado.app.help.config.EpubScriptFontHealth
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.ReadValueScope
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.EpubLayoutPreferences
 import io.legado.app.service.BaseReadAloudService
@@ -125,6 +127,8 @@ internal class EpubLayoutController(
     private var readerFontPath = ""
     private var titleFontBytes: ByteArray? = null
     private var titleFontPath = ""
+    private var scriptFontBytes: Map<String, ByteArray> = emptyMap()
+    private var scriptFontPaths: Map<String, String> = emptyMap()
     private var styleGeneration = 0L
     private var readerInsets = JSONObject()
     private var chromeInsets = JSONObject()
@@ -211,6 +215,7 @@ internal class EpubLayoutController(
             val fontGeneration = styleGeneration
             val fontPath = ReadBookConfig.textFont
             val titlePath = ReadBookConfig.titleFont.ifBlank { fontPath }
+            val scriptPaths = scriptFontSources()
             loading = true
             val startup = EpubStartupTiming("open")
             startup.mark("bound")
@@ -232,7 +237,10 @@ internal class EpubLayoutController(
                         val bodyFont = runCatching { readEpubReaderFont(host.context, fontPath) }.getOrNull()
                         val titleFont = if (titlePath == fontPath) bodyFont else
                             runCatching { readEpubReaderFont(host.context, titlePath) }.getOrNull()
-                        (bodyFont to titleFont).also {
+                        val scriptFonts = scriptPaths.mapValues { (_, scriptPath) ->
+                            runCatching { readEpubReaderFont(host.context, scriptPath) }.getOrNull()
+                        }.filterValues { it != null }.mapValues { it.value!! }
+                        Triple(bodyFont, titleFont, scriptFonts).also {
                             startup.mark("reader-font-ready")
                         }
                     }
@@ -242,6 +250,8 @@ internal class EpubLayoutController(
                         readerFontBytes = font.first
                         titleFontPath = titlePath
                         titleFontBytes = font.second
+                        scriptFontPaths = scriptPaths
+                        scriptFontBytes = font.third
                     }
                     snapshot = opened
                     opened = null
@@ -356,10 +366,13 @@ internal class EpubLayoutController(
         }
         next = openingPreview()?.take(bookUrl, publication)?.also {
             it.adopt(onReady, onFailure, requestViewport)
-        } ?: EpubLayoutSurface(host.context, publication, onReady, onFailure, requestViewport)
+        } ?: EpubLayoutSurface(host.context, publication, onReady, onFailure, requestViewport, reportFontHealth = true)
         surface = next
         next.readerFont(readerFontBytes)
         next.titleFont(titleFontBytes)
+        listOf("latin", "cjk", "other").forEach { scope ->
+            next.scriptFont(scope, scriptFontBytes[scope])
+        }
         host.addView(next, FrameLayout.LayoutParams(host.width, 1))
         gestures = EpubReaderGestures(
             ViewConfiguration.get(host.context).scaledTouchSlop,
@@ -1285,26 +1298,44 @@ internal class EpubLayoutController(
         return true
     }
 
+    private fun scriptFontSources(): Map<String, String> = mapOf(
+        "latin" to ReadValueScope.LATIN,
+        "cjk" to ReadValueScope.CJK,
+        "other" to ReadValueScope.OTHER,
+    ).mapNotNull { (key, scope) ->
+        ReadBookConfig.scriptFontPath(scope)?.takeIf { it.isNotBlank() }?.let { key to it }
+    }.toMap()
+
     fun restyle() {
         if (!loading) contentSlot.clear()
         cancelTurn()
         val mine = ++styleGeneration
         val path = ReadBookConfig.textFont
         val titlePath = ReadBookConfig.titleFont.ifBlank { path }
-        if (readerFontPath != path || titleFontPath != titlePath) {
+        val scriptPaths = scriptFontSources()
+        if (readerFontPath != path || titleFontPath != titlePath || scriptFontPaths != scriptPaths) {
             scope.launch {
-                val (font, titleFont) = withContext(Dispatchers.IO) {
+                val (font, titleFont, scripts) = withContext(Dispatchers.IO) {
                     val bodyFont = runCatching { readEpubReaderFont(host.context, path) }.getOrNull()
-                    bodyFont to if (titlePath == path) bodyFont else
+                    val title = if (titlePath == path) bodyFont else
                         runCatching { readEpubReaderFont(host.context, titlePath) }.getOrNull()
+                    val scriptFonts = scriptPaths.mapValues { (_, scriptPath) ->
+                        runCatching { readEpubReaderFont(host.context, scriptPath) }.getOrNull()
+                    }.filterValues { it != null }.mapValues { it.value!! }
+                    Triple(bodyFont, title, scriptFonts)
                 }
                 if (closed || mine != styleGeneration) return@launch
                 readerFontPath = path
                 readerFontBytes = font
                 titleFontPath = titlePath
                 titleFontBytes = titleFont
+                scriptFontPaths = scriptPaths
+                scriptFontBytes = scripts
                 surface?.readerFont(font)
                 surface?.titleFont(titleFont)
+                listOf("latin", "cjk", "other").forEach { scope ->
+                    surface?.scriptFont(scope, scripts[scope])
+                }
                 if (renderFailed) retryRendering()
                 else if (preparedContent != null && !loading) openDocument(offset = position())
             }
@@ -1390,6 +1421,9 @@ internal class EpubLayoutController(
                 ?.takeIf { it.location.path == location.path }?.let {
                     view.readerFont(readerFontBytes)
                     view.titleFont(titleFontBytes)
+                    listOf("latin", "cjk", "other").forEach { scope ->
+                        view.scriptFont(scope, scriptFontBytes[scope])
+                    }
                     view.documents(documents)
                     view.content(it.location.path, it.html, it.payload)
                 } },
@@ -1809,6 +1843,9 @@ internal class EpubLayoutController(
         readerFontPath = ""
         titleFontBytes = null
         titleFontPath = ""
+        scriptFontBytes = emptyMap()
+        scriptFontPaths = emptyMap()
+        EpubScriptFontHealth.clear()
         documents = emptyList()
         active = false
     }

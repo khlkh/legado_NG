@@ -65,9 +65,8 @@ class EffectiveReadValueResolverTest {
     }
 
     @Test
-    fun `18 book default override wins over global script font`() {
-        // 用户给本书设了 default 字体 X（未动脚本维度）→ 应压过全局 CJK 档案，
-        // 否则混排书里本书字体会神秘失效。
+    fun `18 book default override does not shadow script bucket`() {
+        // 稀疏继承：本书 default 是 DEFAULT 基准桶，不拦 CJK 脚本桶；CJK 继续落到全局脚本档案。
         val result = resolver.resolve(
             ReadValueContext(
                 scope = ReadValueScope.CJK,
@@ -75,7 +74,7 @@ class EffectiveReadValueResolverTest {
                 globalScriptFont = "C",
             )
         )
-        assertEquals(ResolvedReadValue("X", ReadValueSource.THIS_BOOK, ReadValueScope.CJK), result)
+        assertEquals(ResolvedReadValue("C", ReadValueSource.GLOBAL, ReadValueScope.CJK), result)
     }
 
     // endregion
@@ -314,8 +313,8 @@ class EffectiveReadValueResolverTest {
     }
 
     @Test
-    fun `15 follow global base follows current global preset with preset source`() {
-        // 值相同但来源标签不同是有意的：告诉用户「本书跟随预设」（§3.7-1）。
+    fun `15 follow global base falls through to global default`() {
+        // 契约 #15：follow_global 时值同全局当前预设，来源标 Preset。
         val result = resolver.resolve(
             ReadValueContext(
                 scope = ReadValueScope.DEFAULT,
@@ -324,6 +323,34 @@ class EffectiveReadValueResolverTest {
             )
         )
         assertEquals(ResolvedReadValue("B", ReadValueSource.PRESET, ReadValueScope.DEFAULT), result)
+    }
+
+    @Test
+    fun `follow global still labels global script archive as global`() {
+        val result = resolver.resolve(
+            ReadValueContext(
+                scope = ReadValueScope.CJK,
+                basePreset = ReadBasePreset(mode = ReadBasePresetMode.FOLLOW_GLOBAL),
+                globalScriptFont = "C",
+                globalDefaultFont = "B",
+            )
+        )
+        assertEquals(ResolvedReadValue("C", ReadValueSource.GLOBAL, ReadValueScope.CJK), result)
+    }
+
+    @Test
+    fun `follow global script fallback to global default stays global`() {
+        val follow = ReadBasePreset(mode = ReadBasePresetMode.FOLLOW_GLOBAL)
+        for (scope in listOf(ReadValueScope.LATIN, ReadValueScope.CJK, ReadValueScope.OTHER)) {
+            val result = resolver.resolve(
+                ReadValueContext(
+                    scope = scope,
+                    basePreset = follow,
+                    globalDefaultFont = "B",
+                )
+            )
+            assertEquals(ResolvedReadValue("B", ReadValueSource.GLOBAL, scope), result)
+        }
     }
 
     @Test

@@ -46,6 +46,7 @@ internal fun EpubLayoutSheet(
     val maxHeight = minOf(READ_MORE_CONFIG_WINDOW_HEIGHT_DP.dp, LocalConfiguration.current.screenHeightDp.dp)
     val appearance = NgDrawerDefaults.rememberAppearance().copy(horizontalMarginDp = 0, cornerRadiusDp = 20)
     var choices by remember(book.bookUrl) { mutableStateOf(EpubLayoutPreferences.read(book.bookUrl)) }
+    var customExpanded by remember(book.bookUrl) { mutableStateOf(false) }
     val ruleKeys = listOf(EpubLayoutPreferences.PUBLISHER) + EpubLayoutPreferences.features.keys
 
     fun flagsOf(choices: Map<String, Boolean>): List<Boolean> = ruleKeys.map { choices.getValue(it) }
@@ -70,6 +71,7 @@ internal fun EpubLayoutSheet(
     }
 
     val profile = profileOf(choices)
+    val showCustom = customExpanded || profile == EpubPublisherProfile.CUSTOM
     val contentColor = Color(NgTheme.colors.onSurface)
 
     ModalBottomSheet(
@@ -99,25 +101,34 @@ internal fun EpubLayoutSheet(
                 Column(Modifier.padding(horizontal = 16.dp)) {
                     ProfileRow(
                         title = stringResource(R.string.epub_formatting_respect),
-                        selected = profile == EpubPublisherProfile.RESPECT,
+                        selected = profile == EpubPublisherProfile.RESPECT && !showCustom,
                         contentColor = contentColor,
-                        onClick = { applyProfile(EpubPublisherProfile.RESPECT) },
+                        onClick = {
+                            customExpanded = false
+                            applyProfile(EpubPublisherProfile.RESPECT)
+                        },
                     )
                     ReadMoreDivider(contentColor)
                     ProfileRow(
                         title = stringResource(R.string.epub_formatting_override),
-                        selected = profile == EpubPublisherProfile.OVERRIDE,
+                        selected = profile == EpubPublisherProfile.OVERRIDE && !showCustom,
                         contentColor = contentColor,
-                        onClick = { applyProfile(EpubPublisherProfile.OVERRIDE) },
+                        onClick = {
+                            customExpanded = false
+                            applyProfile(EpubPublisherProfile.OVERRIDE)
+                        },
                     )
                     ReadMoreDivider(contentColor)
                     ProfileRow(
                         title = stringResource(R.string.epub_formatting_custom),
-                        selected = profile == EpubPublisherProfile.CUSTOM,
+                        selected = showCustom,
                         contentColor = contentColor,
-                        onClick = { applyProfile(EpubPublisherProfile.CUSTOM) },
+                        onClick = {
+                            customExpanded = true
+                            applyProfile(EpubPublisherProfile.CUSTOM)
+                        },
                     )
-                    if (profile == EpubPublisherProfile.CUSTOM) {
+                    if (showCustom) {
                         ReadMoreDivider(contentColor)
                         SwitchSettingRow(
                             title = stringResource(R.string.epub_publisher_style),
@@ -137,6 +148,7 @@ internal fun EpubLayoutSheet(
                     ActionSettingRow(
                         title = stringResource(R.string.restore_default),
                         onClick = {
+                            customExpanded = false
                             EpubLayoutPreferences.reset(book.bookUrl)
                             choices = EpubLayoutPreferences.read(book.bookUrl)
                             onStyleChanged()

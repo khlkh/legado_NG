@@ -15,6 +15,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.help.DefaultData
+import io.legado.app.help.book.isEpub
 import io.legado.app.help.globalExecutor
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.utils.BitmapUtils
@@ -121,10 +122,20 @@ object ReadBookConfig {
         bookOverridesStore.materializeFollowGlobal(boundBook)
     }
 
+    fun bookFollowsGlobal(): Boolean =
+        onlyThisBook &&
+            bookOverridesStore.current(boundBook)?.basePreset?.mode == BookBasePreset.MODE_FOLLOW_GLOBAL
+
     /** Phase 2d Gate A：同时清 independentOverrides 与 independentReadStyle。 */
     fun resetBookCustomization() {
         bookOverridesStore.resetAll(boundBook)
         bookStyle.followGlobal()
+    }
+
+    fun snapshotBookOverridesJson(): String? = bookOverridesStore.snapshotJson(boundBook)
+
+    fun restoreBookOverridesSnapshot(json: String?) {
+        bookOverridesStore.restoreSnapshot(boundBook, json)
     }
 
     fun bookFontOverride(): String? = bookOverridesStore.current(boundBook)?.font?.default
@@ -136,6 +147,120 @@ object ReadBookConfig {
     fun bookFontOverrideSource(globalFont: String): ResolvedReadValue =
         bookOverridesStore.effectiveDefaultFont(boundBook, globalFont)
 
+    /**
+     * Phase 3 TXT 生产化：是否有任何脚本字体配置。
+     * 覆盖：全局 scripts、本书 font override、本书 pinned 快照 scripts、选中预设 scripts。
+     * 无配置时渲染层零改动（直接返回 highlight 样式）。
+     * 注：basePreset 快照的 scriptFonts 当前恒 emptyMap；未来允许写入时须一并计入。
+     */
+    fun hasScriptTypography(): Boolean {
+        val bookLayer = onlyThisBook && (
+            bookOverridesStore.current(boundBook)?.font?.isEmpty() == false ||
+                bookOverridesStore.current(boundBook)?.basePreset?.snapshot?.scriptFonts?.isNotEmpty() == true
+            )
+        return !ReadScriptTypographyStore.load().isEmpty() ||
+            bookLayer ||
+            durConfig.scriptFonts?.isEmpty() == false
+    }
+
+    /** 解析某脚本维度的有效字体（value + source），走冻结的 EffectiveReadValueResolverContract。 */
+    fun scriptFont(scope: ReadValueScope): ResolvedReadValue {
+        // 仅本书模式下，"选中预设" 就是本书自己的 config（durConfig），而不是 styleSelect 指向的全局预设。
+        val selectedPreset = durConfig
+        val overrides = if (onlyThisBook) bookOverridesStore.current(boundBook) else null
+        val legacy = if (onlyThisBook) bookOverridesStore.legacy(boundBook) else null
+        // DEFAULT 桶的最终回落：pinned 书 = 本书基准 textFont；其余 = 选中预设 textFont。
+        val pinnedBookDefault = if (
+            overrides?.basePreset?.mode == BookBasePreset.MODE_PINNED ||
+            (overrides == null && legacy != null)
+        ) legacy?.textFont else null
+        val globalDefaultFont = pinnedBookDefault ?: selectedPreset.textFont
+        val context = BookReadStyleCompatibility.contextFor(
+            scope = scope,
+            overrides = overrides,
+            legacyConfig = legacy,
+            presetScriptFont = selectedPreset.scriptFonts?.forScope(scope),
+            globalScriptFont = ReadScriptTypographyStore.font(scope),
+            globalDefaultFont = globalDefaultFont,
+            epub = scriptTypographyEpubContext(),
+        )
+        return EffectiveReadValueResolverContract.resolve(context)
+    }
+
+    private fun scriptTypographyEpubContext(): ReadEpubContext? {
+        val book = boundBook.takeIf { it.isEpub } ?: return null
+        val respectFont = EpubLayoutPreferences.read(book.bookUrl)["font"] == true
+        return if (respectFont) {
+            ReadEpubContext(rule = ReadEpubRule.RESPECT, publisherFont = "publisher")
+        } else {
+            null
+        }
+    }
+
+    /**
+     * 渲染层用的脚本字体路径：与 effective default 不同才返回（相同即无需按字换字体）。
+     * 空白/null 表示该维度不换字体。系统字体标记（system:0/1/2）映射到系统字体文件，
+     * 使 TXT（native typeface）与 EPUB（FontFace 字节）都能消费。
+     */
+    fun scriptFontPath(scope: ReadValueScope): String? {
+        val default = scriptFont(ReadValueScope.DEFAULT).value
+        val value = scriptFont(scope).value
+        val defaultFile = systemFontFile(default) ?: default
+        val valueFile = systemFontFile(value) ?: value
+        return valueFile.takeIf { it.isNotBlank() && it != defaultFile }
+    }
+
+    /** 系统字体标记：system:0=默认，system:1=衬线，system:2=等宽。 */
+    fun systemFontValue(index: Int): String = "system:$index"
+
+    fun isSystemFont(value: String?): Boolean = value?.startsWith("system:") == true
+
+    private val systemFontFiles = mapOf(
+        0 to "/system/fonts/Roboto-Regular.ttf",
+        1 to "/system/fonts/NotoSerif-Regular.ttf",
+        2 to "/system/fonts/DroidSansMono.ttf",
+    )
+
+    private fun systemFontFile(value: String?): String? = value
+        ?.removePrefix("system:")
+        ?.toIntOrNull()
+        ?.let { systemFontFiles[it] }
+
+    /**
+     * Phase 3 Language fonts UI：写入脚本字体。
+     * 仅本书 → 本书稀疏 override；全局 → ReadScriptTypographyStore。
+     * UI 层负责在写后 postEvent(UP_CONFIG, 1,2,5) 触发 ChapterProvider 刷新字体表。
+     */
+    fun writeScriptFont(scope: ReadValueScope, value: String?) {
+        val normalized = value?.takeIf { it.isNotBlank() }
+        if (onlyThisBook) {
+            bookOverridesStore.writeScope(boundBook, scope, normalized)
+        } else {
+            ReadScriptTypographyStore.setFont(scope, normalized)
+        }
+    }
+
+    /**
+     * Phase 3 预设编辑器：把脚本字体写进当前预设（durConfig 会话拷贝）。
+     * 仅本书模式下仍写本书 override；否则写 `durConfig.scriptFonts`，随预设保存/导入导出。
+     */
+    fun setEditorScriptFont(scope: ReadValueScope, value: String?) {
+        val normalized = value?.takeIf { it.isNotBlank() }
+        if (onlyThisBook) {
+            bookOverridesStore.writeScope(boundBook, scope, normalized)
+        } else {
+            val existing = durConfig.scriptFonts ?: SparseFontOverrides()
+            val updated = existing.withScope(scope, normalized)
+            durConfig.scriptFonts = updated.takeUnless { it.isEmpty() }
+        }
+    }
+
+    /** 该 scope 是否有可清除的显式脚本字体覆盖（↺ 是否可见）。 */
+    fun hasScriptFontOverride(scope: ReadValueScope): Boolean = if (onlyThisBook) {
+        bookOverridesStore.current(boundBook)?.font?.forScope(scope) != null
+    } else {
+        ReadScriptTypographyStore.font(scope) != null
+    }
     fun saveBookStyle(book: Book) = bookStyle.saveFor(book)
 
     fun setOnlyThisBook(enabled: Boolean) {
@@ -897,6 +1022,7 @@ object ReadBookConfig {
         private var pageAnim: Int = PageAnim.simulationPageAnim,//翻页动画
         private var pageAnimEInk: Int = 4,
         var textFont: String = "",//字体
+        @SerializedName("scriptFonts") var scriptFonts: SparseFontOverrides? = null,//预设级脚本字体覆盖
         @SerializedName("titleFont") var titleFont: String = "",//标题字体
         @SerializedName("headerFont") var headerFont: String = "",//页眉字体
         @SerializedName("footerFont") var footerFont: String = "",//页脚字体
@@ -992,6 +1118,7 @@ object ReadBookConfig {
             textAccentColor = textAccentColor,
             textAccentColorNight = textAccentColorNight,
             textAccentColorEInk = textAccentColorEInk,
+            scriptFonts = scriptFonts,
             readFloatingSeed = readFloatingSeed,
             readFloatingSeedNight = readFloatingSeedNight,
             readFloatingFollowAppNight = readFloatingFollowAppNight,

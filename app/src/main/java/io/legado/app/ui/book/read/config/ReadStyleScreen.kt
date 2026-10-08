@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,8 +75,12 @@ import io.legado.app.R
 import io.legado.app.help.config.ReadHighlightRule
 import io.legado.app.help.config.ReadFloatingAppearanceConfig
 import io.legado.app.help.config.ReadFloatingColorStyle
+import io.legado.app.help.config.ReadValueScope
+import io.legado.app.help.config.ReadValueSource
 import io.legado.app.ui.book.read.ReadDrawerStyle
 import io.legado.app.ui.book.read.readFloatingGlassStyle
+import io.legado.app.ui.design.components.NgButtonVariant
+import io.legado.app.ui.design.components.compose.NgFormActionButton
 import io.legado.app.ui.design.components.compose.NgGlassSurface
 import io.legado.app.ui.design.components.compose.NgSlider
 import io.legado.app.ui.design.components.compose.NgSliderStepButton
@@ -114,6 +120,7 @@ internal enum class ReadStylePage {
     HIGHLIGHT_TEXT_COLOR,
     HIGHLIGHT_BACKGROUND_COLOR,
     HIGHLIGHT_UNDERLINE_COLOR,
+    LANGUAGE_FONTS,
 }
 
 internal enum class HighlightSelectionMode {
@@ -165,6 +172,7 @@ internal data class ReadStyleUiState(
     val highlightSummary: String,
     val isEpub: Boolean,
     val onlyThisBook: Boolean,
+    val followsGlobal: Boolean = false,
     val canUseBookStyle: Boolean,
     val shareLayout: Boolean,
     val globalFloatingFollowApp: Boolean,
@@ -202,6 +210,21 @@ internal data class ReadStyleUiState(
     val hasUnsavedChanges: Boolean = false,
     val bookFont: String = "",
     val bookFontSource: String = "",
+    val languageFonts: List<ReadScriptFontUi> = emptyList(),
+    val editorScriptFonts: List<ReadScriptFontUi> = emptyList(),
+)
+
+/** Language fonts 三行（Latin/CJK/Other）的 UI 状态。 */
+internal data class ReadScriptFontUi(
+    val scope: ReadValueScope,
+    val label: String,
+    val font: String,
+    val source: ReadValueSource,
+    val canReset: Boolean,
+    /** 当前脚本维度没有任何显式覆盖（本书/全局/预设脚本字体），实际值来自默认桶回落。 */
+    val isInherited: Boolean = false,
+    /** EPUB WebView 加载该字体失败（如 OTS 拒绝），行显示删除线，Done 时恢复跟随预设。 */
+    val unavailable: Boolean = false,
 )
 
 internal data class ReadStyleActions(
@@ -275,7 +298,13 @@ internal data class ReadStyleActions(
     val onDone: () -> Unit,
     val onDiscard: () -> Unit,
     val onResetBookFontOverride: () -> Unit,
+    val onFollowGlobal: () -> Unit,
     val onDismissRequest: () -> Unit,
+    val onOpenLanguageFonts: () -> Unit,
+    val onSelectScriptFont: (ReadValueScope) -> Unit,
+    val onResetScriptFont: (ReadValueScope) -> Unit,
+    val onSelectEditorScriptFont: (ReadValueScope) -> Unit,
+    val onResetEditorScriptFont: (ReadValueScope) -> Unit,
 )
 
 @Composable
@@ -293,12 +322,8 @@ internal fun ReadStyleScreen(
         ReadStylePage.ADJUST,
         ReadStylePage.HIGHLIGHT,
     )
-    BackHandler(enabled = true) {
-        if (page in rootPages && state.highlightSelectionMode == HighlightSelectionMode.NONE) {
-            actions.onDismissRequest()
-        } else {
-            actions.onBack()
-        }
+    BackHandler(enabled = page !in rootPages || state.highlightSelectionMode != HighlightSelectionMode.NONE) {
+        actions.onBack()
     }
     NgGlassSurface(
         modifier = Modifier
@@ -342,11 +367,7 @@ internal fun ReadStyleScreen(
 
             when (page) {
                 ReadStylePage.PRESET -> Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(StandardPageHeight - (if (state.onlyThisBook) 155.6.dp else 0.dp)
-                            + (if (state.canUseBookStyle) 62.8.dp else 0.dp)
-                            + (if (state.isEpub) 56.8.dp else 0.dp)),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     PresetPage(
                         state = state,
@@ -367,6 +388,19 @@ internal fun ReadStyleScreen(
                         contentColor = contentColor,
                         accentColor = indicatorColor,
                         selectedContentColor = selectedContentColor,
+                        actions = actions,
+                    )
+                }
+
+                ReadStylePage.LANGUAGE_FONTS -> Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(StandardPageHeight)
+                        .padding(top = 8.dp),
+                ) {
+                    LanguageFontsPage(
+                        state = state,
+                        contentColor = contentColor,
                         actions = actions,
                     )
                 }
@@ -471,25 +505,17 @@ private fun ReadStyleSessionBar(
         } else {
             Spacer(Modifier.weight(1f))
         }
-        Text(
+        NgFormActionButton(
             text = stringResource(R.string.read_style_discard_changes),
-            color = if (hasUnsavedChanges) contentColor else contentColor.copy(alpha = 0.38f),
-            fontSize = 14.sp,
-            modifier = Modifier
-                .clip(RoundedCornerShape(18.dp))
-                .clickable(enabled = hasUnsavedChanges, onClick = onDiscard)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+            onClick = onDiscard,
+            enabled = hasUnsavedChanges,
+            variant = NgButtonVariant.OUTLINE,
         )
         Spacer(Modifier.width(10.dp))
-        Text(
+        NgFormActionButton(
             text = stringResource(R.string.read_style_done),
-            color = Color(NgTheme.colors.onPrimary),
-            fontSize = 14.sp,
-            modifier = Modifier
-                .clip(RoundedCornerShape(18.dp))
-                .background(Color(NgTheme.colors.primary))
-                .clickable(onClick = onDone)
-                .padding(horizontal = 18.dp, vertical = 8.dp),
+            onClick = onDone,
+            variant = NgButtonVariant.PRIMARY,
         )
     }
 }
@@ -551,13 +577,27 @@ private fun PresetPage(
     if (state.canUseBookStyle) {
         PresetSwitchRow(
             title = stringResource(R.string.read_style_only_this_book),
-            subtitle = stringResource(R.string.read_style_only_this_book_subtitle),
             iconRes = R.drawable.ic_bookshelf_dock_all,
             iconSize = 20.dp,
             checked = state.onlyThisBook,
             contentColor = contentColor,
             onCheckedChange = actions.onOnlyThisBookChanged,
         )
+        ReadDivider(contentColor)
+    }
+    if (state.onlyThisBook && !state.followsGlobal) {
+        Row(
+            Modifier.fillMaxWidth().height(56.dp)
+                .clickable(role = Role.Button, onClick = actions.onFollowGlobal)
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.read_style_restore_follow_global),
+                color = contentColor,
+                fontSize = 15.sp,
+            )
+        }
         ReadDivider(contentColor)
     }
     if (state.onlyThisBook) {
@@ -573,9 +613,12 @@ private fun PresetPage(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = state.bookFont + if (state.bookFontSource.isNotBlank()) " · " + state.bookFontSource else "",
+                text = fontDisplayName(state.bookFont) +
+                    if (state.bookFontSource.isNotBlank()) " · " + state.bookFontSource else "",
                 color = contentColor.copy(alpha = 0.72f),
                 fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             if (state.bookFontSource == stringResource(R.string.read_style_source_this_book)) {
                 Spacer(Modifier.width(10.dp))
@@ -591,6 +634,17 @@ private fun PresetPage(
         }
         ReadDivider(contentColor)
     }
+    Row(Modifier.fillMaxWidth().height(56.dp)
+        .clickable(role = Role.Button, onClick = actions.onOpenLanguageFonts)
+        .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Icon(painterResource(R.drawable.ic_ai_capability_text), null, tint = contentColor, modifier = Modifier.size(25.dp))
+        Text(stringResource(R.string.read_style_language_fonts), color = contentColor, fontSize = 15.sp,
+            modifier = Modifier.padding(start = 14.dp).weight(1f))
+        Icon(painterResource(R.drawable.ic_chevron_right_20), null, tint = contentColor.copy(alpha = .72f),
+            modifier = Modifier.size(18.dp))
+    }
+    ReadDivider(contentColor)
     if (state.isEpub) {
         Row(Modifier.fillMaxWidth().height(56.dp)
             .clickable(role = Role.Button, onClick = actions.onOpenEpubSettings).padding(horizontal = 20.dp),
@@ -617,6 +671,113 @@ private fun PresetPage(
         contentColor = contentColor,
         onClick = actions.onRestoreAllPresets,
     )
+}
+
+/** 字体路径 → 显示名（content:// 解码后取最后一段；系统字体标记映射到名称）。 */
+private fun fontDisplayName(path: String): String = when (path) {
+    "system:0" -> "系统默认字体"
+    "system:1" -> "系统衬线字体"
+    "system:2" -> "系统等宽字体"
+    else -> runCatching {
+        java.net.URLDecoder.decode(path, "utf-8")
+    }.getOrDefault(path).substringAfterLast('/').ifBlank { path }
+}
+
+@Composable
+private fun LanguageFontsPage(
+    state: ReadStyleUiState,
+    contentColor: Color,
+    actions: ReadStyleActions,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_arrow_back),
+            contentDescription = stringResource(R.string.back),
+            tint = contentColor,
+            modifier = Modifier
+                .size(28.dp)
+                .clickable(role = Role.Button, onClick = actions.onBack),
+        )
+        Text(
+            text = stringResource(R.string.read_style_language_fonts),
+            color = contentColor,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+        Text(
+            text = stringResource(R.string.read_style_language_fonts_subtitle),
+            color = contentColor.copy(alpha = 0.62f),
+            fontSize = 12.sp,
+            maxLines = 1,
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .weight(1f, fill = false)
+                .basicMarquee(),
+        )
+    }
+    ReadDivider(contentColor)
+    state.languageFonts.forEach { item ->
+        Row(
+            Modifier.fillMaxWidth().height(56.dp)
+                .clickable(role = Role.Button, onClick = { actions.onSelectScriptFont(item.scope) })
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = item.label,
+                color = contentColor,
+                fontSize = 15.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = when {
+                    item.source == ReadValueSource.PUBLISHER ->
+                        stringResource(R.string.read_style_publisher_css_active)
+                    item.isInherited ->
+                        stringResource(R.string.read_style_follow_preset)
+                    else -> fontDisplayName(item.font).ifBlank { item.font } +
+                        " · " + stringResource(
+                            when (item.source) {
+                                ReadValueSource.THIS_BOOK -> R.string.read_style_source_this_book
+                                ReadValueSource.PRESET -> if (state.followsGlobal) {
+                                    R.string.read_style_follow_global
+                                } else {
+                                    R.string.read_style_source_preset
+                                }
+                                ReadValueSource.GLOBAL -> R.string.read_style_source_global
+                                ReadValueSource.PUBLISHER -> R.string.read_style_source_publisher
+                                ReadValueSource.PLATFORM -> R.string.read_style_source_system
+                            }
+                        )
+                },
+                color = contentColor.copy(alpha = 0.72f),
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textDecoration = if (item.unavailable) TextDecoration.LineThrough else TextDecoration.None,
+                modifier = Modifier.weight(1.4f, fill = false),
+            )
+            if (item.canReset) {
+                Spacer(Modifier.width(10.dp))
+                Icon(
+                    painter = painterResource(R.drawable.ic_restore),
+                    contentDescription = stringResource(R.string.read_style_reset_font),
+                    tint = contentColor,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clickable(role = Role.Button, onClick = { actions.onResetScriptFont(item.scope) }),
+                )
+            }
+        }
+        ReadDivider(contentColor)
+    }
 }
 
 @Composable
@@ -954,7 +1115,48 @@ private fun EditorPage(
                     color = contentColor,
                     fontSize = 15.sp,
                 )
-                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            ReadDivider(contentColor, horizontalPadding = 0.dp)
+            EditorSectionLabel(stringResource(R.string.read_style_language_fonts), accentColor)
+            state.editorScriptFonts.forEach { script ->
+                Row(
+                    Modifier.fillMaxWidth().height(52.dp)
+                        .clickable(role = Role.Button) { actions.onSelectEditorScriptFont(script.scope) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = script.label,
+                        color = contentColor,
+                        fontSize = 15.sp,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = if (script.font.isBlank()) {
+                            stringResource(R.string.read_style_follow_global)
+                        } else {
+                            fontDisplayName(script.font) + " · " +
+                                stringResource(R.string.read_style_source_preset_scripts)
+                        },
+                        color = contentColor.copy(alpha = 0.72f),
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1.4f, fill = false),
+                    )
+                    if (script.canReset) {
+                        Spacer(Modifier.width(10.dp))
+                        Icon(
+                            painter = painterResource(R.drawable.ic_restore),
+                            contentDescription = stringResource(R.string.read_style_reset_font),
+                            tint = contentColor,
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clickable(role = Role.Button) { actions.onResetEditorScriptFont(script.scope) },
+                        )
+                    }
+                }
+            }
+            ReadDivider(contentColor, horizontalPadding = 0.dp)
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                     val tileWidth = (maxWidth - 25.dp) / 5f
                     LazyRow(
                         modifier = Modifier

@@ -82,7 +82,8 @@
         title: { family: 'NGTitleFont', url: null, face: null, failed: false }
     };
     function readerFamily(reader) {
-        return (reader.hasFont ? 'NGReaderFont,' : '') + (reader.fontFamily || 'sans-serif');
+        return (window.__ngScriptFontsReady ? 'NGScriptFont,' : '') +
+            (reader.hasFont ? 'NGReaderFont,' : '') + (reader.fontFamily || 'sans-serif');
     }
     async function loadReaderFont(kind, requested, mine) {
         var cached = readerFonts[kind], face = null, failed = false;
@@ -102,6 +103,61 @@
         cached.url = requested; cached.face = face; cached.failed = failed;
         if (face) document.fonts.add(face);
         return failed;
+    }
+
+    var scriptFontFacesState = [];
+    function clearScriptFonts() {
+        scriptFontFacesState.forEach(function (face) { document.fonts.delete(face); });
+        scriptFontFacesState = [];
+        window.__ngScriptFontsReady = false;
+        window.__ngScriptFontFailures = {};
+    }
+    function scriptFontRange(scope) {
+        if (scope === 'cjk') return 'U+3000-303F,U+3040-309F,U+30A0-30FF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FF00-FFEF,U+AC00-D7AF';
+        if (scope === 'latin') return 'U+0000-02FF,U+1E00-1EFF,U+2000-206F';
+        // other：显式列出常见非 Latin/CJK 脚本，避免无 range 的 face 抢占全部码点。
+        return 'U+0370-03FF,U+0400-04FF,U+0590-05FF,U+0600-06FF,U+0900-097F,U+0E00-0E7F';
+    }
+    async function loadScriptFonts(value, mine) {
+        var fonts = value && value.scriptFonts;
+        window.__ngScriptFontFailures = window.__ngScriptFontFailures || {};
+        if (!fonts) {
+            clearScriptFonts();
+            return;
+        }
+        var next = [];
+        ['latin', 'cjk', 'other'].forEach(function (scope) {
+            if (fonts[scope]) {
+                next.push({ scope: scope, url: new URL(fonts[scope], document.baseURI).href });
+            } else {
+                delete window.__ngScriptFontFailures[scope];
+            }
+        });
+        if (!next.length) {
+            clearScriptFonts();
+            return;
+        }
+        var fresh = [];
+        for (var i = 0; i < next.length; i++) {
+            var item = next[i];
+            var face;
+            try {
+                face = new FontFace('NGScriptFont', 'url(' + JSON.stringify(item.url) + ')', {
+                    unicodeRange: scriptFontRange(item.scope)
+                });
+                await face.load();
+                delete window.__ngScriptFontFailures[item.scope];
+            } catch (e) {
+                face = null;
+                window.__ngScriptFontFailures[item.scope] = true;
+            }
+            if (mine !== generation) return;
+            if (face) { document.fonts.add(face); fresh.push(face); }
+        }
+        if (mine !== generation) return;
+        scriptFontFacesState.forEach(function (face) { document.fonts.delete(face); });
+        scriptFontFacesState = fresh;
+        window.__ngScriptFontsReady = scriptFontFacesState.length > 0;
     }
 
     (function indexSource() {
@@ -1386,6 +1442,16 @@
             }
             if (!contentCoordinates) applyTextTransform();
             if (anchorLocation) anchor = locationAnchor(anchorLocation);
+            // Script/reader fonts must be registered before the defaults sheet and feature
+            // policy capture readerFamily(); otherwise the first pagination pass renders with
+            // the preset family only (script fonts never apply on fresh surfaces).
+            var reader = value.readerStyle || value.readerDefaults || {}, fontWarnings = [];
+            if (await loadReaderFont('reader', !value.fixed && reader.fontUrl, mine)) fontWarnings.push('reader');
+            if (mine !== generation) return;
+            if (await loadReaderFont('title', !value.fixed && (value.features || {}).title === false && (reader.title || {}).fontUrl, mine)) fontWarnings.push('title');
+            if (mine !== generation) return;
+            await loadScriptFonts(value, mine);
+            if (mine !== generation) return;
             galleries.forEach(function (g) { g.controls.remove(); }); galleries = [];
             restore(root, originalRoot); if (body !== root) restore(body, originalBody);
             // Reader defaults fill gaps in the book CSS. Zero specificity and insertion before
@@ -1419,14 +1485,7 @@
                 state = { status: 'viewport', token: value.token, fullViewport: fullViewport };
                 return;
             }
-            var reader = value.readerStyle || value.readerDefaults || {}, fontWarnings = [];
-            var fontResults = await Promise.all([
-                loadReaderFont('reader', !value.fixed && reader.fontUrl, mine),
-                loadReaderFont('title', !value.fixed && (value.features || {}).title === false && (reader.title || {}).fontUrl, mine)
-            ]);
-            if (fontResults[0]) fontWarnings.push('reader');
-            if (fontResults[1]) fontWarnings.push('title');
-            if (mine !== generation) return;
+
 
             if (body !== root) {
                 var viewport = originalViewport || document.querySelector('meta[name="viewport"]');
@@ -1712,5 +1771,6 @@
             hideFooter: !!state.cover || bleedRects.some(function (r) { return visible(r) && r.sides.includes('bottom') && r.bottom > viewportHeight - (inset.bottom || 0); }),
             media: mediaState(), location: sourceLocation(), textLength: sourceText.length, chapterBoundaries: chapterBoundaries,
             galleryIndexes: galleries.map(function (gallery) { return galleryIndexes.get(gallery.element) || 0; }),
+            scriptFontFailures: Object.keys(window.__ngScriptFontFailures || {}),
             bleedRects: bleedRects }); } });
 })(window);

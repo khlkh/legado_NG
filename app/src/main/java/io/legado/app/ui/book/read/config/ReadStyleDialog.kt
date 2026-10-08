@@ -21,8 +21,11 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.toColorInt
+import androidx.lifecycle.lifecycleScope
 import com.github.liuyueyi.quick.transfer.constants.TransType
 import com.google.gson.Gson
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import com.google.gson.reflect.TypeToken
 import io.legado.app.R
 import io.legado.app.base.BaseComposeDialogFragment
@@ -32,9 +35,12 @@ import io.legado.app.help.DefaultData
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.EpubScriptFontHealth
 import io.legado.app.help.config.ReadPresetPreferences
+import io.legado.app.help.config.ReadValueScope
 import io.legado.app.help.config.ReadValueSource
 import io.legado.app.help.config.ReadStylePackageManager
+import io.legado.app.help.config.ReadScriptTypographyStore
 import io.legado.app.help.config.ReadHighlightRule
 import io.legado.app.help.config.ReadHighlightRulePackageManager
 import io.legado.app.help.config.ReadHighlightRuleStore
@@ -97,6 +103,9 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
     private var unsavedConfirmCancelled by mutableIntStateOf(0)
     private var unsavedConfirmShowing = false
     private var closing = false
+    private var pendingScriptFontScope by mutableStateOf<ReadValueScope?>(null)
+    private var pendingEditorScriptFontScope by mutableStateOf<ReadValueScope?>(null)
+    private var currentPage: ReadStylePage = ReadStylePage.PRESET
     private val configFileName = "readConfig.zip"
     private val selectExportDocument = registerForActivityResult(
         CreateDocumentContract("application/zip")
@@ -173,6 +182,10 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
             }.getOrNull()
         }
         refreshUi()
+        // EPUB 可见 surface 报告脚本字体加载失败时，实时刷新 Language fonts 删除线。
+        lifecycleScope.launch {
+            EpubScriptFontHealth.failedScopes.collect { refreshUi() }
+        }
         composeView.apply {
             setViewCompositionStrategy(
                 ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
@@ -230,15 +243,14 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        return object : ComponentDialog(requireContext(), theme) {
+        val dialog = object : ComponentDialog(requireContext(), theme) {
             override fun cancel() {
-                if (closing) {
-                    super.cancel()
-                } else {
-                    requestDismiss()
-                }
+                requestDismiss()
             }
         }
+        // cancel() 覆盖同时覆盖返回键与点外部；Compose BackHandler 只负责页内导航。
+        dialog.setCanceledOnTouchOutside(true)
+        return dialog
     }
 
     override fun onDestroyView() {
@@ -415,7 +427,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
             refreshFullLineUnderlineState()
         },
         onFontWeight = ::showFontWeightSetting,
-        onFont = { showDialogFragment<FontSelectDialog>() },
+        onFont = ::selectBodyFont,
         onIndent = ::showParagraphIndentSetting,
         onChineseConverter = ::showChineseConverterSetting,
         onPadding = {
@@ -491,10 +503,16 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
                 applyHighlightRules(rules)
             }
         },
-        onDone = { dismissAllowingStateLoss() },
+        onDone = ::commitDone,
         onDiscard = ::discardAndLeave,
         onResetBookFontOverride = ::resetBookFontOverride,
+        onFollowGlobal = ::followGlobalPreset,
         onDismissRequest = ::requestDismiss,
+        onOpenLanguageFonts = ::openLanguageFonts,
+        onSelectScriptFont = ::selectScriptFont,
+        onResetScriptFont = ::resetScriptFont,
+        onSelectEditorScriptFont = ::selectEditorScriptFont,
+        onResetEditorScriptFont = ::resetEditorScriptFont,
     )
 
     private fun updateAdjustState(transform: ReadStyleUiState.() -> ReadStyleUiState) {
@@ -513,6 +531,8 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
         val bookConfigJson: String?,
         val styleSelect: Int,
         val comicStyleSelect: Int,
+        val scriptTypographyJson: String? = null,
+        val bookOverridesJson: String? = null,
     )
 
     private fun captureSessionSnapshot() {
@@ -524,6 +544,8 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
             bookConfigJson = if (ReadBookConfig.onlyThisBook) gson.toJson(ReadBookConfig.durConfig) else null,
             styleSelect = ReadBookConfig.styleSelect,
             comicStyleSelect = ReadBookConfig.comicStyleSelect,
+            scriptTypographyJson = ReadScriptTypographyStore.snapshotJson(),
+            bookOverridesJson = ReadBookConfig.snapshotBookOverridesJson(),
         )
         sessionSnapshot = snapshot
         sessionSnapshotJson = gson.toJson(snapshot)
@@ -539,11 +561,32 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
                 bookConfigJson = if (ReadBookConfig.onlyThisBook) gson.toJson(ReadBookConfig.durConfig) else null,
                 styleSelect = ReadBookConfig.styleSelect,
                 comicStyleSelect = ReadBookConfig.comicStyleSelect,
+                scriptTypographyJson = ReadScriptTypographyStore.snapshotJson(),
+                bookOverridesJson = ReadBookConfig.snapshotBookOverridesJson(),
             )
         )
     }
 
     private fun computeUnsaved(): Boolean = sessionSnapshot != null && currentSnapshotJson() != sessionSnapshotJson
+
+    private fun commitDone() {
+        // EPUB 渲染失败的脚本字体视为不可用：保存时恢复为跟随预设，忽略本次选择。
+        if (EpubScriptFontHealth.failedScopes.value.isNotEmpty()) {
+            val editorPage = page.isEditorPage()
+            EpubScriptFontHealth.failedScopes.value.forEach { scopeName ->
+                ReadValueScope.entries.firstOrNull { it.name.equals(scopeName, ignoreCase = true) }?.let { scope ->
+                    if (editorPage) {
+                        ReadBookConfig.setEditorScriptFont(scope, null)
+                    } else {
+                        ReadBookConfig.writeScriptFont(scope, null)
+                    }
+                }
+            }
+            EpubScriptFontHealth.clear()
+            refreshUi()
+        }
+        dismissAllowingStateLoss()
+    }
 
     private fun discardChanges(): Boolean {
         val snapshot = sessionSnapshot ?: sessionSnapshotJson.takeIf { it.isNotBlank() }?.let {
@@ -558,14 +601,16 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
             snapshot.bookConfigJson?.let {
                 ReadBookConfig.durConfig = gson.fromJson(it, ReadBookConfig.Config::class.java)
             }
+            ReadBookConfig.restoreBookOverridesSnapshot(snapshot.bookOverridesJson)
         } else {
-            if (ReadBookConfig.onlyThisBook) ReadBookConfig.setOnlyThisBook(false)
+            if (ReadBookConfig.onlyThisBook) ReadBookConfig.resetBookCustomization()
             ReadBookConfig.configList.clear()
             ReadBookConfig.configList.addAll(configList)
             ReadBookConfig.shareConfig = shareConfig
         }
         ReadBookConfig.styleSelect = snapshot.styleSelect
         ReadBookConfig.comicStyleSelect = snapshot.comicStyleSelect
+        ReadScriptTypographyStore.restoreSnapshot(snapshot.scriptTypographyJson)
         editorBackgroundCache = null
         ReadFloatingAppearanceState.refreshFromConfig()
         return true
@@ -705,11 +750,62 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
                 val resolved = ReadBookConfig.bookFontOverrideSource(config.textFont)
                 when (resolved.source) {
                     ReadValueSource.THIS_BOOK -> getString(R.string.read_style_source_this_book)
-                    ReadValueSource.PRESET -> getString(R.string.read_style_source_preset)
+                    ReadValueSource.PRESET -> if (ReadBookConfig.bookFollowsGlobal()) {
+                        getString(R.string.read_style_follow_global)
+                    } else {
+                        getString(R.string.read_style_source_preset)
+                    }
                     ReadValueSource.GLOBAL -> getString(R.string.read_style_source_global)
+                    ReadValueSource.PLATFORM -> getString(R.string.read_style_source_system)
                     else -> ""
                 }
             } else "",
+            followsGlobal = ReadBookConfig.bookFollowsGlobal(),
+            languageFonts = listOf(
+                ReadValueScope.LATIN,
+                ReadValueScope.CJK,
+                ReadValueScope.OTHER,
+            ).map { scope ->
+                val resolved = ReadBookConfig.scriptFont(scope)
+                val hasThisLayerOverride = ReadBookConfig.hasScriptFontOverride(scope)
+                val hasPresetOverride = ReadBookConfig.durConfig.scriptFonts?.forScope(scope) != null
+                ReadScriptFontUi(
+                    scope = scope,
+                    label = getString(
+                        when (scope) {
+                            ReadValueScope.LATIN -> R.string.read_style_script_latin
+                            ReadValueScope.CJK -> R.string.read_style_script_cjk
+                            else -> R.string.read_style_script_other
+                        }
+                    ),
+                    font = resolved.value,
+                    source = resolved.source,
+                    canReset = hasThisLayerOverride,
+                    isInherited = resolved.source != ReadValueSource.PUBLISHER &&
+                        !hasThisLayerOverride && !hasPresetOverride,
+                    unavailable = EpubScriptFontHealth.isFailed(scope.name.lowercase()),
+                )
+            },
+            editorScriptFonts = listOf(
+                ReadValueScope.LATIN,
+                ReadValueScope.CJK,
+                ReadValueScope.OTHER,
+            ).map { scope ->
+                val presetFont = ReadBookConfig.durConfig.scriptFonts?.forScope(scope).orEmpty()
+                ReadScriptFontUi(
+                    scope = scope,
+                    label = getString(
+                        when (scope) {
+                            ReadValueScope.LATIN -> R.string.read_style_script_latin
+                            ReadValueScope.CJK -> R.string.read_style_script_cjk
+                            else -> R.string.read_style_script_other
+                        }
+                    ),
+                    font = presetFont,
+                    source = if (presetFont.isBlank()) ReadValueSource.PLATFORM else ReadValueSource.PRESET,
+                    canReset = presetFont.isNotBlank(),
+                )
+            },
         )
     }
 
@@ -728,6 +824,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
 
     private fun openEditor(index: Int, isNew: Boolean = false) {
         creatingPreset = isNew
+        currentPage = ReadStylePage.EDIT
         changeBgTextConfig(index)
         page = ReadStylePage.EDIT
         refreshUi()
@@ -738,7 +835,57 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
         refreshUi()
         postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
     }
+
+    private fun followGlobalPreset() {
+        ReadBookConfig.materializeBookFollowGlobal()
+        editorBackgroundCache = null
+        ReadFloatingAppearanceState.refreshFromConfig()
+        refreshUi()
+        notifyPresetRestored()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
+    }
+
+    private fun openLanguageFonts() {
+        currentPage = ReadStylePage.LANGUAGE_FONTS
+        page = ReadStylePage.LANGUAGE_FONTS
+        refreshUi()
+    }
+
+    private fun selectScriptFont(scope: ReadValueScope) {
+        pendingEditorScriptFontScope = null
+        pendingScriptFontScope = scope
+        EpubScriptFontHealth.report(scope.name.lowercase(), false)
+        showDialogFragment<FontSelectDialog>()
+    }
+
+    private fun selectBodyFont() {
+        pendingScriptFontScope = null
+        pendingEditorScriptFontScope = null
+        showDialogFragment<FontSelectDialog>()
+    }
+
+    private fun resetScriptFont(scope: ReadValueScope) {
+        ReadBookConfig.writeScriptFont(scope, null)
+        EpubScriptFontHealth.report(scope.name.lowercase(), false)
+        refreshUi()
+        // 硬性要求：全局脚本字体写入后必须刷新字体表；本书覆盖路径同样刷新（幂等）。
+        postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
+    }
+
+    private fun selectEditorScriptFont(scope: ReadValueScope) {
+        pendingScriptFontScope = null
+        pendingEditorScriptFontScope = scope
+        EpubScriptFontHealth.report(scope.name.lowercase(), false)
+        showDialogFragment<FontSelectDialog>()
+    }
+
+    private fun resetEditorScriptFont(scope: ReadValueScope) {
+        ReadBookConfig.setEditorScriptFont(scope, null)
+        refreshUi()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
+    }
     private fun navigateTo(target: ReadStylePage) {
+        currentPage = target
         if (target != ReadStylePage.HIGHLIGHT && highlightSelectionMode != HighlightSelectionMode.NONE) {
             clearHighlightSelection(refresh = false)
         }
@@ -829,7 +976,13 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
                 page = ReadStylePage.PRESET
                 refreshUi()
             }
+
+            page == ReadStylePage.LANGUAGE_FONTS -> {
+                page = ReadStylePage.PRESET
+                refreshUi()
+            }
         }
+        currentPage = page
     }
 
     private fun applyEditorTextColor(color: Int) {
@@ -1629,9 +1782,39 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
     }
 
     override val curFontPath: String
-        get() = ReadBookConfig.textFont
+        get() = pendingEditorScriptFontScope?.let { ReadBookConfig.scriptFont(it).value }
+            ?: pendingScriptFontScope?.let { ReadBookConfig.scriptFont(it).value }
+            ?: ReadBookConfig.textFont
+
+    override val fontTitle: String
+        get() = when (val scope = pendingEditorScriptFontScope ?: pendingScriptFontScope) {
+            null -> getString(R.string.body_font)
+            ReadValueScope.LATIN -> getString(R.string.read_style_script_latin)
+            ReadValueScope.CJK -> getString(R.string.read_style_script_cjk)
+            else -> getString(R.string.read_style_script_other)
+        }
+
+    override val isBodyFontDialog: Boolean
+        get() = pendingEditorScriptFontScope == null && pendingScriptFontScope == null
 
     override fun selectFont(path: String) {
+        val editorScope = pendingEditorScriptFontScope
+        if (editorScope != null) {
+            pendingEditorScriptFontScope = null
+            ReadBookConfig.setEditorScriptFont(editorScope, path)
+            postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
+            refreshUi()
+            return
+        }
+        val scope = pendingScriptFontScope
+        if (scope != null) {
+            pendingScriptFontScope = null
+            ReadBookConfig.writeScriptFont(scope, path)
+            // 硬性要求：全局脚本字体写入后必须刷新字体表（UP_CONFIG → ChapterProvider.upStyle）。
+            postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
+            refreshUi()
+            return
+        }
         if (path != ReadBookConfig.textFont || path.isEmpty()) {
             ReadBookConfig.textFont = path
             postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5))

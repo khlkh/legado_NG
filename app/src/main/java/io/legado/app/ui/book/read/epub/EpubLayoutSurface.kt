@@ -15,6 +15,7 @@ import android.webkit.PermissionRequest
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
+import android.webkit.ConsoleMessage
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -24,6 +25,7 @@ import android.widget.FrameLayout
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import androidx.webkit.WebSettingsCompat
+import io.legado.app.help.config.EpubScriptFontHealth
 import io.legado.app.model.epub.EpubResourceGateway
 import io.legado.app.model.epub.EpubResourceLink
 import io.legado.app.model.epub.EpubPublicationSession
@@ -39,6 +41,7 @@ internal class EpubLayoutSurface(
     private var onReady: (JSONObject) -> Unit,
     private var onError: (String) -> Unit,
     private var onViewportRequired: ((Boolean) -> Unit)? = null,
+    private val reportFontHealth: Boolean = false,
 ) : FrameLayout(context), Closeable {
     private val gateway = EpubResourceGateway(publication, readerRuntime = true)
     // Android 14's UiModeManager callback can retain the Context that created it.
@@ -319,6 +322,10 @@ internal class EpubLayoutSurface(
         gateway.setTitleFont(bytes)
     }
 
+    fun scriptFont(scope: String, bytes: ByteArray?) {
+        gateway.setScriptFont(scope, bytes)
+    }
+
     fun refreshViewport() { if (loaded) configure() }
 
     /** Preparation-only cancellation; keep the WebView, never publish its old revision. */
@@ -357,6 +364,10 @@ internal class EpubLayoutSurface(
             options.optJSONObject(key)?.optJSONObject("title")?.takeIf { it.optBoolean("hasFont") }
                 ?.put("fontUrl", gateway.titleFontUrl())
         }
+        val scriptFonts = listOf("latin", "cjk", "other").mapNotNull { scope ->
+            gateway.scriptFontUrl(scope)?.let { scope to it }
+        }.toMap()
+        if (scriptFonts.isNotEmpty()) options.put("scriptFonts", JSONObject(scriptFonts))
         webView.evaluateJavascript(EpubWebViewCapabilities.CHECK) { supported ->
             if (closed || revision.toString() != token) return@evaluateJavascript
             if (supported != "true") {
@@ -652,6 +663,14 @@ internal class EpubLayoutSurface(
                         }
                         val ready = {
                             if (!closed && revision.toString() == token) {
+                                if (reportFontHealth) {
+                                    val failures = report.optJSONArray("scriptFontFailures")?.let { arr ->
+                                        (0 until arr.length()).mapNotNull { arr.optString(it) }.toSet()
+                                    } ?: emptySet()
+                                    listOf("latin", "cjk", "other").forEach { scope ->
+                                        EpubScriptFontHealth.report(scope, scope in failures)
+                                    }
+                                }
                                 publishState(report)
                             }
                         }

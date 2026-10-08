@@ -47,6 +47,21 @@ class BookReadStyleOverridesStoreTest {
         assertEquals("#112233", legacy?.bgStr)
         assertEquals(ReadBasePresetMode.PINNED, overrides?.basePreset?.toReadBasePreset()?.mode)
         assertEquals("B", overrides?.basePreset?.snapshot?.defaultFont)
+        assertEquals(emptyMap<ReadValueScope, String>(), overrides?.basePreset?.snapshot?.scriptFonts)
+
+        val scripted = legacyBook("B").apply {
+            config.independentReadStyle = GSON.toJson(
+                ReadBookConfig.Config(
+                    textFont = "B",
+                    scriptFonts = SparseFontOverrides(cjk = "CJK.ttf"),
+                )
+            )
+        }
+        val scriptedOverrides = store.materializePinnedBaseIfNeeded(scripted)
+        assertEquals(
+            mapOf(ReadValueScope.CJK to "CJK.ttf"),
+            scriptedOverrides?.basePreset?.snapshot?.scriptFonts,
+        )
 
         val after = store.effectiveDefaultFont(owner, globalFont = "A")
         assertEquals("B", after.value)
@@ -61,6 +76,17 @@ class BookReadStyleOverridesStoreTest {
         val effective = store.effectiveDefaultFont(owner, globalFont = "A")
         assertEquals("C", effective.value)
         assertEquals(ReadValueSource.THIS_BOOK, effective.source)
+    }
+
+    @Test
+    fun `write scope font stores single script dimension and clears it`() {
+        val owner = legacyBook("B")
+        store.materializePinnedBaseIfNeeded(owner)
+        store.writeScope(owner, ReadValueScope.CJK, "CJK.ttf")
+        assertEquals("CJK.ttf", store.current(owner)?.font?.forScope(ReadValueScope.CJK))
+        assertNull(store.current(owner)?.font?.forScope(ReadValueScope.LATIN))
+        store.writeScope(owner, ReadValueScope.CJK, null)
+        assertNull(store.current(owner)?.font?.forScope(ReadValueScope.CJK))
     }
 
     @Test
@@ -95,6 +121,40 @@ class BookReadStyleOverridesStoreTest {
         val effective = store.effectiveDefaultFont(owner, globalFont = "A")
         assertEquals("A", effective.value)
         assertEquals(ReadValueSource.PRESET, effective.source)
+    }
+
+    @Test
+    fun `follow global keeps existing book font overrides`() {
+        val owner = legacyBook("B")
+        store.materializePinnedBaseIfNeeded(owner)
+        store.writeScope(owner, ReadValueScope.CJK, "CJK.ttf")
+        store.materializeFollowGlobal(owner)
+        assertEquals("CJK.ttf", store.current(owner)?.font?.forScope(ReadValueScope.CJK))
+        assertEquals(BookBasePreset.MODE_FOLLOW_GLOBAL, store.current(owner)?.basePreset?.mode)
+    }
+
+    @Test
+    fun `restore snapshot rolls back book script font overrides`() {
+        val owner = legacyBook("B")
+        store.materializePinnedBaseIfNeeded(owner)
+        store.writeScope(owner, ReadValueScope.CJK, "CJK.ttf")
+        val snapshot = store.snapshotJson(owner)
+        store.writeScope(owner, ReadValueScope.LATIN, "Latin.ttf")
+        assertEquals("Latin.ttf", store.current(owner)?.font?.forScope(ReadValueScope.LATIN))
+        store.restoreSnapshot(owner, snapshot)
+        assertEquals("CJK.ttf", store.current(owner)?.font?.forScope(ReadValueScope.CJK))
+        assertNull(store.current(owner)?.font?.forScope(ReadValueScope.LATIN))
+        assertEquals(snapshot, stored[owner.bookUrl]?.first)
+    }
+
+    @Test
+    fun `restore snapshot to null clears overrides written this session`() {
+        val owner = Book(bookUrl = "a")
+        assertNull(store.snapshotJson(owner))
+        store.writeScope(owner, ReadValueScope.OTHER, "Other.ttf")
+        store.restoreSnapshot(owner, null)
+        assertNull(owner.config.independentOverrides)
+        assertNull(store.current(owner)?.font?.forScope(ReadValueScope.OTHER))
     }
 
     @Test

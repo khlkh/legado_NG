@@ -60,6 +60,21 @@ data class SparseFontOverrides(
         ReadValueScope.CJK -> cjk
         ReadValueScope.OTHER -> other
     }
+
+    fun withScope(scope: ReadValueScope, value: String?): SparseFontOverrides = when (scope) {
+        ReadValueScope.DEFAULT -> copy(default = value)
+        ReadValueScope.LATIN -> copy(latin = value)
+        ReadValueScope.CJK -> copy(cjk = value)
+        ReadValueScope.OTHER -> copy(other = value)
+    }
+
+    /** 转成 ReadPresetSnapshot.scriptFonts 用的稀疏 map（只含非空维度）。 */
+    fun toScriptFontMap(): Map<ReadValueScope, String> = buildMap {
+        default?.let { put(ReadValueScope.DEFAULT, it) }
+        latin?.let { put(ReadValueScope.LATIN, it) }
+        cjk?.let { put(ReadValueScope.CJK, it) }
+        other?.let { put(ReadValueScope.OTHER, it) }
+    }
 }
 
 object BookReadStyleCompatibility {
@@ -90,6 +105,7 @@ object BookReadStyleCompatibility {
         globalDefaultFont: String?,
         platformFont: String = "platform",
         epub: ReadEpubContext? = null,
+        presetScriptFont: String? = null,
     ): ReadValueContext {
         if (overrides != null || legacyConfig != null) {
             return ReadValueContext(
@@ -101,11 +117,12 @@ object BookReadStyleCompatibility {
                         ReadBasePreset(
                             mode = ReadBasePresetMode.PINNED,
                             snapshot = ReadPresetSnapshot(
-                                scriptFonts = emptyMap(),
+                                scriptFonts = legacy.scriptFonts?.toScriptFontMap() ?: emptyMap(),
                                 defaultFont = legacy.textFont,
                             ),
                         )
                     },
+                presetScriptFont = presetScriptFont,
                 globalScriptFont = globalScriptFont,
                 globalDefaultFont = globalDefaultFont,
                 platformFont = platformFont,
@@ -114,6 +131,7 @@ object BookReadStyleCompatibility {
         }
         return ReadValueContext(
             scope = scope,
+            presetScriptFont = presetScriptFont,
             globalScriptFont = globalScriptFont,
             globalDefaultFont = globalDefaultFont,
             platformFont = platformFont,
