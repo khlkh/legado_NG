@@ -18,3 +18,31 @@ fun interface ReadScriptClassifier {
      */
     fun classify(codePoint: Int, previousStrong: ReadValueScope?): ReadValueScope
 }
+
+/**
+ * 生产分类器：机械实现 §3.7-2。
+ * 契约测试 ReadScriptClassifierTest 直接消费本对象。
+ * 来源：5e4a67a6e 中的生产实现（其 PoC 脚手架已跳过，生产解析由 87d6d57c4 接入）。
+ */
+object ReadScriptClassifierContract : ReadScriptClassifier {
+    override fun classify(codePoint: Int, previousStrong: ReadValueScope?): ReadValueScope {
+        // 全角形式先归 CJK（按计划：U+3000–303F、U+FF00–FFEF）
+        if (codePoint in 0x3000..0x303F || codePoint in 0xFF00..0xFFEF) {
+            return ReadValueScope.CJK
+        }
+        return when (Character.UnicodeScript.of(codePoint)) {
+            Character.UnicodeScript.HAN,
+            Character.UnicodeScript.HIRAGANA,
+            Character.UnicodeScript.KATAKANA,
+            Character.UnicodeScript.HANGUL,
+            -> ReadValueScope.CJK
+
+            Character.UnicodeScript.LATIN -> ReadValueScope.LATIN
+            Character.UnicodeScript.COMMON,
+            Character.UnicodeScript.INHERITED,
+            -> previousStrong ?: ReadValueScope.DEFAULT
+
+            else -> ReadValueScope.OTHER
+        }
+    }
+}

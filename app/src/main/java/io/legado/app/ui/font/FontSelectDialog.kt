@@ -10,6 +10,8 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,12 +37,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.bundleOf
@@ -76,6 +81,7 @@ import io.legado.app.utils.putPrefString
 import io.legado.app.utils.toastOnUi
 import java.io.File
 import java.net.URLDecoder
+import kotlin.math.roundToInt
 
 /** 字体选择对话框。内容使用 Compose，目录读取与字体应用行为保持不变。 */
 class FontSelectDialog : BaseComposeDialogFragment() {
@@ -108,6 +114,8 @@ class FontSelectDialog : BaseComposeDialogFragment() {
     private var selectedFontPath by mutableStateOf("")
     private var selectedSystemFont by mutableIntStateOf(0)
     private var readerPreviewHost: ReadBookActivity? = null
+    private var surfaceOffsetX by mutableIntStateOf(0)
+    private var surfaceOffsetY by mutableIntStateOf(0)
 
     private val selectFontDir = registerForActivityResult(SelectDirectoryContract()) { result ->
         result.uri?.let {
@@ -209,7 +217,9 @@ class FontSelectDialog : BaseComposeDialogFragment() {
         }
         val fontTitle = getString(if (isTitleFont) R.string.read_title_font else R.string.body_font)
         ReadConfigDialogSurface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .offset { IntOffset(surfaceOffsetX, surfaceOffsetY) },
             contentPadding = PaddingValues(
                 start = 18.dp,
                 top = 18.dp,
@@ -217,13 +227,34 @@ class FontSelectDialog : BaseComposeDialogFragment() {
                 bottom = 12.dp,
             ),
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(16.dp)
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            surfaceOffsetX += dragAmount.x.roundToInt()
+                            surfaceOffsetY += dragAmount.y.roundToInt()
+                        }
+                    },
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_drag_handle),
+                    contentDescription = getString(R.string.font_dialog_drag_hint),
+                    tint = Color(NgTheme.colors.onSurfaceVariant),
+                    modifier = Modifier.size(28.dp, 14.dp),
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                ReadConfigDialogTitle(fontTitle)
+                ReadConfigDialogTitle(callBack?.fontTitle?.takeIf { it.isNotBlank() } ?: getString(R.string.body_font))
             }
             Spacer(Modifier.height(8.dp))
             ReadConfigDock(
@@ -444,25 +475,22 @@ class FontSelectDialog : BaseComposeDialogFragment() {
 
     private fun selectCustomFont(item: FileDoc) {
         selectedFontPath = item.toString()
-        selectFont(selectedFontPath)
+        callBack?.selectFont(selectedFontPath)
+        dismissAllowingStateLoss()
     }
 
     private fun selectSystemFont(index: Int) {
         selectedSystemFont = index
         selectedFontPath = ""
-        if (!isTitleFont) AppConfig.systemTypefaces = index
-        selectFont("")
-    }
-
-    private fun selectFont(path: String) {
-        if (isReaderBodyFont) {
-            if (path != ReadBookConfig.textFont || path.isEmpty()) {
-                ReadBookConfig.textFont = path
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5))
-            }
+        // 正文字体对话框：更新全局系统字体偏好并清空正文字体；
+        // 脚本字体对话框：写入 system:index 标记，保持「该脚本用系统衬线/等宽」的选择。
+        if (callBack?.isBodyFontDialog != false) {
+            AppConfig.systemTypefaces = index
+            callBack?.selectFont("")
         } else {
-            callBack?.selectFont(path)
+            callBack?.selectFont(ReadBookConfig.systemFontValue(index))
         }
+        dismissAllowingStateLoss()
     }
 
     private fun currentFontName(): String? {
@@ -478,5 +506,7 @@ class FontSelectDialog : BaseComposeDialogFragment() {
     interface CallBack {
         fun selectFont(path: String)
         val curFontPath: String
+        val fontTitle: String get() = ""
+        val isBodyFontDialog: Boolean get() = true
     }
 }

@@ -37,7 +37,7 @@ internal class BookReadStyleOverridesStore(
             basePreset = BookBasePreset(
                 mode = BookBasePreset.MODE_PINNED,
                 snapshot = ReadPresetSnapshot(
-                    scriptFonts = emptyMap(),
+                    scriptFonts = legacyConfig.scriptFonts?.toScriptFontMap() ?: emptyMap(),
                     defaultFont = legacyConfig.textFont,
                 ),
             ),
@@ -52,7 +52,7 @@ internal class BookReadStyleOverridesStore(
     }
 
     fun materializeFollowGlobal(owner: Book): BookReadStyleOverrides {
-        val overrides = BookReadStyleOverrides(
+        val overrides = (current(owner) ?: BookReadStyleOverrides()).copy(
             basePreset = BookBasePreset(mode = BookBasePreset.MODE_FOLLOW_GLOBAL),
         )
         val json = BookReadStyleCompatibility.toJson(overrides)
@@ -62,10 +62,14 @@ internal class BookReadStyleOverridesStore(
         return overrides
     }
 
-    fun writeDefaultFont(owner: Book, value: String?): BookReadStyleOverrides? {
+    fun writeDefaultFont(owner: Book, value: String?): BookReadStyleOverrides? =
+        writeScope(owner, ReadValueScope.DEFAULT, value)
+
+    /** Phase 3：写单脚本维度的本书字体 override（DEFAULT/LATIN/CJK/OTHER）。 */
+    fun writeScope(owner: Book, scope: ReadValueScope, value: String?): BookReadStyleOverrides? {
         materializePinnedBaseIfNeeded(owner)
         val existing = current(owner) ?: BookReadStyleOverrides()
-        val newFont = (existing.font ?: SparseFontOverrides()).copy(default = value)
+        val newFont = (existing.font ?: SparseFontOverrides()).withScope(scope, value)
         val newOverrides = existing.copy(font = if (newFont.isEmpty()) null else newFont)
         val json = if (newOverrides.isEmpty()) null else BookReadStyleCompatibility.toJson(newOverrides)
         persist(owner.bookUrl, json, owner.config.independentReadStyle)
@@ -77,6 +81,16 @@ internal class BookReadStyleOverridesStore(
         persist(owner.bookUrl, null, null)
         owner.config.independentOverrides = null
         owner.config.independentReadStyle = null
+    }
+
+    /** 会话快照：原始 independentOverrides JSON，避免 round-trip 改变键序。 */
+    fun snapshotJson(owner: Book): String? = owner.config.independentOverrides
+
+    /** Discard：按打开抽屉时的 JSON 写回本书稀疏覆盖，legacy 保持现状。 */
+    fun restoreSnapshot(owner: Book, overridesJson: String?) {
+        if (owner.config.independentOverrides == overridesJson) return
+        persist(owner.bookUrl, overridesJson, owner.config.independentReadStyle)
+        owner.config.independentOverrides = overridesJson
     }
 
     fun effectiveDefaultFont(
