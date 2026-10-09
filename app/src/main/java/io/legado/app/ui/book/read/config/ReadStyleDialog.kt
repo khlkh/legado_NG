@@ -49,6 +49,8 @@ import io.legado.app.help.config.ReadValueSource
 import io.legado.app.help.config.ReadStyleLanguageBinder
 import io.legado.app.help.config.ReadStyleLanguageMap
 import io.legado.app.help.config.ReadStylePackageManager
+import io.legado.app.help.config.LatinOpticalScale
+import io.legado.app.help.config.LatinOpticalScaleStore
 import io.legado.app.help.config.ReadScriptTypographyStore
 import io.legado.app.help.config.ReadHighlightRule
 import io.legado.app.help.config.ReadHighlightRulePackageManager
@@ -589,6 +591,19 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
         onResetScriptFont = ::resetScriptFont,
         onSelectEditorScriptFont = ::selectEditorScriptFont,
         onResetEditorScriptFont = ::resetEditorScriptFont,
+        onLatinScaleChanged = { value ->
+            val rounded = (value * 100).roundToInt() / 100f
+            LatinOpticalScaleStore.save(LatinOpticalScale.clamp(rounded))
+            updateAdjustState { copy(latinScale = LatinOpticalScale.clamp(rounded)) }
+        },
+        onLatinScaleChangeFinished = {
+            postEvent(EventBus.UP_CONFIG, arrayListOf(5))
+        },
+        onLatinScaleReset = {
+            LatinOpticalScaleStore.save(null)
+            updateAdjustState { copy(latinScale = null) }
+            postEvent(EventBus.UP_CONFIG, arrayListOf(5))
+        },
     )
 
     private fun updateAdjustState(transform: ReadStyleUiState.() -> ReadStyleUiState) {
@@ -609,6 +624,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
         val comicStyleSelect: Int,
         val scriptTypographyJson: String? = null,
         val bookOverridesJson: String? = null,
+        val latinScaleJson: String? = null,
     )
 
     private fun captureSessionSnapshot() {
@@ -622,6 +638,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
             comicStyleSelect = ReadBookConfig.comicStyleSelect,
             scriptTypographyJson = ReadScriptTypographyStore.snapshotJson(),
             bookOverridesJson = ReadBookConfig.snapshotBookOverridesJson(),
+            latinScaleJson = LatinOpticalScaleStore.snapshotJson(),
         )
         sessionSnapshot = snapshot
         sessionSnapshotJson = gson.toJson(snapshot)
@@ -639,6 +656,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
                 comicStyleSelect = ReadBookConfig.comicStyleSelect,
                 scriptTypographyJson = ReadScriptTypographyStore.snapshotJson(),
                 bookOverridesJson = ReadBookConfig.snapshotBookOverridesJson(),
+                latinScaleJson = LatinOpticalScaleStore.snapshotJson(),
             )
         )
     }
@@ -687,6 +705,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
         ReadBookConfig.styleSelect = snapshot.styleSelect
         ReadBookConfig.comicStyleSelect = snapshot.comicStyleSelect
         ReadScriptTypographyStore.restoreSnapshot(snapshot.scriptTypographyJson)
+        LatinOpticalScaleStore.restoreSnapshot(snapshot.latinScaleJson)
         editorBackgroundCache = null
         ReadFloatingAppearanceState.refreshFromConfig()
         return true
@@ -907,6 +926,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
                     canReset = presetFont.isNotBlank(),
                 )
             },
+            latinScale = LatinOpticalScaleStore.manual(),
         )
     }
 
