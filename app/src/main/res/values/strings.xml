@@ -2630,4 +2630,6 @@
     <string name="all_bookmark_expanded">Expanded</string>
     <string name="all_bookmark_collapsed">Collapsed</string>
     <string name="read_style_sheet_transparency">Sheet</string>
+    <string name="read_style_name_required">Enter a preset name</string>
+    <string name="read_style_name_kept">Empty name was not saved</string>
 </resources>

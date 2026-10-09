@@ -54,6 +54,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +70,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -192,6 +194,7 @@ internal data class ReadStyleUiState(
     val presets: List<ReadStylePresetUi>,
     val selectedPresetIndex: Int,
     val selectedPresetName: String,
+    val presetNameDraft: String? = null,
     val canRestoreCurrentDefault: Boolean,
     val highlightSummary: String,
     val isEpub: Boolean,
@@ -690,6 +693,22 @@ private fun PresetPage(
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val spacing = 8.dp
         val presetWidth = (maxWidth - spacing * 6) / 5
+        val largeScreen = isLargeScreen(LocalConfiguration.current)
+        val targetRowWidthPx = with(LocalDensity.current) { maxWidth.roundToPx() }
+        LaunchedEffect(targetRowWidthPx, largeScreen) {
+            if (!largeScreen || targetRowWidthPx <= 0) return@LaunchedEffect
+            snapshotFlow {
+                val info = presetListState.layoutInfo
+                val position = state.presets.indexOfFirst { it.index == state.selectedPresetIndex }
+                val laidOut = info.viewportSize.width == targetRowWidthPx
+                val shown = info.visibleItemsInfo.any { it.index == position }
+                Triple(laidOut, shown, position)
+            }.collect { (laidOut, shown, position) ->
+                if (laidOut && position >= 0 && !shown) {
+                    presetListState.scrollToItem(position)
+                }
+            }
+        }
         LazyRow(
             state = presetListState,
             modifier = Modifier
