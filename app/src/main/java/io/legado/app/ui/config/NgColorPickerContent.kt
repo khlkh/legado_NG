@@ -75,12 +75,16 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -95,10 +99,18 @@ import io.legado.app.ui.design.components.compose.NgFlatActionRailItem
 import io.legado.app.ui.design.components.compose.NgFlatActionRailVariant
 import io.legado.app.ui.design.components.compose.NgFormField
 import io.legado.app.ui.design.components.compose.NgFormFieldVariant
+import io.legado.app.ui.design.theme.NgColorMath
 import io.legado.app.ui.design.theme.NgTheme
 import io.legado.app.utils.toastOnUi
 import kotlin.math.floor
 import kotlin.math.roundToInt
+
+/** Which reading color the live value replaces in the WCAG sample. */
+internal enum class NgColorPreviewRole {
+    TEXT,
+    BACKGROUND,
+    ACCENT,
+}
 
 /** Shared editor only. Its host owns dismissal, sampling, reset and confirmation. */
 @Composable
@@ -107,6 +119,10 @@ internal fun NgColorPickerContent(
     originalColor: Int,
     modifier: Modifier = Modifier,
     showAlphaSlider: Boolean = true,
+    previewRole: NgColorPreviewRole? = null,
+    previewBackground: Int = 0,
+    previewForeground: Int = 0,
+    previewAccent: Int = 0,
     onColorChanged: (Int) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -180,6 +196,16 @@ internal fun NgColorPickerContent(
             )
             Spacer(Modifier.height(12.dp))
         }
+        if (previewRole != null) {
+            NgColorContrastPreview(
+                color = state.color,
+                role = previewRole,
+                background = previewBackground,
+                foreground = previewForeground,
+                accent = previewAccent,
+            )
+            Spacer(Modifier.height(12.dp))
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -239,6 +265,58 @@ internal fun NgColorPickerContent(
         }
         Spacer(Modifier.height(16.dp))
         NgPickerSavedColors(state, change)
+    }
+}
+
+@Composable
+private fun NgColorContrastPreview(
+    color: Int,
+    role: NgColorPreviewRole,
+    background: Int,
+    foreground: Int,
+    accent: Int,
+) {
+    val previewBg = if (role == NgColorPreviewRole.BACKGROUND) color else background
+    val previewFg = if (role == NgColorPreviewRole.BACKGROUND) foreground else color
+    val previewMark = if (role == NgColorPreviewRole.ACCENT) color else accent
+    val sample = stringResource(R.string.ng_paper_preview_sample)
+    val splitIndex = sample.indexOfFirst { it == '，' || it == ',' }.takeIf { it >= 0 } ?: (sample.length / 2)
+    val plain = sample.substring(0, splitIndex).trimEnd(',', '，', ' ')
+    val marked = sample.substring(splitIndex).trimStart(',', '，', ' ')
+    val ratio = NgColorMath.displayedContrast(previewFg, previewBg)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(NgColorMath.opaque(previewBg)))
+            .border(1.dp, Color(NgTheme.colors.outlineVariant), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = buildAnnotatedString {
+                append(plain)
+                append("  ")
+                withStyle(
+                    SpanStyle(
+                        color = Color(previewFg),
+                        background = Color(NgColorMath.opaque(previewMark)),
+                    ),
+                ) {
+                    append(marked)
+                }
+            },
+            color = Color(previewFg),
+            fontSize = 15.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = NgColorMath.wcagContrastLabel(ratio),
+            color = Color(previewFg).copy(alpha = 0.72f),
+            fontSize = 11.sp,
+        )
     }
 }
 
