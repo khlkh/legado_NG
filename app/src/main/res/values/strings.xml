@@ -2309,6 +2309,7 @@
     <string name="ng_color_picker_current">Current</string>
     <string name="ng_color_picker_restore_original">Restore original color</string>
     <string name="ng_color_picker_hex">HEX</string>
+    <string name="ng_paper_preview_sample">Heaven and earth, dark and yellow.</string>
     <string name="ng_color_picker_saved_colors">Saved colors</string>
     <string name="ng_color_picker_long_press_delete">Long press to remove</string>
     <string name="ng_color_picker_add_saved">Save current color</string>

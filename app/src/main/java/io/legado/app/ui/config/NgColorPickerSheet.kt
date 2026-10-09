@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Colorize
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -194,6 +195,10 @@ internal fun NgInlineColorPicker(
     showAlphaSlider: Boolean = true,
     forceOpaque: Boolean = false,
     backgroundRenderer: ((Int, Int) -> Bitmap)? = null,
+    previewRole: NgColorPreviewRole? = null,
+    previewBackground: Int = 0,
+    previewForeground: Int = 0,
+    previewAccent: Int = 0,
 ) {
     val state = remember(title, forceOpaque) { NgColorPickerState(initialColor, forceOpaque) }
     val originalColor = remember(title, forceOpaque) { state.color }
@@ -204,21 +209,27 @@ internal fun NgInlineColorPicker(
         state.sampleRgb(sampled)
         if (state.color != previous) onChange(state.color)
     }
-    val focusManager = LocalFocusManager.current
     val maxHeight = minOf(620, (LocalConfiguration.current.screenHeightDp * 0.78f).toInt()).dp
     Column(modifier = Modifier.fillMaxWidth().heightIn(max = maxHeight)) {
-        NgColorPickerHeader(title = title, onPick = takeColor, onClose = onBack, inline = true)
+        NgColorPickerHeader(
+            title = title,
+            onPick = takeColor,
+            onClose = onBack,
+            inline = true,
+            onReset = onReset,
+        )
         Column(modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-            NgColorPickerContent(state = state, originalColor = originalColor,
-                showAlphaSlider = showAlphaSlider, onColorChanged = onChange)
+            NgColorPickerContent(
+                state = state,
+                originalColor = originalColor,
+                showAlphaSlider = showAlphaSlider,
+                previewRole = previewRole,
+                previewBackground = previewBackground,
+                previewForeground = previewForeground,
+                previewAccent = previewAccent,
+                onColorChanged = onChange,
+            )
             Spacer(Modifier.height(8.dp))
-        }
-        TextButton(
-            onClick = { focusManager.clearFocus(); state.reset(state.color); onReset() },
-            modifier = Modifier.align(Alignment.Start),
-        ) {
-            Text(stringResource(R.string.ng_reset_color),
-                color = Color(NgTheme.colors.onSurfaceVariant), fontSize = 14.sp)
         }
     }
 }
@@ -229,6 +240,7 @@ internal fun NgColorPickerHeader(
     onPick: () -> Unit,
     onClose: () -> Unit,
     inline: Boolean = false,
+    onReset: (() -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
     Row(
@@ -248,14 +260,33 @@ internal fun NgColorPickerHeader(
             Text(title, color = Color(NgTheme.colors.onSurface), fontSize = 18.sp,
                 fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        NgThemeSheetActionButton(
-            onClick = { focusManager.clearFocus(); if (inline) onPick() else onClose() },
-            contentDescription = stringResource(if (inline) R.string.ng_color_picker_eyedropper else R.string.cancel),
-            touchSize = 44.dp,
-        ) {
-            Icon(if (inline) Icons.Rounded.Colorize else Icons.Rounded.Close,
-                contentDescription = null, modifier = Modifier.size(22.dp),
-                tint = Color(if (inline) NgTheme.colors.primary else NgTheme.colors.onSurface))
+        if (inline && onReset != null) {
+            NgThemeSheetActionButton(
+                onClick = { focusManager.clearFocus(); onPick() },
+                contentDescription = stringResource(R.string.ng_color_picker_eyedropper),
+                touchSize = 44.dp,
+            ) {
+                Icon(Icons.Rounded.Colorize, contentDescription = null, modifier = Modifier.size(22.dp),
+                    tint = Color(NgTheme.colors.primary))
+            }
+            NgThemeSheetActionButton(
+                onClick = { focusManager.clearFocus(); onReset() },
+                contentDescription = stringResource(R.string.ng_reset_color),
+                touchSize = 44.dp,
+            ) {
+                Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(22.dp),
+                    tint = Color(NgTheme.colors.onSurface))
+            }
+        } else {
+            NgThemeSheetActionButton(
+                onClick = { focusManager.clearFocus(); if (inline) onPick() else onClose() },
+                contentDescription = stringResource(if (inline) R.string.ng_color_picker_eyedropper else R.string.cancel),
+                touchSize = 44.dp,
+            ) {
+                Icon(if (inline) Icons.Rounded.Colorize else Icons.Rounded.Close,
+                    contentDescription = null, modifier = Modifier.size(22.dp),
+                    tint = Color(if (inline) NgTheme.colors.primary else NgTheme.colors.onSurface))
+            }
         }
     }
 }
