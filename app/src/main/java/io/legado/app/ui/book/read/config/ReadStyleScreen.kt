@@ -111,6 +111,7 @@ import io.legado.app.ui.design.components.compose.NgSwitchActionGroup
 import io.legado.app.ui.design.components.compose.ngSliderStepValue
 import kotlin.math.roundToInt
 import io.legado.app.ui.design.theme.NgTheme
+import io.legado.app.ui.config.NgColorPreviewRole
 import io.legado.app.ui.config.NgInlineColorPicker
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -2297,6 +2298,14 @@ private fun EditorColorPage(
             onBack = actions.onBack,
             onColorChanged = onColorChanged,
             onReset = actions.onResetEditorColor,
+            previewRole = when (page) {
+                ReadStylePage.EDIT_BACKGROUND_COLOR -> NgColorPreviewRole.BACKGROUND
+                ReadStylePage.EDIT_TEXT_COLOR -> NgColorPreviewRole.TEXT
+                else -> NgColorPreviewRole.ACCENT
+            },
+            previewBackground = state.editorBackgroundColor,
+            previewForeground = state.editorTextColor,
+            previewAccent = state.editorTextAccentColor,
         )
     }
 }
