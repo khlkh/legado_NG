@@ -28,7 +28,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.wrapContentWidth
+
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -42,6 +45,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -83,6 +88,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.R
+import io.legado.app.help.book.BookScriptClass
 import io.legado.app.help.config.ReadHighlightRule
 import io.legado.app.help.config.ReadFloatingAppearanceConfig
 import io.legado.app.help.config.ReadFloatingColorStyle
@@ -136,8 +142,9 @@ internal enum class ReadStylePage {
     HIGHLIGHT_UNDERLINE_COLOR,
     LANGUAGE_FONTS,
     FLOATING_WINDOWS,
-
     APP_DEFAULTS,
+    NEW_BOOK_PRESET,
+
 }
 
 internal enum class HighlightSelectionMode {
@@ -193,6 +200,11 @@ internal data class ReadStyleUiState(
     val canUseBookStyle: Boolean,
     val shareLayout: Boolean,
     val globalFloatingFollowApp: Boolean,
+    val floatingFollowAppPref: Boolean = false,
+    val languagePresetCjk: String? = null,
+    val languagePresetLatin: String? = null,
+    val languagePresetOther: String? = null,
+    val detectedScriptClass: String? = null,
     val textSize: Int,
     val letterSpacing: Float,
     val lineSpacingExtra: Int,
@@ -258,6 +270,7 @@ internal data class ReadStyleActions(
     val onOnlyThisBookChanged: (Boolean) -> Unit,
     val onShareLayoutChanged: (Boolean) -> Unit,
     val onGlobalFloatingFollowAppChanged: (Boolean) -> Unit,
+    val onLanguagePresetChanged: (BookScriptClass, String?) -> Unit,
     val onImportHighlights: () -> Unit,
     val onExportHighlights: () -> Unit,
     val onRestoreBuiltInHighlights: () -> Unit,
@@ -318,6 +331,7 @@ internal data class ReadStyleActions(
     val onFollowGlobal: () -> Unit,
     val onDismissRequest: () -> Unit,
     val onOpenLanguageFonts: () -> Unit,
+    val onOpenNewBookPreset: () -> Unit,
     val onOpenFloatingWindows: () -> Unit,
     val onSelectScriptFont: (ReadValueScope) -> Unit,
     val onResetScriptFont: (ReadValueScope) -> Unit,
@@ -339,6 +353,7 @@ internal fun ReadStyleScreen(
         ReadStylePage.PRESET,
         ReadStylePage.ADJUST,
         ReadStylePage.HIGHLIGHT,
+        ReadStylePage.APP_DEFAULTS,
     )
     BackHandler(enabled = page !in rootPages || state.highlightSelectionMode != HighlightSelectionMode.NONE) {
         actions.onBack()
@@ -361,11 +376,13 @@ internal fun ReadStyleScreen(
                         stringResource(R.string.read_style_tab_preset),
                         stringResource(R.string.read_style_tab_adjust),
                         stringResource(R.string.read_style_tab_highlight),
+                        stringResource(R.string.read_style_tab_defaults),
                     ),
                     selectedIndex = when (page) {
                         ReadStylePage.PRESET -> 0
                         ReadStylePage.ADJUST -> 1
-                        else -> 2
+                        ReadStylePage.HIGHLIGHT -> 2
+                        else -> 3
                     },
                     contentColor = contentColor,
                     selectedContainerColor = indicatorColor,
@@ -375,10 +392,12 @@ internal fun ReadStyleScreen(
                             when (index) {
                                 0 -> ReadStylePage.PRESET
                                 1 -> ReadStylePage.ADJUST
-                                else -> ReadStylePage.HIGHLIGHT
+                                2 -> ReadStylePage.HIGHLIGHT
+                                else -> ReadStylePage.APP_DEFAULTS
                             }
                         )
                     },
+                    fontSize = 13.sp,
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
             }
@@ -424,6 +443,7 @@ internal fun ReadStyleScreen(
                 }
 
 
+
                 ReadStylePage.FLOATING_WINDOWS -> Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -447,6 +467,21 @@ internal fun ReadStyleScreen(
                     DefaultsPage(
                         state = state,
                         contentColor = contentColor,
+                        actions = actions,
+                    )
+                }
+
+
+                ReadStylePage.NEW_BOOK_PRESET -> Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(StandardPageHeight)
+                        .padding(top = 8.dp),
+                ) {
+                    NewBookPresetPage(
+                        state = state,
+                        contentColor = contentColor,
+                        accentColor = indicatorColor,
                         actions = actions,
                     )
                 }
@@ -774,16 +809,6 @@ private fun PresetPage(
         }
         ReadDivider(contentColor)
     }
-    if (!state.onlyThisBook) {
-        PresetSwitchRow(
-            title = stringResource(R.string.read_style_global_follow_app_color),
-            iconRes = R.drawable.ic_cfg_theme,
-            checked = state.globalFloatingFollowApp,
-            contentColor = contentColor,
-            onCheckedChange = actions.onGlobalFloatingFollowAppChanged,
-        )
-        ReadDivider(contentColor)
-    }
     if (!state.onlyThisBook) PresetRestoreAllRow(
         contentColor = contentColor,
         onClick = actions.onRestoreAllPresets,
@@ -1015,12 +1040,16 @@ private fun PresetSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     iconSize: Dp = 25.dp,
     subtitle: String? = null,
+    enabled: Boolean = true,
 ) {
+    val displayedColor = if (enabled) contentColor else contentColor.copy(alpha = 0.38f)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(if (subtitle == null) 56.dp else 62.dp)
-            .clickable { onCheckedChange(!checked) }
+            .then(
+                if (enabled) Modifier.clickable { onCheckedChange(!checked) } else Modifier
+            )
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1029,7 +1058,7 @@ private fun PresetSwitchRow(
                 painter = painterResource(iconRes),
                 contentDescription = null,
                 modifier = Modifier.size(iconSize),
-                tint = contentColor,
+                tint = displayedColor,
             )
         }
         Column(
@@ -1037,13 +1066,13 @@ private fun PresetSwitchRow(
         ) {
             Text(
                 text = title,
-                color = contentColor,
+                color = displayedColor,
                 fontSize = 15.sp,
             )
             subtitle?.let {
                 Text(
                     text = it,
-                    color = contentColor.copy(alpha = 0.62f),
+                    color = displayedColor.copy(alpha = 0.62f),
                     fontSize = 11.5.sp,
                 )
             }
@@ -1051,6 +1080,7 @@ private fun PresetSwitchRow(
         NgSwitchControl(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            enabled = enabled,
             modifier = Modifier.size(width = 52.dp, height = 36.dp),
         )
     }
@@ -1115,6 +1145,12 @@ private fun DefaultsPage(
             onClick = actions.onOpenLanguageFonts,
         )
         ReadDivider(contentColor)
+        DefaultsLinkRow(
+            title = stringResource(R.string.read_style_new_book_preset),
+            iconRes = R.drawable.ic_book_info_read,
+            contentColor = contentColor,
+            onClick = actions.onOpenNewBookPreset,
+        )
     }
 }
 
@@ -1152,6 +1188,112 @@ private fun FloatingWindowsPage(
 }
 
 @Composable
+private fun NewBookPresetPage(
+    state: ReadStyleUiState,
+    contentColor: Color,
+    accentColor: Color,
+    actions: ReadStyleActions,
+) {
+    val useCurrent = stringResource(R.string.read_style_use_current_preset)
+    val options = remember(state.presets, useCurrent) {
+        listOf(null to useCurrent) + state.presets.filter { it.index >= 0 && it.name.isNotBlank() }.map { preset ->
+            preset.name to preset.name
+        }
+    }
+    StyleSubpageHeader(
+        title = stringResource(R.string.read_style_new_book_preset),
+        subtitle = stringResource(R.string.read_style_new_book_preset_summary),
+        contentColor = contentColor,
+        onBack = actions.onBack,
+    )
+    ReadDivider(contentColor)
+    NewBookPresetRow(
+        title = stringResource(R.string.read_style_new_book_cjk),
+        selectedName = state.languagePresetCjk,
+        options = options,
+        contentColor = contentColor,
+        accentColor = accentColor,
+        detected = state.detectedScriptClass == BookScriptClass.Cjk.storageValue,
+        onSelected = { actions.onLanguagePresetChanged(BookScriptClass.Cjk, it) },
+    )
+    ReadDivider(contentColor)
+    NewBookPresetRow(
+        title = stringResource(R.string.read_style_new_book_latin),
+        selectedName = state.languagePresetLatin,
+        options = options,
+        contentColor = contentColor,
+        accentColor = accentColor,
+        detected = state.detectedScriptClass == BookScriptClass.Latin.storageValue,
+        onSelected = { actions.onLanguagePresetChanged(BookScriptClass.Latin, it) },
+    )
+    ReadDivider(contentColor)
+    NewBookPresetRow(
+        title = stringResource(R.string.read_style_new_book_other),
+        selectedName = state.languagePresetOther,
+        options = options,
+        contentColor = contentColor,
+        accentColor = accentColor,
+        detected = state.detectedScriptClass == BookScriptClass.Other.storageValue,
+        onSelected = { actions.onLanguagePresetChanged(BookScriptClass.Other, it) },
+    )
+    ReadDivider(contentColor)
+}
+
+@Composable
+private fun NewBookPresetRow(
+    title: String,
+    selectedName: String?,
+    options: List<Pair<String?, String>>,
+    contentColor: Color,
+    accentColor: Color,
+    detected: Boolean = false,
+    onSelected: (String?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.first == selectedName }?.second
+        ?: options.first().second
+    Box(modifier = Modifier.fillMaxWidth()) {
+        LabeledValueRow(
+            label = title,
+            value = selectedLabel,
+            contentColor = contentColor,
+            labelColor = if (detected) accentColor else contentColor,
+            canReset = selectedName != null,
+            resetDescription = stringResource(R.string.read_style_use_current_preset),
+            onClick = { expanded = true },
+            onReset = { onSelected(null) },
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { (value, label) ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = label,
+                            color = if (value == selectedName) accentColor else contentColor,
+                            fontSize = 14.sp,
+                            fontWeight = if (value == selectedName) {
+                                FontWeight.Medium
+                            } else {
+                                FontWeight.Normal
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onSelected(value)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun DefaultsLinkRow(
     title: String,
     iconRes: Int,
@@ -1170,7 +1312,7 @@ private fun DefaultsLinkRow(
             painter = painterResource(iconRes),
             contentDescription = null,
             tint = contentColor,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(25.dp),
         )
         Text(
             text = title,
@@ -1226,6 +1368,57 @@ private fun StyleSubpageHeader(
                 .weight(1f, fill = false)
                 .basicMarquee(),
         )
+    }
+}
+
+@Composable
+private fun LabeledValueRow(
+    label: String,
+    value: String,
+    contentColor: Color,
+    labelColor: Color = contentColor,
+    unavailable: Boolean = false,
+    canReset: Boolean = false,
+    resetDescription: String = "",
+    onClick: () -> Unit,
+    onReset: () -> Unit = {},
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color = labelColor,
+            fontSize = 15.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            color = contentColor.copy(alpha = 0.72f),
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textDecoration = if (unavailable) TextDecoration.LineThrough else TextDecoration.None,
+            modifier = Modifier.weight(1.4f, fill = false),
+        )
+        if (canReset) {
+            Spacer(Modifier.width(10.dp))
+            Icon(
+                painter = painterResource(R.drawable.ic_restore),
+                contentDescription = resetDescription,
+                tint = contentColor,
+                modifier = Modifier
+                    .size(22.dp)
+                    .clickable(role = Role.Button, onClick = onReset),
+            )
+        }
     }
 }
 
