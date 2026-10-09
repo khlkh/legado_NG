@@ -351,43 +351,33 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
         onFloatingColorSourceChanged = ::setFloatingColorSource,
         onPickFloatingColor = ::pickFloatingColor,
         onFloatingTransparencyChanged = { value ->
-            val config = ReadBookConfig.durConfig
-            config.readFloatingTransparency = ReadFloatingAppearanceConfig.normalizePercent(value)
-            updateEditorState {
-                copy(editorFloatingTransparency = config.curReadFloatingTransparency())
-            }
+            val transparency = ReadFloatingAppearanceConfig.normalizePercent(value)
+            ReadBookConfig.readFloatingGlobalTransparency = transparency
+            updateEditorState { copy(editorFloatingTransparency = transparency) }
             ReadFloatingAppearanceState.update(
-                config.curReadFloatingTransparency(),
-                config.curReadFloatingPrimaryStrength(),
-                ReadBookConfig.effectiveReadFloatingColor(config).colorStyle,
+                transparency,
+                ReadBookConfig.readFloatingGlobalPrimaryStrength,
+                ReadBookConfig.effectiveReadFloatingColor().colorStyle,
             )
         },
         onFloatingPrimaryStrengthChanged = { value ->
-            val config = ReadBookConfig.durConfig
-            config.readFloatingPrimaryStrength = ReadFloatingAppearanceConfig.normalizePercent(value)
-            updateEditorState {
-                copy(editorFloatingPrimaryStrength = config.curReadFloatingPrimaryStrength())
-            }
+            val strength = ReadFloatingAppearanceConfig.normalizePercent(value)
+            ReadBookConfig.readFloatingGlobalPrimaryStrength = strength
+            updateEditorState { copy(editorFloatingPrimaryStrength = strength) }
             ReadFloatingAppearanceState.update(
-                config.curReadFloatingTransparency(),
-                config.curReadFloatingPrimaryStrength(),
-                ReadBookConfig.effectiveReadFloatingColor(config).colorStyle,
+                ReadBookConfig.readFloatingGlobalTransparency,
+                strength,
+                ReadBookConfig.effectiveReadFloatingColor().colorStyle,
             )
         },
         onFloatingColorStyleChanged = { style ->
-            val config = ReadBookConfig.durConfig
-            if (ReadBookConfig.floatingColorManagedGlobally) {
-                ReadBookConfig.readFloatingGlobalColorStyle = style
-            } else {
-                config.readFloatingColorStyle = style
-            }
+            ReadBookConfig.readFloatingGlobalColorStyle = style
             updateEditorState { copy(editorFloatingColorStyle = style) }
             ReadFloatingAppearanceState.update(
-                config.curReadFloatingTransparency(),
-                config.curReadFloatingPrimaryStrength(),
-                ReadBookConfig.effectiveReadFloatingColor(config).colorStyle,
+                ReadBookConfig.readFloatingGlobalTransparency,
+                ReadBookConfig.readFloatingGlobalPrimaryStrength,
+                style,
             )
-            if (!ReadBookConfig.floatingColorManagedGlobally) ReadBookConfig.save()
             notifyFloatingAppearanceChanged()
         },
         onFloatingAppearanceChangeFinished = {
@@ -509,6 +499,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
         onFollowGlobal = ::followGlobalPreset,
         onDismissRequest = ::requestDismiss,
         onOpenLanguageFonts = ::openLanguageFonts,
+        onOpenFloatingWindows = ::openFloatingWindows,
         onSelectScriptFont = ::selectScriptFont,
         onResetScriptFont = ::resetScriptFont,
         onSelectEditorScriptFont = ::selectEditorScriptFont,
@@ -683,7 +674,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
             }.getOrNull()
         }
         val rules = currentRules()
-        val effectiveFloatingColor = ReadBookConfig.effectiveReadFloatingColor(config)
+        val effectiveFloatingColor = ReadBookConfig.effectiveReadFloatingColor()
         selectedHighlightIds = selectedHighlightIds.intersect(rules.mapTo(hashSetOf()) { it.id })
         screenState = ReadStyleUiState(
             presets = (if (ReadBookConfig.onlyThisBook) listOf(-1 to config) else emptyList())
@@ -711,6 +702,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
             isEpub = ReadBook.book?.isEpub == true,
             onlyThisBook = ReadBookConfig.onlyThisBook,
             canUseBookStyle = ReadBookConfig.canUseBookStyle,
+
             globalFloatingFollowApp = ReadBookConfig.floatingColorManagedGlobally,
             textSize = ReadBookConfig.textSize,
             letterSpacing = ReadBookConfig.letterSpacing,
@@ -731,10 +723,10 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
             editorBackgroundColor = backgroundColor,
             editorTextAccentColor = config.curTextAccentColor(),
             editorBackgroundAlpha = ReadBookConfig.bgAlpha.coerceIn(0, 100),
-            editorFloatingColorSeed = effectiveFloatingColor.seed,
-            editorFloatingColorFromBackground = !effectiveFloatingColor.followsApplication,
-            editorFloatingTransparency = config.curReadFloatingTransparency(),
-            editorFloatingPrimaryStrength = config.curReadFloatingPrimaryStrength(),
+            editorFloatingColorSeed = ReadBookConfig.currentGlobalFloatingSeed(),
+            editorFloatingColorFromBackground = !ReadBookConfig.readFloatingFollowAppGlobally,
+            editorFloatingTransparency = ReadBookConfig.readFloatingGlobalTransparency,
+            editorFloatingPrimaryStrength = ReadBookConfig.readFloatingGlobalPrimaryStrength,
             editorFloatingColorStyle = effectiveFloatingColor.colorStyle,
             fullLineUnderline = currentFullLineUnderlineState(),
             highlightDraft = highlightDraft,
@@ -848,6 +840,13 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
     private fun openLanguageFonts() {
         currentPage = ReadStylePage.LANGUAGE_FONTS
         page = ReadStylePage.LANGUAGE_FONTS
+        refreshUi()
+    }
+
+
+    private fun openFloatingWindows() {
+        currentPage = ReadStylePage.FLOATING_WINDOWS
+        page = ReadStylePage.FLOATING_WINDOWS
         refreshUi()
     }
 
@@ -979,6 +978,11 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
 
             page == ReadStylePage.LANGUAGE_FONTS -> {
                 page = ReadStylePage.PRESET
+                refreshUi()
+            }
+
+            page == ReadStylePage.FLOATING_WINDOWS -> {
+                page = ReadStylePage.APP_DEFAULTS
                 refreshUi()
             }
         }
@@ -1124,22 +1128,12 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
     }
 
     private fun setFloatingColorSource(fromBackground: Boolean) {
-        if (ReadBookConfig.floatingColorManagedGlobally) return
-        val config = ReadBookConfig.durConfig
-        if (fromBackground) {
-            updateEditorState { copy(editorFloatingColorFromBackground = true) }
-            return
-        }
-        if (config.curReadFloatingSeed() != 0) {
-            config.clearCurReadFloatingSeed()
-            ReadBookConfig.save()
-        }
+        ReadBookConfig.readFloatingFollowAppGlobally = !fromBackground
         refreshUi()
         notifyFloatingAppearanceChanged()
     }
 
     private fun pickFloatingColor() {
-        if (ReadBookConfig.floatingColorManagedGlobally) return
         val config = ReadBookConfig.durConfig
         if (config.curBgType() == 0) {
             runCatching { config.curBgStr().toColorInt() }
@@ -1168,9 +1162,8 @@ class ReadStyleDialog : BaseComposeDialogFragment(),
     }
 
     private fun applyFloatingColor(color: Int) {
-        if (ReadBookConfig.floatingColorManagedGlobally) return
-        ReadBookConfig.durConfig.setCurReadFloatingSeed(color)
-        ReadBookConfig.save()
+        ReadBookConfig.readFloatingFollowAppGlobally = false
+        ReadBookConfig.setGlobalFloatingSeed(color)
         refreshUi()
         notifyFloatingAppearanceChanged()
     }
