@@ -33,6 +33,7 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.primaryColor
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -499,6 +500,26 @@ internal object NgColorMath {
         val darker = min(luminance(first), luminance(second))
         return (lighter + 0.05) / (darker + 0.05)
     }
+
+    /** Source-over: opaque FG·α + BG·(1−α). */
+    fun flatten(@ColorInt foreground: Int, @ColorInt background: Int): Int {
+        val amount = alpha(foreground) / 255f
+        if (amount >= 0.999f) return opaque(foreground)
+        if (amount <= 0.001f) return opaque(background)
+        return opaque(blend(opaque(background), opaque(foreground), amount))
+    }
+
+    fun displayedContrast(@ColorInt foreground: Int, @ColorInt background: Int): Double =
+        contrastRatio(flatten(foreground, background), opaque(background))
+
+    fun wcagGrade(ratio: Double): String = when {
+        ratio >= 7.0 -> "AAA"
+        ratio >= 4.5 -> "AA"
+        else -> "—"
+    }
+
+    fun wcagContrastLabel(ratio: Double): String =
+        "WCAG %.1f:1  %s".format(Locale.US, ratio, wcagGrade(ratio))
 
     private fun luminance(@ColorInt color: Int): Double {
         fun channel(value: Int): Double {
