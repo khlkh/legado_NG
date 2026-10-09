@@ -7,6 +7,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -49,16 +52,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -103,6 +114,9 @@ private val EditorPageHeight = 500.dp
 private val PresetVisibleHorizontalInset = 6.dp
 private val BackgroundTileSpacing = 6.dp
 
+private const val SheetTransparencyMinPercent = 0
+private const val SheetTransparencyMaxPercent = 72
+
 internal enum class ReadStylePage {
     PRESET,
     ADJUST,
@@ -119,6 +133,9 @@ internal enum class ReadStylePage {
     HIGHLIGHT_BACKGROUND_COLOR,
     HIGHLIGHT_UNDERLINE_COLOR,
     LANGUAGE_FONTS,
+    FLOATING_WINDOWS,
+
+    APP_DEFAULTS,
 }
 
 internal enum class HighlightSelectionMode {
@@ -307,6 +324,7 @@ internal data class ReadStyleActions(
     val onFollowGlobal: () -> Unit,
     val onDismissRequest: () -> Unit,
     val onOpenLanguageFonts: () -> Unit,
+    val onOpenFloatingWindows: () -> Unit,
     val onSelectScriptFont: (ReadValueScope) -> Unit,
     val onResetScriptFont: (ReadValueScope) -> Unit,
     val onSelectEditorScriptFont: (ReadValueScope) -> Unit,
@@ -405,6 +423,34 @@ internal fun ReadStyleScreen(
                         .padding(top = 8.dp),
                 ) {
                     LanguageFontsPage(
+                        state = state,
+                        contentColor = contentColor,
+                        actions = actions,
+                    )
+                }
+
+
+                ReadStylePage.FLOATING_WINDOWS -> Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(StandardPageHeight)
+                        .padding(top = 8.dp),
+                ) {
+                    FloatingWindowsPage(
+                        state = state,
+                        contentColor = contentColor,
+                        accentColor = indicatorColor,
+                        actions = actions,
+                    )
+                }
+
+                ReadStylePage.APP_DEFAULTS -> Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(StandardPageHeight)
+                        .padding(top = 8.dp),
+                ) {
+                    DefaultsPage(
                         state = state,
                         contentColor = contentColor,
                         actions = actions,
@@ -525,6 +571,77 @@ private fun ReadStyleSessionBar(
             text = stringResource(R.string.read_style_done),
             onClick = onDone,
             variant = NgButtonVariant.PRIMARY,
+        )
+    }
+}
+
+@Composable
+
+private fun SheetTransparencySlider(
+    value: Int,
+    contentColor: Color,
+    onValueChanged: (Int) -> Unit,
+) {
+    val label = stringResource(R.string.read_style_sheet_transparency)
+    val movedThumbColor = Color(NgTheme.colors.error)
+    val min = SheetTransparencyMinPercent.toFloat()
+    val max = SheetTransparencyMaxPercent.toFloat()
+    val range = min..max
+    val current = value.toFloat().coerceIn(range)
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(12.dp)
+            .padding(horizontal = 20.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = label
+                progressBarRangeInfo = ProgressBarRangeInfo(
+                    current = current,
+                    range = range,
+                    steps = SheetTransparencyMaxPercent - SheetTransparencyMinPercent - 1,
+                )
+                setProgress { target ->
+                    onValueChanged(target.toInt().coerceIn(SheetTransparencyMinPercent, SheetTransparencyMaxPercent))
+                    true
+                }
+            }
+            .pointerInput(Unit) {
+                fun emit(x: Float) {
+                    val fraction = (x / size.width.toFloat()).coerceIn(0f, 1f)
+                    val next = (min + (max - min) * fraction).toInt()
+                    onValueChanged(next.coerceIn(SheetTransparencyMinPercent, SheetTransparencyMaxPercent))
+                }
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    emit(down.position.x)
+                    do {
+                        val event = awaitPointerEvent()
+                        event.changes.firstOrNull()?.let { change ->
+                            if (change.pressed) emit(change.position.x)
+                            change.consume()
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            },
+    ) {
+        val trackHeight = 1.dp.toPx()
+        val y = (size.height - trackHeight) / 2f
+        val fraction = ((current - min) / (max - min)).coerceIn(0f, 1f)
+        val thumbX = size.width * fraction
+        drawRect(
+            color = contentColor.copy(alpha = 0.06f),
+            topLeft = Offset(0f, y),
+            size = Size(size.width, trackHeight),
+        )
+        val thumbColor = if (value == SheetTransparencyMinPercent) {
+            contentColor.copy(alpha = 0.10f)
+        } else {
+            movedThumbColor
+        }
+        drawCircle(
+            color = thumbColor,
+            radius = 2.dp.toPx(),
+            center = Offset(thumbX, size.height / 2f),
         )
     }
 }
@@ -698,41 +815,15 @@ private fun LanguageFontsPage(
     contentColor: Color,
     actions: ReadStyleActions,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_arrow_back),
-            contentDescription = stringResource(R.string.back),
-            tint = contentColor,
-            modifier = Modifier
-                .size(28.dp)
-                .clickable(role = Role.Button, onClick = actions.onBack),
-        )
-        Text(
-            text = stringResource(R.string.read_style_language_fonts),
-            color = contentColor,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(start = 8.dp),
-        )
-        Text(
-            text = stringResource(R.string.read_style_language_fonts_subtitle),
-            color = contentColor.copy(alpha = 0.62f),
-            fontSize = 12.sp,
-            maxLines = 1,
-            modifier = Modifier
-                .padding(start = 12.dp)
-                .weight(1f, fill = false)
-                .basicMarquee(),
-        )
-    }
+    StyleSubpageHeader(
+        title = stringResource(R.string.read_style_language_fonts),
+        subtitle = stringResource(R.string.read_style_language_fonts_subtitle),
+        contentColor = contentColor,
+        onBack = actions.onBack,
+    )
     ReadDivider(contentColor)
     state.languageFonts.forEach { item ->
+
         Row(
             Modifier.fillMaxWidth().height(56.dp)
                 .clickable(role = Role.Button, onClick = { actions.onSelectScriptFont(item.scope) })
@@ -1009,6 +1100,145 @@ private fun PresetRestoreAllRow(
 }
 
 @Composable
+private fun DefaultsPage(
+    state: ReadStyleUiState,
+    contentColor: Color,
+    actions: ReadStyleActions,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        DefaultsLinkRow(
+            title = stringResource(R.string.read_style_floating_section),
+            iconRes = R.drawable.ic_cfg_theme,
+            contentColor = contentColor,
+            onClick = actions.onOpenFloatingWindows,
+        )
+        ReadDivider(contentColor)
+        DefaultsLinkRow(
+            title = stringResource(R.string.read_style_language_fonts),
+            iconRes = R.drawable.ic_ai_capability_text,
+            contentColor = contentColor,
+            onClick = actions.onOpenLanguageFonts,
+        )
+        ReadDivider(contentColor)
+    }
+}
+
+@Composable
+private fun FloatingWindowsPage(
+    state: ReadStyleUiState,
+    contentColor: Color,
+    accentColor: Color,
+    actions: ReadStyleActions,
+) {
+    Column(Modifier.fillMaxWidth().fillMaxHeight()) {
+        StyleSubpageHeader(
+            title = stringResource(R.string.read_style_floating_section),
+            subtitle = stringResource(R.string.read_style_floating_section_subtitle),
+            contentColor = contentColor,
+            onBack = actions.onBack,
+        )
+        ReadDivider(contentColor)
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 12.dp),
+        ) {
+            EditorFloatingSection(
+                state = state,
+                contentColor = contentColor,
+                accentColor = accentColor,
+                indicatorColor = accentColor,
+                actions = actions,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DefaultsLinkRow(
+    title: String,
+    iconRes: Int,
+    contentColor: Color,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(22.dp),
+        )
+        Text(
+            text = title,
+            color = contentColor,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(start = 14.dp).weight(1f),
+        )
+        Icon(
+            painter = painterResource(R.drawable.ic_chevron_right_20),
+            contentDescription = null,
+            tint = contentColor.copy(alpha = 0.72f),
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun StyleSubpageHeader(
+    title: String,
+    subtitle: String,
+    contentColor: Color,
+    onBack: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_arrow_back),
+            contentDescription = stringResource(R.string.back),
+            tint = contentColor,
+            modifier = Modifier
+                .size(28.dp)
+                .clickable(role = Role.Button, onClick = onBack),
+        )
+        Text(
+            text = title,
+            color = contentColor,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+        Text(
+            text = subtitle,
+            color = contentColor.copy(alpha = 0.62f),
+            fontSize = 12.sp,
+            maxLines = 1,
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .weight(1f, fill = false)
+                .basicMarquee(),
+        )
+    }
+}
+
+@Composable
 private fun EditorPage(
     state: ReadStyleUiState,
     contentColor: Color,
@@ -1204,19 +1434,6 @@ private fun EditorPage(
                 }
                 Spacer(Modifier.height(14.dp))
                 ReadDivider(contentColor, horizontalPadding = 0.dp)
-                EditorSectionLabel(
-                    stringResource(R.string.read_style_floating_section),
-                    accentColor,
-                )
-                EditorFloatingSection(
-                    state = state,
-                    contentColor = contentColor,
-                    accentColor = accentColor,
-                    indicatorColor = indicatorColor,
-                    actions = actions,
-                )
-                Spacer(Modifier.height(8.dp))
-                ReadDivider(contentColor, horizontalPadding = 0.dp)
                 EditorNavigationRow(
                     title = stringResource(R.string.read_style_restore_current),
                     summary = stringResource(
@@ -1377,9 +1594,7 @@ private fun EditorFloatingSection(
 ) {
     val selectedContentColor = Color(NgTheme.colors.onPrimary)
     val sourceShape = RoundedCornerShape(10.dp)
-    val globallyFollowsApplication = state.globalFloatingFollowApp
-    val inkMode = state.editorMode == 2
-    val fromBackground = !globallyFollowsApplication && !inkMode && state.editorFloatingColorFromBackground
+    val fromBackground = state.editorFloatingColorFromBackground
     val hasSample = state.editorFloatingColorSeed != 0
     val displayedColor = if (hasSample) {
         state.editorFloatingColorSeed
@@ -1402,13 +1617,13 @@ private fun EditorFloatingSection(
     ) {
         FloatingSourceOption(
             label = stringResource(R.string.read_style_floating_color_follow),
-            selected = !inkMode && !fromBackground,
+            selected = !fromBackground,
             contentColor = contentColor,
             selectedContainerColor = indicatorColor,
             selectedContentColor = selectedContentColor,
             onClick = { actions.onFloatingColorSourceChanged(false) },
             modifier = Modifier.weight(1f),
-            enabled = !globallyFollowsApplication && !inkMode,
+
         )
         FloatingSourceOption(
             label = stringResource(R.string.read_style_floating_color_background),
@@ -1418,29 +1633,12 @@ private fun EditorFloatingSection(
             selectedContentColor = selectedContentColor,
             onClick = { actions.onFloatingColorSourceChanged(true) },
             modifier = Modifier.weight(1f),
-            enabled = !globallyFollowsApplication && !inkMode,
-        )
-    }
 
-    if (inkMode) {
-        Text(
-            text = stringResource(R.string.read_style_floating_ink_no_seed),
-            modifier = Modifier.padding(top = 6.dp), color = contentColor.copy(alpha = 0.62f), fontSize = 11.sp,
-        )
-    } else if (globallyFollowsApplication) {
-        Text(
-            text = stringResource(R.string.read_style_global_follow_app_color_managed),
-            modifier = Modifier.padding(top = 6.dp),
-            color = contentColor.copy(alpha = 0.62f),
-            fontSize = 11.sp,
         )
     }
 
     Text(
-        text = stringResource(
-            if (globallyFollowsApplication) R.string.read_style_global_color_style
-            else R.string.read_style_floating_color_style
-        ) + " · " + stringResource(R.string.read_style_shared_short),
+        text = stringResource(R.string.read_style_floating_color_style),
         modifier = Modifier.padding(top = 12.dp, bottom = 7.dp),
         color = contentColor,
         fontSize = 15.sp,
@@ -1513,7 +1711,7 @@ private fun EditorFloatingSection(
     }
 
     EditorFloatingSlider(
-        title = "${stringResource(R.string.read_floating_window_transparency)} · ${stringResource(R.string.read_style_shared_short)}",
+        title = stringResource(R.string.read_floating_window_transparency),
         value = state.editorFloatingTransparency,
         contentColor = contentColor,
         accentColor = accentColor,
@@ -1521,7 +1719,7 @@ private fun EditorFloatingSection(
         onValueChangeFinished = actions.onFloatingAppearanceChangeFinished,
     )
     EditorFloatingSlider(
-        title = "${stringResource(R.string.read_floating_window_primary_strength)} · ${stringResource(R.string.read_style_shared_short)}",
+        title = stringResource(R.string.read_floating_window_primary_strength),
         value = state.editorFloatingPrimaryStrength,
         contentColor = contentColor,
         accentColor = accentColor,
@@ -1554,11 +1752,14 @@ private fun FloatingSourceOption(
     ) {
         Text(
             text = label,
+            modifier = Modifier.padding(horizontal = 4.dp),
             color = (if (selected) selectedContentColor else contentColor).copy(
                 alpha = if (enabled || selected) 1f else 0.42f
             ),
             fontSize = fontSize,
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

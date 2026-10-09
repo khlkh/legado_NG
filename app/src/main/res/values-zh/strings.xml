@@ -2411,6 +2411,7 @@
     <string name="read_style_color_accent_short">强调</string>
     <string name="read_style_floating_color">浮窗取色</string>
     <string name="read_style_floating_section">浮窗</string>
+    <string name="read_style_floating_section_subtitle">所有预设共用</string>
     <string name="read_style_floating_color_follow">跟随应用</string>
     <string name="read_style_floating_color_background">从背景取色</string>
     <string name="read_style_floating_color_style">色彩风格</string>
@@ -2605,4 +2606,5 @@
     <string name="webdav_cancelled">传输已取消</string>
     <string name="webdav_transfer_result">传输结果</string>
     <string name="webdav_result_counts">完成 %1$d 项 · 跳过 %2$d 项 · 失败 %3$d 项</string>
+    <string name="read_style_sheet_transparency">面板</string>
 </resources>

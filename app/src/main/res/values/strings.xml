@@ -2511,6 +2511,7 @@
     <string name="read_style_color_accent_short">Accent</string>
     <string name="read_style_floating_color">Pick floating-window color</string>
     <string name="read_style_floating_section">Floating windows</string>
+    <string name="read_style_floating_section_subtitle">Shared by every preset</string>
     <string name="read_style_floating_color_follow">Follow app</string>
     <string name="read_style_floating_color_background">Pick from background</string>
     <string name="read_style_floating_color_style">Color style</string>
@@ -2703,4 +2704,5 @@
     <string name="webdav_cancelled">Transfer cancelled</string>
     <string name="webdav_transfer_result">Transfer results</string>
     <string name="webdav_result_counts">Completed %1$d · Skipped %2$d · Failed %3$d</string>
+    <string name="read_style_sheet_transparency">Sheet</string>
 </resources>
