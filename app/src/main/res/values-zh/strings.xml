@@ -2619,4 +2619,6 @@
     <string name="webdav_transfer_result">传输结果</string>
     <string name="webdav_result_counts">完成 %1$d 项 · 跳过 %2$d 项 · 失败 %3$d 项</string>
     <string name="read_style_sheet_transparency">面板</string>
+    <string name="read_style_name_required">请填写预设名称</string>
+    <string name="read_style_name_kept">名称为空，已保留原来的名称</string>
 </resources>

@@ -2717,4 +2717,6 @@
     <string name="webdav_transfer_result">Transfer results</string>
     <string name="webdav_result_counts">Completed %1$d · Skipped %2$d · Failed %3$d</string>
     <string name="read_style_sheet_transparency">Sheet</string>
+    <string name="read_style_name_required">Enter a preset name</string>
+    <string name="read_style_name_kept">Empty name was not saved</string>
 </resources>
