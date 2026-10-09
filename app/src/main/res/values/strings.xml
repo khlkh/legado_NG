@@ -2407,7 +2407,7 @@
     <string name="read_tip_position">%1$s · %2$s</string>
     <string name="read_tip_used_at">Used in %1$s</string>
     <string name="reading_presets">Reading presets</string>
-    <string name="read_style_only_this_book">Customize for this book</string>
+    <string name="read_style_only_this_book">Preset for this book only</string>
     <string name="read_style_only_this_book_subtitle">Changes apply only to this book and won\'t follow the global preset</string>
     <string name="read_style_book_font">Book font</string>
     <string name="read_style_language_fonts">Language fonts</string>
