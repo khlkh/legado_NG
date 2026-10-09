@@ -66,7 +66,7 @@ class AboutActivity : BaseActivity<ComposeActivityBinding>() {
                     )
                     Box(modifier = Modifier.weight(1f)) {
                         AboutScreen(
-                            versionName = appInfo.versionName,
+                            versionName = "${appInfo.versionName}-${appInfo.versionCode}",
                             onContributorsClick = { openUrl(R.string.contributors_url) },
                             onCheckUpdateClick = ::checkUpdate,
                             onCheckUpdateLongClick = if (BuildConfig.DEBUG) ::showLatestRelease else null,
