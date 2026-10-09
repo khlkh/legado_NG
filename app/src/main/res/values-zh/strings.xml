@@ -2532,4 +2532,6 @@
     <string name="all_bookmark_expanded">已展开</string>
     <string name="all_bookmark_collapsed">已收起</string>
     <string name="read_style_sheet_transparency">面板</string>
+    <string name="read_style_name_required">请填写预设名称</string>
+    <string name="read_style_name_kept">名称为空，已保留原来的名称</string>
 </resources>
