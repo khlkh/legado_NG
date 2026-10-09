@@ -2355,6 +2355,7 @@
     <string name="read_style_color_accent_short">强调</string>
     <string name="read_style_floating_color">浮窗取色</string>
     <string name="read_style_floating_section">浮窗</string>
+    <string name="read_style_floating_section_subtitle">所有预设共用</string>
     <string name="read_style_floating_color_follow">跟随应用</string>
     <string name="read_style_floating_color_background">从背景取色</string>
     <string name="read_style_floating_color_style">色彩风格</string>
@@ -2518,4 +2519,5 @@
     <string name="all_bookmark_collapse_all">全部收起</string>
     <string name="all_bookmark_expanded">已展开</string>
     <string name="all_bookmark_collapsed">已收起</string>
+    <string name="read_style_sheet_transparency">面板</string>
 </resources>

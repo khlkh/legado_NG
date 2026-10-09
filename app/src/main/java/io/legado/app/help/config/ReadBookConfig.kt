@@ -28,6 +28,7 @@ import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.getFile
 import io.legado.app.utils.getMeanColor
+import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
@@ -106,7 +107,7 @@ object ReadBookConfig {
     }
     val onlyThisBook: Boolean get() = bookStyle.config != null
     val canUseBookStyle: Boolean get() = bookStyle.isBound
-    val floatingColorManagedGlobally: Boolean get() = !onlyThisBook && readFloatingFollowAppGlobally
+    val floatingColorManagedGlobally: Boolean get() = readFloatingFollowAppGlobally
 
     fun bindBook(book: Book): Boolean {
         boundBook = book
@@ -638,6 +639,90 @@ object ReadBookConfig {
         )
     }
 
+    var readFloatingGlobalTransparency: Int
+        get() {
+            migrateFloatingAppearanceIfNeeded()
+            return ReadFloatingAppearanceConfig.normalizePercent(
+                appCtx.getPrefInt(
+                    PreferKey.readFloatingGlobalTransparency,
+                    ReadFloatingAppearanceConfig.DEFAULT_TRANSPARENCY_PERCENT,
+                )
+            )
+        }
+        set(value) {
+            appCtx.putPrefInt(
+                PreferKey.readFloatingGlobalTransparency,
+                ReadFloatingAppearanceConfig.normalizePercent(value),
+            )
+        }
+
+    var readFloatingGlobalPrimaryStrength: Int
+        get() {
+            migrateFloatingAppearanceIfNeeded()
+            return ReadFloatingAppearanceConfig.normalizePercent(
+                appCtx.getPrefInt(
+                    PreferKey.readFloatingGlobalPrimaryStrength,
+                    ReadFloatingAppearanceConfig.DEFAULT_PRIMARY_STRENGTH_PERCENT,
+                )
+            )
+        }
+        set(value) {
+            appCtx.putPrefInt(
+                PreferKey.readFloatingGlobalPrimaryStrength,
+                ReadFloatingAppearanceConfig.normalizePercent(value),
+            )
+        }
+
+    fun currentGlobalFloatingSeed(): Int {
+        migrateFloatingAppearanceIfNeeded()
+        val key = if (isNightTheme) {
+            PreferKey.readFloatingGlobalSeedNight
+        } else {
+            PreferKey.readFloatingGlobalSeed
+        }
+        return appCtx.getPrefInt(key, 0)
+    }
+
+    fun setGlobalFloatingSeed(color: Int) {
+        val key = if (isNightTheme) {
+            PreferKey.readFloatingGlobalSeedNight
+        } else {
+            PreferKey.readFloatingGlobalSeed
+        }
+        appCtx.putPrefInt(key, color or 0xFF000000.toInt())
+    }
+
+    /**
+     * 浮窗外观只保留全局一层。旧数据在当前预设上时，首次读取抄到全局偏好。
+     * 透明度键作为迁移标记，最后写入。
+     */
+    private fun migrateFloatingAppearanceIfNeeded() {
+        val prefs = appCtx.defaultSharedPreferences
+        if (prefs.contains(PreferKey.readFloatingGlobalTransparency)) return
+        if (configList.isEmpty() && bookStyle.config == null) return
+        val preset = bookStyle.config
+            ?: configList.getOrNull(readStyleSelect)
+            ?: configList.firstOrNull()
+            ?: return
+        appCtx.putPrefInt(
+            PreferKey.readFloatingGlobalPrimaryStrength,
+            preset.curReadFloatingPrimaryStrength(),
+        )
+        appCtx.putPrefInt(PreferKey.readFloatingGlobalSeed, preset.readFloatingSeed)
+        appCtx.putPrefInt(PreferKey.readFloatingGlobalSeedNight, preset.readFloatingSeedNight)
+        if (!readFloatingFollowAppGlobally) {
+            if (preset.curReadFloatingFollowsApplication()) {
+                readFloatingFollowAppGlobally = true
+            } else {
+                readFloatingGlobalColorStyle = preset.curReadFloatingColorStyle()
+            }
+        }
+        appCtx.putPrefInt(
+            PreferKey.readFloatingGlobalTransparency,
+            preset.curReadFloatingTransparency(),
+        )
+    }
+
     private fun normalizeAutoReadPageMode(value: Int): Int = when (value) {
         PageAnim.coverPageAnim -> PageAnim.coverPageAnim
         else -> PageAnim.scrollPageAnim
@@ -691,16 +776,18 @@ object ReadBookConfig {
 
     val config get() = bookStyle.config ?: durConfig
 
-    internal fun effectiveReadFloatingColor(
-        preset: Config = durConfig,
-    ): EffectiveReadFloatingColor = resolveEffectiveReadFloatingColor(
-        isEInk = AppConfig.isEInkMode,
-        globallyFollowsApplication = floatingColorManagedGlobally,
-        globalColorStyle = readFloatingGlobalColorStyle,
-        presetSeed = preset.curReadFloatingSeed(),
-        presetFollowsApplication = preset.curReadFloatingFollowsApplication(),
-        presetColorStyle = preset.curReadFloatingColorStyle(),
-    )
+    internal fun effectiveReadFloatingColor(): EffectiveReadFloatingColor {
+        migrateFloatingAppearanceIfNeeded()
+        val seed = currentGlobalFloatingSeed()
+        return resolveEffectiveReadFloatingColor(
+            isEInk = AppConfig.isEInkMode,
+            globallyFollowsApplication = readFloatingFollowAppGlobally,
+            globalColorStyle = readFloatingGlobalColorStyle,
+            presetSeed = seed,
+            presetFollowsApplication = seed == 0,
+            presetColorStyle = readFloatingGlobalColorStyle,
+        )
+    }
 
     var bgAlpha: Int
         get() = config.bgAlpha
