@@ -1659,47 +1659,6 @@ private fun EditorPage(
                     color = contentColor,
                     fontSize = 15.sp,
                 )
-            ReadDivider(contentColor, horizontalPadding = 0.dp)
-            EditorSectionLabel(stringResource(R.string.read_style_language_fonts), accentColor)
-            state.editorScriptFonts.forEach { script ->
-                Row(
-                    Modifier.fillMaxWidth().height(52.dp)
-                        .clickable(role = Role.Button) { actions.onSelectEditorScriptFont(script.scope) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = script.label,
-                        color = contentColor,
-                        fontSize = 15.sp,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = if (script.font.isBlank()) {
-                            stringResource(R.string.read_style_follow_global)
-                        } else {
-                            fontDisplayName(script.font) + " · " +
-                                stringResource(R.string.read_style_source_preset_scripts)
-                        },
-                        color = contentColor.copy(alpha = 0.72f),
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1.4f, fill = false),
-                    )
-                    if (script.canReset) {
-                        Spacer(Modifier.width(10.dp))
-                        Icon(
-                            painter = painterResource(R.drawable.ic_restore),
-                            contentDescription = stringResource(R.string.read_style_reset_font),
-                            tint = contentColor,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clickable(role = Role.Button) { actions.onResetEditorScriptFont(script.scope) },
-                        )
-                    }
-                }
-            }
-            ReadDivider(contentColor, horizontalPadding = 0.dp)
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                     val tileWidth = (maxWidth - 25.dp) / 5f
                     LazyRow(
@@ -1737,6 +1696,46 @@ private fun EditorPage(
                     }
                 }
                 Spacer(Modifier.height(14.dp))
+                ReadDivider(contentColor, horizontalPadding = 0.dp)
+                EditorSectionLabel(stringResource(R.string.read_style_language_fonts), accentColor)
+                state.editorScriptFonts.forEach { script ->
+                    Row(
+                        Modifier.fillMaxWidth().height(52.dp)
+                            .clickable(role = Role.Button) { actions.onSelectEditorScriptFont(script.scope) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = script.label,
+                            color = contentColor,
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = if (script.font.isBlank()) {
+                                stringResource(R.string.read_style_follow_global)
+                            } else {
+                                fontDisplayName(script.font) + " · " +
+                                    stringResource(R.string.read_style_source_preset_scripts)
+                            },
+                            color = contentColor.copy(alpha = 0.72f),
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1.4f, fill = false),
+                        )
+                        if (script.canReset) {
+                            Spacer(Modifier.width(10.dp))
+                            Icon(
+                                painter = painterResource(R.drawable.ic_restore),
+                                contentDescription = stringResource(R.string.read_style_reset_font),
+                                tint = contentColor,
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clickable(role = Role.Button) { actions.onResetEditorScriptFont(script.scope) },
+                            )
+                        }
+                    }
+                }
                 ReadDivider(contentColor, horizontalPadding = 0.dp)
                 EditorNavigationRow(
                     title = stringResource(R.string.read_style_restore_current),
