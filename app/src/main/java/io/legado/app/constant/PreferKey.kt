@@ -190,6 +190,7 @@ object PreferKey {
     const val readFloatingGlobalSeedNight = "readFloatingGlobalSeedNight.v1"
     const val comicStyleSelect = "comicStyleSelect"
     const val readStyleSelect = "readStyleSelect"
+    const val readStyleLanguageMap = "readStyleLanguageMap"
     const val readNightTheme = "readNightTheme"
     const val readThemeMode = "readThemeMode.v1"
     const val systemTypefaces = "system_typefaces"
