@@ -2400,6 +2400,7 @@
     <string name="read_style_name">样式名称</string>
     <string name="read_style_mode_day">日间</string>
     <string name="read_style_mode_night">夜间</string>
+    <string name="read_style_toggle_theme_mode">切换日间/夜间主题</string>
     <string name="read_style_mode_eink">墨水</string>
     <string name="read_style_shared_short">共用</string>
     <string name="read_style_shared_geometry">形状与尺寸共用，颜色按日夜配置</string>
