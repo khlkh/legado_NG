@@ -355,13 +355,11 @@ internal fun NgColorPickerHeader(
         }
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             if (clusterLabels.isNotEmpty()) {
-                NgFlatActionRail(
-                    items = clusterLabels.mapIndexed { index, label ->
-                        NgFlatActionRailItem(label = label, emphasized = index == clusterIndex)
-                    },
-                    onItemClick = onClusterSelected,
+                NgSegmentDock(
+                    labels = clusterLabels,
+                    selectedIndex = clusterIndex,
+                    onSelected = onClusterSelected,
                     modifier = Modifier.padding(horizontal = 2.dp),
-                    variant = NgFlatActionRailVariant.TEXT_MODE_PICKER,
                 )
             } else {
                 Text(title, color = Color(NgTheme.colors.onSurface), fontSize = 18.sp,
