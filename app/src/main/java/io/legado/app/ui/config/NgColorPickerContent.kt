@@ -102,9 +102,6 @@ import io.legado.app.R
 import io.legado.app.ui.design.components.NgDialogVariant
 import io.legado.app.ui.design.components.compose.NgDialog
 import io.legado.app.ui.design.components.compose.NgDialogTextActionButton
-import io.legado.app.ui.design.components.compose.NgFlatActionRail
-import io.legado.app.ui.design.components.compose.NgFlatActionRailItem
-import io.legado.app.ui.design.components.compose.NgFlatActionRailVariant
 import io.legado.app.ui.design.components.compose.NgFormField
 import io.legado.app.ui.design.components.compose.NgFormFieldVariant
 import io.legado.app.ui.design.components.compose.NgSliderStepButton
@@ -196,18 +193,16 @@ internal fun NgColorPickerContent(
             .fillMaxWidth()
             .then(if (previewRole != null) Modifier.fillMaxHeight() else Modifier),
     ) {
-        NgFlatActionRail(
-            items = NgColorPickerMode.entries.mapIndexed { index, mode ->
-                NgFlatActionRailItem(label = modeLabels[index], emphasized = state.mode == mode)
-            },
-            onItemClick = { index ->
+        NgSegmentDock(
+            labels = modeLabels,
+            selectedIndex = state.mode.ordinal,
+            onSelected = { index ->
                 focusManager.clearFocus()
                 keyboard?.hide()
                 if (state.setMode(NgColorPickerMode.entries[index])) {
                     context.toastOnUi(R.string.ng_color_picker_unfinished)
                 }
             },
-            variant = NgFlatActionRailVariant.TEXT_MODE_PICKER,
         )
         Spacer(Modifier.height(10.dp))
         if (previewRole != null) {
@@ -691,6 +686,58 @@ private fun NgPickerGrid(
     }
 }
 
+/**
+ * Same selected treatment as the reading Preset / Adjust / Highlight dock:
+ * a translucent track, a solid primary pill, and on-primary text.
+ */
+@Composable
+internal fun NgSegmentDock(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp = 40.dp,
+    fontSize: TextUnit = 13.sp,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    val track = if (NgTheme.snapshot.isDark) Color(0xFF1F1F1F) else Color.White
+    val contentColor = Color(NgTheme.colors.onSurface)
+    val selectedContainerColor = Color(NgTheme.colors.primary)
+    val selectedContentColor = Color(NgTheme.colors.onPrimary)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(shape)
+            .background(track.copy(alpha = 0.28f))
+            .padding(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        labels.forEachIndexed { index, label ->
+            val selected = index == selectedIndex.coerceIn(labels.indices)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(10.dp))
+                    .then(if (selected) Modifier.background(selectedContainerColor) else Modifier)
+                    .clickable(role = Role.Tab) { onSelected(index) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    color = if (selected) selectedContentColor else contentColor,
+                    fontSize = fontSize,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun NgSwatchFamilyBar(selectedId: String, onSelected: (String) -> Unit) {
     val colors = NgTheme.colors
@@ -1038,13 +1085,13 @@ private fun NgPickerSliders(
 ) {
     var hsv by rememberSaveable { mutableStateOf(true) }
     Column(modifier.fillMaxWidth()) {
-        NgFlatActionRail(
-            items = listOf(
-                NgFlatActionRailItem(label = stringResource(R.string.ng_color_picker_hsv), emphasized = hsv),
-                NgFlatActionRailItem(label = stringResource(R.string.ng_color_picker_rgb), emphasized = !hsv),
+        NgSegmentDock(
+            labels = listOf(
+                stringResource(R.string.ng_color_picker_hsv),
+                stringResource(R.string.ng_color_picker_rgb),
             ),
-            onItemClick = { index -> hsv = index == 0 },
-            variant = NgFlatActionRailVariant.TEXT_MODE_PICKER,
+            selectedIndex = if (hsv) 0 else 1,
+            onSelected = { index -> hsv = index == 0 },
         )
         Spacer(Modifier.height(8.dp))
         if (hsv) NgPickerHsv(state, change) else NgPickerRgb(state, change)
