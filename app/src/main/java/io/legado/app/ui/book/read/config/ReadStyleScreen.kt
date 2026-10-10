@@ -43,8 +43,10 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -113,6 +115,7 @@ import kotlin.math.roundToInt
 import io.legado.app.ui.design.theme.NgTheme
 import io.legado.app.ui.config.NgColorPreviewRole
 import io.legado.app.ui.config.NgInlineColorPicker
+import io.legado.app.ui.config.NgThemeSheetActionButton
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -149,7 +152,20 @@ internal enum class ReadStylePage {
     FLOATING_WINDOWS,
     APP_DEFAULTS,
     NEW_BOOK_PRESET,
+    EDIT_AI_THEME,
 
+}
+
+internal fun editorColorClusterIndex(page: ReadStylePage): Int = when (page) {
+    ReadStylePage.EDIT_BACKGROUND_COLOR -> 1
+    ReadStylePage.EDIT_ACCENT_COLOR -> 2
+    else -> 0
+}
+
+internal fun editorColorPageForCluster(index: Int): ReadStylePage = when (index) {
+    1 -> ReadStylePage.EDIT_BACKGROUND_COLOR
+    2 -> ReadStylePage.EDIT_ACCENT_COLOR
+    else -> ReadStylePage.EDIT_TEXT_COLOR
 }
 
 internal enum class HighlightSelectionMode {
@@ -242,6 +258,9 @@ internal data class ReadStyleUiState(
     val editorInitialBackgroundType: Int?,
     val editorInitialBackgroundName: String?,
     val editorInitialBackground: ImageBitmap?,
+    val editorSessionTextColor: Int? = null,
+    val editorSessionAccentColor: Int? = null,
+    val editorSessionBackgroundColor: Int? = null,
     val hasUnsavedChanges: Boolean = false,
     val bookFont: String = "",
     val bookFontSource: String = "",
@@ -293,6 +312,7 @@ internal data class ReadStyleActions(
     val onTextColorChanged: (Int) -> Unit,
     val onBackgroundColorChanged: (Int) -> Unit,
     val onTextAccentColorChanged: (Int) -> Unit,
+    val onApplyPaperLook: (Int, Int, Int) -> Unit,
     val onResetEditorColor: () -> Unit,
     val onBackgroundAlphaChanged: (Int) -> Unit,
     val onSelectBackgroundImage: () -> Unit,
@@ -524,6 +544,13 @@ internal fun ReadStyleScreen(
                 ReadStylePage.EDIT_ACCENT_COLOR -> EditorColorPage(
                     page = page,
                     state = state,
+                    actions = actions,
+                )
+
+                ReadStylePage.EDIT_AI_THEME -> EditorAiThemePage(
+                    state = state,
+                    contentColor = contentColor,
+                    accentColor = accentColor,
                     actions = actions,
                 )
 
@@ -1607,25 +1634,24 @@ private fun EditorPage(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    EditorColorTile(
-                        label = stringResource(R.string.read_style_color_text_short),
-                        color = Color(state.editorTextColor),
+                    EditorColorChoice(
+                        label = stringResource(R.string.read_style_color_custom),
                         contentColor = contentColor,
+                        swatches = listOf(
+                            Color(state.editorTextColor),
+                            Color(state.editorBackgroundColor),
+                            Color(state.editorTextAccentColor),
+                        ),
                         onClick = { actions.onPageSelected(ReadStylePage.EDIT_TEXT_COLOR) },
                         modifier = Modifier.weight(1f),
                     )
-                    EditorColorTile(
-                        label = stringResource(R.string.read_style_color_background_short),
-                        color = Color(state.editorBackgroundColor),
+                    EditorColorChoice(
+                        label = stringResource(R.string.read_style_color_ai),
                         contentColor = contentColor,
-                        onClick = { actions.onPageSelected(ReadStylePage.EDIT_BACKGROUND_COLOR) },
-                        modifier = Modifier.weight(1f),
-                    )
-                    EditorColorTile(
-                        label = stringResource(R.string.read_style_color_accent_short),
-                        color = Color(state.editorTextAccentColor),
-                        contentColor = contentColor,
-                        onClick = { actions.onPageSelected(ReadStylePage.EDIT_ACCENT_COLOR) },
+                        swatches = ngPaperLooks(state.editorMode == 1).first().let { look ->
+                            listOf(Color(look.text), Color(look.background), Color(look.accent))
+                        },
+                        onClick = { actions.onPageSelected(ReadStylePage.EDIT_AI_THEME) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -2140,43 +2166,49 @@ private fun EditorFloatingSlider(
 }
 
 @Composable
-private fun EditorColorTile(
+private fun EditorColorChoice(
     label: String,
-    color: Color,
     contentColor: Color,
+    swatches: List<Color>,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(10.dp)
-    Row(
+    Column(
         modifier = modifier
-            .height(54.dp)
+            .height(72.dp)
             .clip(shape)
             .background(Color(NgTheme.colors.surface).copy(alpha = 0.22f))
             .border(0.7.dp, contentColor.copy(alpha = 0.12f), shape)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(CircleShape)
-                .background(color)
-                .border(0.7.dp, contentColor.copy(alpha = 0.18f), CircleShape),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            swatches.take(3).forEach { swatch ->
+                Box(
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .size(16.dp)
+                        .clip(CircleShape)
+                        .background(swatch)
+                        .border(0.7.dp, contentColor.copy(alpha = 0.18f), CircleShape),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Icon(
+                painter = painterResource(R.drawable.ic_chevron_right_20),
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = contentColor.copy(alpha = 0.62f),
+            )
+        }
         Text(
             text = label,
-            modifier = Modifier.padding(start = 8.dp).weight(1f),
+            modifier = Modifier.padding(top = 6.dp),
             color = contentColor,
             fontSize = 14.sp,
             maxLines = 1,
-        )
-        Icon(
-            painter = painterResource(R.drawable.ic_chevron_right_20),
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = contentColor.copy(alpha = 0.62f),
         )
     }
 }
@@ -2262,36 +2294,41 @@ private fun EditorColorPage(
     state: ReadStyleUiState,
     actions: ReadStyleActions,
 ) {
-    val title: String
     val currentColor: Int
     val onColorChanged: (Int) -> Unit
+    val slotOriginal: Int
     when (page) {
         ReadStylePage.EDIT_TEXT_COLOR -> {
-            title = stringResource(R.string.text_color)
             currentColor = state.editorTextColor
             onColorChanged = actions.onTextColorChanged
+            slotOriginal = state.editorSessionTextColor ?: currentColor
         }
 
         ReadStylePage.EDIT_BACKGROUND_COLOR -> {
-            title = stringResource(R.string.bg_color)
             currentColor = state.editorBackgroundColor
             onColorChanged = actions.onBackgroundColorChanged
+            slotOriginal = state.editorSessionBackgroundColor ?: currentColor
         }
 
         else -> {
-            title = stringResource(R.string.text_accent_color)
             currentColor = state.editorTextAccentColor
             onColorChanged = actions.onTextAccentColorChanged
+            slotOriginal = state.editorSessionAccentColor ?: currentColor
         }
     }
+    val clusterLabels = listOf(
+        stringResource(R.string.read_style_color_text_short),
+        stringResource(R.string.read_style_color_background_short),
+        stringResource(R.string.read_style_color_accent_short),
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         NgInlineColorPicker(
-            title = title,
-            initialColor = state.editorInitialColor ?: currentColor,
+            title = stringResource(R.string.read_style_section_colors),
+            initialColor = currentColor,
             backgroundRenderer = ::renderCurrentReadBackground,
             onBack = actions.onBack,
             onColorChanged = onColorChanged,
@@ -2304,6 +2341,138 @@ private fun EditorColorPage(
             previewBackground = state.editorBackgroundColor,
             previewForeground = state.editorTextColor,
             previewAccent = state.editorTextAccentColor,
+            clusterLabels = clusterLabels,
+            clusterIndex = editorColorClusterIndex(page),
+            onClusterSelected = { index ->
+                actions.onPageSelected(editorColorPageForCluster(index))
+            },
+            slotOriginalColor = slotOriginal,
+        )
+    }
+}
+
+@Composable
+private fun EditorAiThemePage(
+    state: ReadStyleUiState,
+    contentColor: Color,
+    accentColor: Color,
+    actions: ReadStyleActions,
+) {
+    val looks = ngPaperLooks(state.editorMode == 1)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NgThemeSheetActionButton(
+                onClick = actions.onBack,
+                contentDescription = stringResource(R.string.back),
+                touchSize = 44.dp,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                    tint = Color(NgTheme.colors.onSurface),
+                )
+            }
+            Text(
+                text = stringResource(R.string.read_style_color_ai),
+                modifier = Modifier.weight(1f),
+                color = Color(NgTheme.colors.onSurface),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+            NgThemeSheetActionButton(
+                onClick = actions.onResetEditorColor,
+                contentDescription = stringResource(R.string.ng_reset_color),
+                touchSize = 44.dp,
+            ) {
+                Icon(
+                    Icons.Rounded.Restore,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                    tint = Color(NgTheme.colors.onSurface),
+                )
+            }
+        }
+        Text(
+            text = stringResource(R.string.read_style_ai_hint),
+            color = contentColor.copy(alpha = 0.62f),
+            fontSize = 12.sp,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        looks.forEach { look ->
+            val selected = state.editorBackgroundType == 0 &&
+                state.editorBackgroundColor == look.background &&
+                state.editorTextColor == look.text &&
+                state.editorTextAccentColor == look.accent
+            EditorPaperLookRow(
+                name = stringResource(look.nameRes),
+                look = look,
+                selected = selected,
+                contentColor = contentColor,
+                accentColor = accentColor,
+                onClick = {
+                    actions.onApplyPaperLook(look.text, look.background, look.accent)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditorPaperLookRow(
+    name: String,
+    look: NgPaperLook,
+    selected: Boolean,
+    contentColor: Color,
+    accentColor: Color,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(10.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .height(56.dp)
+            .clip(shape)
+            .background(Color(look.background))
+            .border(
+                width = if (selected) 1.5.dp else 0.7.dp,
+                color = if (selected) accentColor else contentColor.copy(alpha = 0.16f),
+                shape = shape,
+            )
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = name,
+            modifier = Modifier.weight(1f),
+            color = Color(look.text),
+            fontSize = 15.sp,
+            maxLines = 1,
+        )
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(Color(look.text))
+                .border(0.7.dp, Color(look.background), CircleShape),
+        )
+        Box(
+            modifier = Modifier
+                .padding(start = 6.dp)
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(Color(look.accent))
+                .border(0.7.dp, Color(look.background), CircleShape),
         )
     }
 }

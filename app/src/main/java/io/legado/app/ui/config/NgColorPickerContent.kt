@@ -129,6 +129,37 @@ internal enum class NgColorPreviewRole {
     ACCENT,
 }
 
+internal data class NgContrastPreviewColors(
+    val background: Int,
+    val foreground: Int,
+    val accent: Int,
+    val bodyContrast: Double,
+    val accentContrast: Double,
+)
+
+/**
+ * The first phrase uses the text color. The second phrase uses the accent as ink.
+ * Both sit on the reading background.
+ */
+internal fun ngContrastPreview(
+    role: NgColorPreviewRole,
+    color: Int,
+    background: Int,
+    foreground: Int,
+    accent: Int,
+): NgContrastPreviewColors {
+    val previewBg = if (role == NgColorPreviewRole.BACKGROUND) color else background
+    val previewFg = if (role == NgColorPreviewRole.TEXT) color else foreground
+    val previewAccent = if (role == NgColorPreviewRole.ACCENT) color else accent
+    return NgContrastPreviewColors(
+        previewBg,
+        previewFg,
+        previewAccent,
+        NgColorMath.displayedContrast(previewFg, previewBg),
+        NgColorMath.displayedContrast(previewAccent, previewBg),
+    )
+}
+
 /** Shared editor only. Its host owns dismissal, sampling, reset and confirmation. */
 @Composable
 internal fun NgColorPickerContent(
@@ -232,7 +263,14 @@ private fun NgColorEditorBody(
             }
         } else {
             when (state.mode) {
-                NgColorPickerMode.GRID -> NgPickerGrid(state, change, graphicModifier)
+                NgColorPickerMode.GRID -> NgPickerGrid(
+                    state = state,
+                    change = change,
+                    modifier = graphicModifier,
+                    previewRole = previewRole,
+                    previewForeground = previewForeground,
+                    previewBackground = previewBackground,
+                )
                 NgColorPickerMode.SPECTRUM -> NgPickerSpectrum(state, change, graphicModifier)
                 NgColorPickerMode.WHEEL -> NgPickerWheel(state, change, graphicModifier)
                 NgColorPickerMode.RGB -> Unit
@@ -440,35 +478,35 @@ private fun NgContrastColorBox(
 @Composable
 private fun NgColorContrastPreview(
     color: Int,
-    role: NgColorPreviewRole,
+    role: NgColorPreviewRole?,
     background: Int,
     foreground: Int,
     accent: Int,
     modifier: Modifier = Modifier,
 ) {
-    val previewBg = if (role == NgColorPreviewRole.BACKGROUND) color else background
-    val previewFg = if (role == NgColorPreviewRole.BACKGROUND) foreground else color
-    val previewMark = if (role == NgColorPreviewRole.ACCENT) color else accent
+    val activeRole = role ?: NgColorPreviewRole.TEXT
+    val preview = ngContrastPreview(activeRole, color, background, foreground, accent)
     val sample = stringResource(R.string.ng_paper_preview_sample)
-    val splitIndex = sample.indexOfFirst { it == '，' || it == ',' }.takeIf { it >= 0 } ?: (sample.length / 2)
-    val plain = sample.substring(0, splitIndex).trimEnd(',', '，', ' ')
-    val marked = sample.substring(splitIndex).trimStart(',', '，', ' ')
-    val ratioLabel = NgColorMath.wcagContrastLabel(NgColorMath.displayedContrast(previewFg, previewBg))
+    val splitAt = sample.indexOfFirst { it == '，' || it == ',' }
+    val lead = if (splitAt >= 0) sample.substring(0, splitAt + 1) else sample
+    val rest = if (splitAt >= 0) sample.substring(splitAt + 1).trimStart() else ""
+    val ratio = if (activeRole == NgColorPreviewRole.ACCENT) preview.accentContrast else preview.bodyContrast
+    val ratioLabel = NgColorMath.wcagContrastLabel(ratio)
     val shape = RoundedCornerShape(14.dp)
     val measurer = rememberTextMeasurer()
     val fontFamily = NgTheme.fontFamily
     BoxWithConstraints(
         modifier
             .clip(shape)
-            .background(Color(NgColorMath.opaque(previewBg)))
+            .background(Color(NgColorMath.opaque(preview.background)))
             .border(1.dp, Color(NgTheme.colors.outlineVariant), shape)
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
         val sizes = contrastFontSizes(
             measurer = measurer,
             fontFamily = fontFamily,
-            plain = plain,
-            marked = marked,
+            lead = lead,
+            rest = rest,
             grade = ratioLabel,
             maxWidthPx = constraints.maxWidth,
             maxHeightPx = constraints.maxHeight,
@@ -476,31 +514,29 @@ private fun NgColorContrastPreview(
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = plain,
-                    modifier = Modifier.weight(1f),
-                    color = Color(previewFg),
+                    text = lead,
+                    color = Color(preview.foreground),
                     style = tightTextStyle(sizes.first.value, fontFamily),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Clip,
                 )
-                Text(
-                    text = marked,
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(Color(NgColorMath.opaque(previewMark)))
-                        .padding(horizontal = 2.dp),
-                    color = Color(previewFg),
-                    style = tightTextStyle(sizes.second.value, fontFamily),
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                )
+                if (rest.isNotEmpty()) {
+                    Text(
+                        text = rest,
+                        modifier = Modifier.padding(start = 4.dp),
+                        color = Color(preview.accent),
+                        style = tightTextStyle(sizes.first.value, fontFamily),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
+                    )
+                }
             }
             Text(
                 text = ratioLabel,
-                color = Color(previewFg).copy(alpha = 0.72f),
-                style = tightTextStyle(sizes.third.value, fontFamily),
+                color = Color(preview.foreground).copy(alpha = 0.72f),
+                style = tightTextStyle(sizes.second.value, fontFamily),
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Clip,
@@ -520,30 +556,30 @@ private fun tightTextStyle(sizeSp: Float, fontFamily: FontFamily?): TextStyle = 
 private fun contrastFontSizes(
     measurer: TextMeasurer,
     fontFamily: FontFamily?,
-    plain: String,
-    marked: String,
+    lead: String,
+    rest: String,
     grade: String,
     maxWidthPx: Int,
     maxHeightPx: Int,
-): Triple<TextUnit, TextUnit, TextUnit> {
+): Pair<TextUnit, TextUnit> {
     val width = maxWidthPx.coerceAtLeast(1)
     val height = maxHeightPx.coerceAtLeast(1)
-    val half = (width / 2).coerceAtLeast(1)
-    var sample = 14f
+    var sampleSize = 14f
     var gradeSize = 11f
     repeat(12) {
-        val sampleStyle = tightTextStyle(sample, fontFamily)
+        val sampleStyle = tightTextStyle(sampleSize, fontFamily)
         val gradeStyle = tightTextStyle(gradeSize, fontFamily)
-        val plainPx = measurer.measure(plain, sampleStyle, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip).size
-        val markedPx = measurer.measure(marked, sampleStyle, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip).size
+        val leadPx = measurer.measure(lead, sampleStyle, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip).size
+        val restPx = measurer.measure(rest, sampleStyle, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip).size
         val gradePx = measurer.measure(grade, gradeStyle, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip).size
-        val fits = plainPx.width <= half && markedPx.width <= half && gradePx.width <= width &&
-            maxOf(plainPx.height, markedPx.height) + gradePx.height <= height
-        if (fits || sample <= 8f) return Triple(sample.sp, sample.sp, gradeSize.sp)
-        sample -= 0.5f
-        gradeSize = (sample * 11f / 14f).coerceAtLeast(7f)
+        val gap = if (rest.isEmpty()) 0 else 8
+        val fits = leadPx.width + restPx.width + gap <= width && gradePx.width <= width &&
+            maxOf(leadPx.height, restPx.height) + gradePx.height <= height
+        if (fits || sampleSize <= 8f) return sampleSize.sp to gradeSize.sp
+        sampleSize -= 0.5f
+        gradeSize = (sampleSize * 11f / 14f).coerceAtLeast(7f)
     }
-    return Triple(sample.sp, sample.sp, gradeSize.sp)
+    return sampleSize.sp to gradeSize.sp
 }
 
 @Composable
@@ -585,20 +621,55 @@ private fun NgPickerGrid(
     state: NgColorPickerState,
     change: (() -> Unit) -> Unit,
     modifier: Modifier = Modifier,
+    previewRole: NgColorPreviewRole? = null,
+    previewForeground: Int = 0,
+    previewBackground: Int = 0,
 ) {
     var familyId by rememberSaveable { mutableStateOf(NgSwatchFamilies.SPECTRUM_ID) }
-    val palette = remember(familyId, state.alpha) { NgSwatchFamilies.cells(familyId, state.alpha).toList() }
+    val activeFamilyId = if (NgSwatchFamilies.families.any { it.id == familyId }) {
+        familyId
+    } else {
+        NgSwatchFamilies.SPECTRUM_ID
+    }
+    val spectrum = activeFamilyId == NgSwatchFamilies.SPECTRUM_ID
+    val palette = remember(activeFamilyId, state.alpha, previewRole, previewForeground, previewBackground) {
+        if (!spectrum && previewRole != null) {
+            NgSwatchFamilies.readingPalette(activeFamilyId, state.alpha, previewForeground, previewBackground).toList()
+        } else {
+            NgSwatchFamilies.cells(activeFamilyId, state.alpha).toList()
+        }
+    }
     val selectedIndex = palette.indexOfFirst { (it and 0x00FFFFFF) == (state.color and 0x00FFFFFF) }
     val description = stringResource(R.string.ng_color_picker_mode_grid)
     val border = Color(NgTheme.colors.outlineVariant)
     val columns = NgSwatchFamilies.COLS
     val rows = NgSwatchFamilies.ROWS
+    val pairHint = if (previewRole == null || spectrum) {
+        null
+    } else {
+        stringResource(
+            when (previewRole) {
+                NgColorPreviewRole.TEXT -> R.string.ng_grid_text_mark
+                NgColorPreviewRole.BACKGROUND -> R.string.ng_grid_bg_mark
+                NgColorPreviewRole.ACCENT -> R.string.ng_grid_accent_themes
+            },
+        )
+    }
     fun select(index: Int) {
         val cell = palette[index.coerceIn(0, palette.lastIndex)]
         change { state.setColor((cell and 0x00FFFFFF) or (state.alpha shl 24)) }
     }
     Column(modifier) {
-        NgSwatchFamilyBar(familyId) { familyId = it }
+        NgSwatchFamilyBar(activeFamilyId) { familyId = it }
+        if (pairHint != null) {
+            Text(
+                text = pairHint,
+                color = Color(NgTheme.colors.onSurfaceVariant),
+                fontSize = 11.sp,
+                maxLines = 2,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
         Spacer(Modifier.height(6.dp))
         NgPickerGridCanvas(
             palette = palette,
@@ -609,6 +680,12 @@ private fun NgPickerGrid(
             colorLabel = NgColorPickerColors.format(state.color),
             border = border,
             onSelect = ::select,
+            showPairStatus = !spectrum && (previewRole == NgColorPreviewRole.TEXT ||
+                previewRole == NgColorPreviewRole.BACKGROUND),
+            markAccentUses = !spectrum && previewRole != null,
+            previewRole = previewRole,
+            previewForeground = previewForeground,
+            previewBackground = previewBackground,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
     }
@@ -649,6 +726,11 @@ private fun NgPickerGridCanvas(
     colorLabel: String,
     border: Color,
     onSelect: (Int) -> Unit,
+    showPairStatus: Boolean = false,
+    markAccentUses: Boolean = false,
+    previewRole: NgColorPreviewRole? = null,
+    previewForeground: Int = 0,
+    previewBackground: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     Canvas(
@@ -691,11 +773,32 @@ private fun NgPickerGridCanvas(
         val cellWidth = size.width / columns
         val cellHeight = size.height / rows
         palette.forEachIndexed { index, color ->
-            drawRect(
-                Color(color),
-                topLeft = Offset(index % columns * cellWidth, index / columns * cellHeight),
-                size = Size(cellWidth + 0.5f, cellHeight + 0.5f),
-            )
+            val column = index % columns
+            val row = index / columns
+            val origin = Offset(column * cellWidth, row * cellHeight)
+            val cellSize = Size(cellWidth + 0.5f, cellHeight + 0.5f)
+            drawRect(Color(color), topLeft = origin, size = cellSize)
+            val role = previewRole
+            if (showPairStatus && role != null && column < NgSwatchFamilies.FAN_COLUMNS) {
+                drawPairStatus(
+                    passes = readingCellIsValid(role, color, previewForeground, previewBackground),
+                    origin = origin,
+                    cellWidth = cellWidth,
+                    cellHeight = cellHeight,
+                    ink = swatchInk(color),
+                )
+            }
+            if (markAccentUses && column >= NgSwatchFamilies.FAN_COLUMNS &&
+                NgColorMath.contrastRatio(color, previewBackground) >= 4.5
+            ) {
+                val inset = 2.dp.toPx()
+                drawRect(
+                    Color.White.copy(alpha = 0.92f),
+                    topLeft = origin + Offset(inset, inset),
+                    size = Size((cellWidth - 2 * inset).coerceAtLeast(0f), (cellHeight - 2 * inset).coerceAtLeast(0f)),
+                    style = Stroke(1.5.dp.toPx()),
+                )
+            }
         }
         if (selectedIndex >= 0) {
             val row = selectedIndex / columns
@@ -722,6 +825,42 @@ private fun NgPickerGridCanvas(
         }
         drawRoundRect(border.copy(alpha = 0.4f), cornerRadius = CornerRadius(12.dp.toPx()), style = Stroke(1.dp.toPx()))
     }
+}
+
+/** Corner mark only. The swatch underneath stays the candidate color. */
+private fun DrawScope.drawPairStatus(
+    passes: Boolean,
+    origin: Offset,
+    cellWidth: Float,
+    cellHeight: Float,
+    ink: Color,
+) {
+    val mark = minOf(cellWidth, cellHeight) * 0.22f
+    val pad = 2.dp.toPx()
+    val anchor = origin + Offset(pad, cellHeight - pad)
+    val halo = if (ink == Color.White) Color(0xFF1A1A1A) else Color.White
+    val stroke = 1.25.dp.toPx()
+    if (passes) {
+        val mid = anchor + Offset(mark * 0.35f, -mark * 0.05f)
+        val start = anchor + Offset(0f, -mark * 0.45f)
+        val end = anchor + Offset(mark, -mark)
+        drawLine(halo, start, mid, stroke + 1.5.dp.toPx())
+        drawLine(halo, mid, end, stroke + 1.5.dp.toPx())
+        drawLine(ink, start, mid, stroke)
+        drawLine(ink, mid, end, stroke)
+    } else {
+        val center = anchor + Offset(mark * 0.35f, -mark * 0.4f)
+        drawCircle(halo, mark * 0.34f, center)
+        drawCircle(Color(0xFFE0A100), mark * 0.22f, center)
+    }
+}
+
+private fun swatchInk(color: Int): Color {
+    val red = color shr 16 and 0xFF
+    val green = color shr 8 and 0xFF
+    val blue = color and 0xFF
+    val luminance = red * 0.299 + green * 0.587 + blue * 0.114
+    return if (luminance >= 160.0) Color(0xFF1A1A1A) else Color.White
 }
 
 @Composable

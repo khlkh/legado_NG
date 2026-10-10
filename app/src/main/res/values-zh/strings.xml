@@ -2553,4 +2553,18 @@
     <string name="read_style_sheet_transparency">面板</string>
     <string name="read_style_name_required">请填写预设名称</string>
     <string name="read_style_name_kept">名称为空，已保留原来的名称</string>
+    <string name="read_style_color_custom">自选配色</string>
+    <string name="read_style_color_ai">AI 主题</string>
+    <string name="read_style_ai_hint">点一条，同时写入文字、背景和强调。</string>
+    <string name="read_style_ai_cream">米白</string>
+    <string name="read_style_ai_warm">暖纸</string>
+    <string name="read_style_ai_cool">冷白</string>
+    <string name="read_style_ai_ink">墨色</string>
+    <string name="read_style_ai_umber">暖褐</string>
+    <string name="read_style_ai_slate">石板</string>
+    <string name="read_palette_sunset">日落</string>
+    <string name="read_palette_aurora">极光</string>
+    <string name="ng_grid_accent_themes">最后三列是本族强调色、文字的互补色和三角色，每格色相不同。白框表示写在当前背景上达到 4.5:1。</string>
+    <string name="ng_grid_text_mark">勾表示相对当前背景达到 4.5:1，圆点表示未达到。格子颜色不变。</string>
+    <string name="ng_grid_bg_mark">勾表示相对当前文字达到 4.5:1，圆点表示未达到。格子颜色不变。</string>
 </resources>
