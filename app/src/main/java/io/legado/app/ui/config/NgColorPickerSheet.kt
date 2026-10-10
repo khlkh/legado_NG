@@ -204,9 +204,14 @@ internal fun NgInlineColorPicker(
     previewBackground: Int = 0,
     previewForeground: Int = 0,
     previewAccent: Int = 0,
+    clusterLabels: List<String> = emptyList(),
+    clusterIndex: Int = 0,
+    onClusterSelected: (Int) -> Unit = {},
+    slotOriginalColor: Int? = null,
 ) {
     val state = remember(title, forceOpaque) { NgColorPickerState(initialColor, forceOpaque) }
-    val originalColor = remember(title, forceOpaque) { state.color }
+    val openedColor = remember(title, forceOpaque) { state.color }
+    val originalColor = slotOriginalColor ?: openedColor
     LaunchedEffect(initialColor) { state.syncColor(initialColor) }
     val onChange by rememberUpdatedState(onColorChanged)
     val takeColor = rememberNgColorEyedropper(backgroundRenderer) { sampled ->
@@ -231,6 +236,9 @@ internal fun NgInlineColorPicker(
                 onClose = onBack,
                 inline = true,
                 onReset = onReset,
+                clusterLabels = clusterLabels,
+                clusterIndex = clusterIndex,
+                onClusterSelected = onClusterSelected,
             )
         },
         body = { visualHeight, scrolling ->
@@ -327,6 +335,9 @@ internal fun NgColorPickerHeader(
     onClose: () -> Unit,
     inline: Boolean = false,
     onReset: (() -> Unit)? = null,
+    clusterLabels: List<String> = emptyList(),
+    clusterIndex: Int = 0,
+    onClusterSelected: (Int) -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
     Row(
@@ -343,8 +354,19 @@ internal fun NgColorPickerHeader(
                 tint = Color(if (inline) NgTheme.colors.onSurface else NgTheme.colors.primary))
         }
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            Text(title, color = Color(NgTheme.colors.onSurface), fontSize = 18.sp,
-                fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (clusterLabels.isNotEmpty()) {
+                NgFlatActionRail(
+                    items = clusterLabels.mapIndexed { index, label ->
+                        NgFlatActionRailItem(label = label, emphasized = index == clusterIndex)
+                    },
+                    onItemClick = onClusterSelected,
+                    modifier = Modifier.padding(horizontal = 2.dp),
+                    variant = NgFlatActionRailVariant.TEXT_MODE_PICKER,
+                )
+            } else {
+                Text(title, color = Color(NgTheme.colors.onSurface), fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
         if (inline && onReset != null) {
             NgThemeSheetActionButton(
