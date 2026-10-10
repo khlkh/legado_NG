@@ -124,7 +124,6 @@ private fun isLargeScreen(configuration: Configuration): Boolean {
         Configuration.SCREENLAYOUT_SIZE_LARGE
 }
 
-private val EditorPageHeight = 500.dp
 private val PresetVisibleHorizontalInset = 6.dp
 private val BackgroundTileSpacing = 6.dp
 
@@ -2288,7 +2287,6 @@ private fun EditorColorPage(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(EditorPageHeight)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         NgInlineColorPicker(

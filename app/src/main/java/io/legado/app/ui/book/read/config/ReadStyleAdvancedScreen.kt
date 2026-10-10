@@ -886,7 +886,6 @@ internal fun AdvancedColorPage(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(AdvancedPageHeight)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         NgInlineColorPicker(

@@ -11,6 +11,7 @@ import kotlin.math.roundToInt
 internal enum class NgColorPickerMode {
     GRID,
     SPECTRUM,
+    WHEEL,
     RGB,
 }
 

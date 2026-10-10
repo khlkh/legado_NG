@@ -1,5 +1,7 @@
 package io.legado.app.ui.config
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -11,14 +13,15 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,17 +79,21 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -99,11 +107,20 @@ import io.legado.app.ui.design.components.compose.NgFlatActionRailItem
 import io.legado.app.ui.design.components.compose.NgFlatActionRailVariant
 import io.legado.app.ui.design.components.compose.NgFormField
 import io.legado.app.ui.design.components.compose.NgFormFieldVariant
+import io.legado.app.ui.design.components.compose.NgSliderStepButton
 import io.legado.app.ui.design.theme.NgColorMath
+import io.legado.app.ui.design.theme.NgColorScheme
 import io.legado.app.ui.design.theme.NgTheme
 import io.legado.app.utils.toastOnUi
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.hypot
 import kotlin.math.roundToInt
+import kotlin.math.sin
+
+/** Larger part of a golden-ratio split. The smaller part uses weight 1. */
+private const val GOLDEN_LARGER = 1.618034f
 
 /** Which reading color the live value replaces in the WCAG sample. */
 internal enum class NgColorPreviewRole {
@@ -119,6 +136,7 @@ internal fun NgColorPickerContent(
     originalColor: Int,
     modifier: Modifier = Modifier,
     showAlphaSlider: Boolean = true,
+    visualHeight: Dp = 168.dp,
     previewRole: NgColorPreviewRole? = null,
     previewBackground: Int = 0,
     previewForeground: Int = 0,
@@ -139,9 +157,14 @@ internal fun NgColorPickerContent(
     val modeLabels = listOf(
         stringResource(R.string.ng_color_picker_mode_grid),
         stringResource(R.string.ng_color_picker_mode_spectrum),
+        stringResource(R.string.ng_color_picker_mode_wheel),
         stringResource(R.string.ng_color_picker_mode_rgb),
     )
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (previewRole != null) Modifier.fillMaxHeight() else Modifier),
+    ) {
         NgFlatActionRail(
             items = NgColorPickerMode.entries.mapIndexed { index, mode ->
                 NgFlatActionRailItem(label = modeLabels[index], emphasized = state.mode == mode)
@@ -155,116 +178,262 @@ internal fun NgColorPickerContent(
             },
             variant = NgFlatActionRailVariant.TEXT_MODE_PICKER,
         )
-        Spacer(Modifier.height(18.dp))
-        Box(Modifier.fillMaxWidth().height(244.dp)) {
-            when (state.mode) {
-                NgColorPickerMode.GRID -> NgPickerGrid(state, change)
-                NgColorPickerMode.SPECTRUM -> NgPickerSpectrum(state, change)
-                NgColorPickerMode.RGB -> NgPickerRgb(state, change)
-            }
-        }
-        Spacer(Modifier.height(18.dp))
-        if (showAlphaSlider) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.ng_color_picker_opacity),
-                    color = Color(colors.onSurfaceVariant),
-                    fontSize = 13.sp,
-                )
-                Text(
-                    "${(state.alpha / 255f * 100).roundToInt()}%",
-                    color = Color(colors.onSurface),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-            NgPickerSlider(
-                value = state.alpha.toFloat(),
-                max = 255f,
-                description = stringResource(R.string.ng_color_picker_opacity),
-                valueDescription = "${(state.alpha / 255f * 100).roundToInt()}%",
-                gradient = listOf(
-                    Color(state.color or (0xFF shl 24)).copy(alpha = 0f),
-                    Color(state.color or (0xFF shl 24)),
-                ),
-                checkerboard = true,
-                onValueChange = { change { state.setAlpha(it.roundToInt()) } },
-            )
-            Spacer(Modifier.height(12.dp))
-        }
+        Spacer(Modifier.height(10.dp))
         if (previewRole != null) {
+            NgColorEditorBody(
+                state = state,
+                change = change,
+                showAlphaSlider = showAlphaSlider,
+                originalColor = originalColor,
+                previewRole = previewRole,
+                previewBackground = previewBackground,
+                previewForeground = previewForeground,
+                previewAccent = previewAccent,
+                hexLabel = hexLabel,
+                colors = colors,
+            )
+        } else {
+            NgColorLooseBody(
+                state = state,
+                change = change,
+                showAlphaSlider = showAlphaSlider,
+                visualHeight = visualHeight,
+                originalColor = originalColor,
+                hexLabel = hexLabel,
+                colors = colors,
+            )
+        }
+    }
+}
+
+/** Editor page: the graphic fills leftover space. The sample bar, opacity, and saved colors stay one line each. */
+@Composable
+private fun NgColorEditorBody(
+    state: NgColorPickerState,
+    change: (() -> Unit) -> Unit,
+    showAlphaSlider: Boolean,
+    originalColor: Int,
+    previewRole: NgColorPreviewRole,
+    previewBackground: Int,
+    previewForeground: Int,
+    previewAccent: Int,
+    hexLabel: String,
+    colors: NgColorScheme,
+) {
+    Column(Modifier.fillMaxSize()) {
+        val graphicModifier = Modifier.fillMaxWidth().weight(1f)
+        if (state.mode == NgColorPickerMode.RGB) {
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                NgPickerSliders(state, change, Modifier.fillMaxWidth())
+                if (showAlphaSlider) {
+                    Spacer(Modifier.height(4.dp))
+                    NgOpacitySlider(state, change, colors)
+                }
+            }
+        } else {
+            when (state.mode) {
+                NgColorPickerMode.GRID -> NgPickerGrid(state, change, graphicModifier)
+                NgColorPickerMode.SPECTRUM -> NgPickerSpectrum(state, change, graphicModifier)
+                NgColorPickerMode.WHEEL -> NgPickerWheel(state, change, graphicModifier)
+                NgColorPickerMode.RGB -> Unit
+            }
+            if (showAlphaSlider) {
+                Spacer(Modifier.height(6.dp))
+                NgOpacitySlider(state, change, colors)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             NgColorContrastPreview(
                 color = state.color,
                 role = previewRole,
                 background = previewBackground,
                 foreground = previewForeground,
                 accent = previewAccent,
+                modifier = Modifier.weight(GOLDEN_LARGER).fillMaxHeight(),
             )
-            Spacer(Modifier.height(12.dp))
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            NgPickerPreview(
-                color = originalColor,
-                label = stringResource(R.string.ng_color_picker_original),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(topStart = 9.dp, bottomStart = 9.dp))
-                    .clickable(
-                        role = Role.Button,
-                        onClickLabel = stringResource(R.string.ng_color_picker_restore_original),
-                    ) { change { state.setColor(originalColor) } },
+            Spacer(Modifier.width(16.dp))
+            NgContrastColorBox(
+                originalColor = originalColor,
+                selectedColor = state.color,
+                onRestoreOriginal = { change { state.setColor(originalColor) } },
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             )
-            NgPickerPreview(
-                color = state.color,
-                label = stringResource(R.string.ng_color_picker_current),
-                modifier = Modifier.clip(RoundedCornerShape(topEnd = 9.dp, bottomEnd = 9.dp)),
-            )
-            Spacer(Modifier.width(14.dp))
-            Text(
-                hexLabel,
-                color = Color(colors.onSurfaceVariant),
-                fontSize = 11.sp,
-            )
-            Spacer(Modifier.width(8.dp))
-            NgFormField(
+            Spacer(Modifier.width(16.dp))
+            NgPickerHexField(
                 label = hexLabel,
                 value = state.hexInput,
+                isError = state.isHexInputError,
                 onValueChange = { text ->
                     if (text.length <= 9) change { state.editHex(text) }
                 },
-                modifier = Modifier.weight(1f).semantics {
-                    contentDescription = hexLabel
-                },
-                isError = state.isHexInputError,
-                variant = NgFormFieldVariant.DIALOG_UNDERLINE,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                    keyboardType = KeyboardType.Ascii,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(onDone = {
-                    focusManager.clearFocus()
-                    keyboard?.hide()
-                }),
+                modifier = Modifier.weight(GOLDEN_LARGER),
             )
         }
         if (!state.isInputValid) {
             Text(
                 stringResource(R.string.ng_color_picker_input_error),
-                modifier = Modifier.padding(top = 5.dp),
+                modifier = Modifier.padding(top = 2.dp),
                 color = Color(colors.error),
                 fontSize = 11.sp,
-                lineHeight = 15.sp,
+                lineHeight = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(4.dp))
         NgPickerSavedColors(state, change)
+    }
+}
+
+/** Sheets without a reading-color sample keep the graphic at its own height. */
+@Composable
+private fun NgColorLooseBody(
+    state: NgColorPickerState,
+    change: (() -> Unit) -> Unit,
+    showAlphaSlider: Boolean,
+    visualHeight: Dp,
+    originalColor: Int,
+    hexLabel: String,
+    colors: NgColorScheme,
+) {
+    when (state.mode) {
+        NgColorPickerMode.GRID -> NgPickerGrid(state, change, Modifier.fillMaxWidth().height(visualHeight))
+        NgColorPickerMode.SPECTRUM -> NgPickerSpectrum(state, change, Modifier.fillMaxWidth().height(visualHeight))
+        NgColorPickerMode.WHEEL -> NgPickerWheel(state, change, Modifier.fillMaxWidth().height(visualHeight))
+        NgColorPickerMode.RGB -> NgPickerSliders(
+            state,
+            change,
+            Modifier.fillMaxWidth().height(visualHeight).verticalScroll(rememberScrollState()),
+        )
+    }
+    Spacer(Modifier.height(10.dp))
+    if (showAlphaSlider) {
+        NgOpacitySlider(state, change, colors)
+        Spacer(Modifier.height(12.dp))
+    }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        NgPickerPreview(
+            color = originalColor,
+            label = stringResource(R.string.ng_color_picker_original),
+            modifier = Modifier
+                .size(width = 48.dp, height = 44.dp)
+                .clip(RoundedCornerShape(topStart = 9.dp, bottomStart = 9.dp))
+                .clickable(
+                    role = Role.Button,
+                    onClickLabel = stringResource(R.string.ng_color_picker_restore_original),
+                ) { change { state.setColor(originalColor) } },
+        )
+        NgPickerPreview(
+            color = state.color,
+            label = stringResource(R.string.ng_color_picker_current),
+            modifier = Modifier
+                .size(width = 48.dp, height = 44.dp)
+                .clip(RoundedCornerShape(topEnd = 9.dp, bottomEnd = 9.dp)),
+        )
+        Spacer(Modifier.width(14.dp))
+        NgPickerHexField(
+            label = hexLabel,
+            value = state.hexInput,
+            isError = state.isHexInputError,
+            onValueChange = { text ->
+                if (text.length <= 9) change { state.editHex(text) }
+            },
+            modifier = Modifier.weight(1f),
+        )
+    }
+    if (!state.isInputValid) {
+        Text(
+            stringResource(R.string.ng_color_picker_input_error),
+            modifier = Modifier.padding(top = 5.dp),
+            color = Color(colors.error),
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+        )
+    }
+    Spacer(Modifier.height(16.dp))
+    NgPickerSavedColors(state, change)
+}
+
+@Composable
+private fun NgOpacitySlider(
+    state: NgColorPickerState,
+    change: (() -> Unit) -> Unit,
+    colors: NgColorScheme,
+) {
+    val percent = "${(state.alpha / 255f * 100).roundToInt()}%"
+    Row(
+        modifier = Modifier.fillMaxWidth().height(36.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.ng_color_picker_opacity),
+            color = Color(colors.onSurfaceVariant),
+            fontSize = 13.sp,
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(8.dp))
+        NgPickerSlider(
+            value = state.alpha.toFloat(),
+            max = 255f,
+            description = stringResource(R.string.ng_color_picker_opacity),
+            valueDescription = percent,
+            gradient = listOf(
+                Color(state.color or (0xFF shl 24)).copy(alpha = 0f),
+                Color(state.color or (0xFF shl 24)),
+            ),
+            checkerboard = true,
+            trackHeight = 28.dp,
+            modifier = Modifier.weight(1f),
+            onValueChange = { change { state.setAlpha(it.roundToInt()) } },
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            percent,
+            modifier = Modifier.width(40.dp),
+            color = Color(colors.onSurface),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun NgContrastColorBox(
+    originalColor: Int,
+    selectedColor: Int,
+    onRestoreOriginal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier
+            .clip(shape)
+            .border(1.dp, Color(NgTheme.colors.outlineVariant), shape),
+    ) {
+        NgPickerPreview(
+            color = originalColor,
+            label = stringResource(R.string.ng_color_picker_original),
+            embeddedLabel = true,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clickable(
+                    role = Role.Button,
+                    onClickLabel = stringResource(R.string.ng_color_picker_restore_original),
+                ) { onRestoreOriginal() },
+        )
+        NgPickerPreview(
+            color = selectedColor,
+            label = stringResource(R.string.ng_color_picker_current),
+            embeddedLabel = true,
+            modifier = Modifier.weight(GOLDEN_LARGER).fillMaxHeight(),
+        )
     }
 }
 
@@ -275,6 +444,7 @@ private fun NgColorContrastPreview(
     background: Int,
     foreground: Int,
     accent: Int,
+    modifier: Modifier = Modifier,
 ) {
     val previewBg = if (role == NgColorPreviewRole.BACKGROUND) color else background
     val previewFg = if (role == NgColorPreviewRole.BACKGROUND) foreground else color
@@ -283,69 +453,222 @@ private fun NgColorContrastPreview(
     val splitIndex = sample.indexOfFirst { it == '，' || it == ',' }.takeIf { it >= 0 } ?: (sample.length / 2)
     val plain = sample.substring(0, splitIndex).trimEnd(',', '，', ' ')
     val marked = sample.substring(splitIndex).trimStart(',', '，', ' ')
-    val ratio = NgColorMath.displayedContrast(previewFg, previewBg)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .clip(RoundedCornerShape(14.dp))
+    val ratioLabel = NgColorMath.wcagContrastLabel(NgColorMath.displayedContrast(previewFg, previewBg))
+    val shape = RoundedCornerShape(14.dp)
+    val measurer = rememberTextMeasurer()
+    val fontFamily = NgTheme.fontFamily
+    BoxWithConstraints(
+        modifier
+            .clip(shape)
             .background(Color(NgColorMath.opaque(previewBg)))
-            .border(1.dp, Color(NgTheme.colors.outlineVariant), RoundedCornerShape(14.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.Center,
+            .border(1.dp, Color(NgTheme.colors.outlineVariant), shape)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
-        Text(
-            text = buildAnnotatedString {
-                append(plain)
-                append("  ")
-                withStyle(
-                    SpanStyle(
-                        color = Color(previewFg),
-                        background = Color(NgColorMath.opaque(previewMark)),
-                    ),
-                ) {
-                    append(marked)
-                }
-            },
-            color = Color(previewFg),
-            fontSize = 15.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        val sizes = contrastFontSizes(
+            measurer = measurer,
+            fontFamily = fontFamily,
+            plain = plain,
+            marked = marked,
+            grade = ratioLabel,
+            maxWidthPx = constraints.maxWidth,
+            maxHeightPx = constraints.maxHeight,
         )
-        Text(
-            text = NgColorMath.wcagContrastLabel(ratio),
-            color = Color(previewFg).copy(alpha = 0.72f),
-            fontSize = 11.sp,
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = plain,
+                    modifier = Modifier.weight(1f),
+                    color = Color(previewFg),
+                    style = tightTextStyle(sizes.first.value, fontFamily),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                )
+                Text(
+                    text = marked,
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(Color(NgColorMath.opaque(previewMark)))
+                        .padding(horizontal = 2.dp),
+                    color = Color(previewFg),
+                    style = tightTextStyle(sizes.second.value, fontFamily),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                )
+            }
+            Text(
+                text = ratioLabel,
+                color = Color(previewFg).copy(alpha = 0.72f),
+                style = tightTextStyle(sizes.third.value, fontFamily),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+        }
+    }
+}
+
+private fun tightTextStyle(sizeSp: Float, fontFamily: FontFamily?): TextStyle = TextStyle(
+    fontSize = sizeSp.sp,
+    lineHeight = sizeSp.sp,
+    fontFamily = fontFamily,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+)
+
+/** Shrink the sample and the WCAG line together until both fit the text box. */
+private fun contrastFontSizes(
+    measurer: TextMeasurer,
+    fontFamily: FontFamily?,
+    plain: String,
+    marked: String,
+    grade: String,
+    maxWidthPx: Int,
+    maxHeightPx: Int,
+): Triple<TextUnit, TextUnit, TextUnit> {
+    val width = maxWidthPx.coerceAtLeast(1)
+    val height = maxHeightPx.coerceAtLeast(1)
+    val half = (width / 2).coerceAtLeast(1)
+    var sample = 14f
+    var gradeSize = 11f
+    repeat(12) {
+        val sampleStyle = tightTextStyle(sample, fontFamily)
+        val gradeStyle = tightTextStyle(gradeSize, fontFamily)
+        val plainPx = measurer.measure(plain, sampleStyle, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip).size
+        val markedPx = measurer.measure(marked, sampleStyle, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip).size
+        val gradePx = measurer.measure(grade, gradeStyle, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip).size
+        val fits = plainPx.width <= half && markedPx.width <= half && gradePx.width <= width &&
+            maxOf(plainPx.height, markedPx.height) + gradePx.height <= height
+        if (fits || sample <= 8f) return Triple(sample.sp, sample.sp, gradeSize.sp)
+        sample -= 0.5f
+        gradeSize = (sample * 11f / 14f).coerceAtLeast(7f)
+    }
+    return Triple(sample.sp, sample.sp, gradeSize.sp)
+}
+
+@Composable
+private fun NgPickerHexField(
+    label: String,
+    value: String,
+    isError: Boolean,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = NgTheme.colors
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Color(colors.onSurfaceVariant), fontSize = 11.sp)
+        Spacer(Modifier.width(8.dp))
+        NgFormField(
+            label = label,
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.weight(1f).semantics { contentDescription = label },
+            isError = isError,
+            variant = NgFormFieldVariant.DIALOG_UNDERLINE,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Characters,
+                keyboardType = KeyboardType.Ascii,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(onDone = {
+                focusManager.clearFocus()
+                keyboard?.hide()
+            }),
         )
     }
 }
 
 @Composable
-private fun NgPickerGrid(state: NgColorPickerState, change: (() -> Unit) -> Unit) {
-    val palette = remember { NgColorPickerColors.gridColors() }
+private fun NgPickerGrid(
+    state: NgColorPickerState,
+    change: (() -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var familyId by rememberSaveable { mutableStateOf(NgSwatchFamilies.SPECTRUM_ID) }
+    val palette = remember(familyId, state.alpha) { NgSwatchFamilies.cells(familyId, state.alpha).toList() }
     val selectedIndex = palette.indexOfFirst { (it and 0x00FFFFFF) == (state.color and 0x00FFFFFF) }
     val description = stringResource(R.string.ng_color_picker_mode_grid)
     val border = Color(NgTheme.colors.outlineVariant)
+    val columns = NgSwatchFamilies.COLS
+    val rows = NgSwatchFamilies.ROWS
     fun select(index: Int) {
-        change { state.setColor((palette[index.coerceIn(0, palette.lastIndex)] and 0x00FFFFFF) or (state.alpha shl 24)) }
+        val cell = palette[index.coerceIn(0, palette.lastIndex)]
+        change { state.setColor((cell and 0x00FFFFFF) or (state.alpha shl 24)) }
     }
+    Column(modifier) {
+        NgSwatchFamilyBar(familyId) { familyId = it }
+        Spacer(Modifier.height(6.dp))
+        NgPickerGridCanvas(
+            palette = palette,
+            selectedIndex = selectedIndex,
+            columns = columns,
+            rows = rows,
+            description = description,
+            colorLabel = NgColorPickerColors.format(state.color),
+            border = border,
+            onSelect = ::select,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun NgSwatchFamilyBar(selectedId: String, onSelected: (String) -> Unit) {
+    val colors = NgTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        NgSwatchFamilies.families.forEach { family ->
+            val selected = family.id == selectedId
+            Text(
+                text = stringResource(family.labelRes),
+                color = Color(if (selected) colors.onPrimary else colors.onSurface),
+                fontSize = 12.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(if (selected) colors.primary else colors.surfaceVariant))
+                    .clickable(role = Role.Tab) { onSelected(family.id) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NgPickerGridCanvas(
+    palette: List<Int>,
+    selectedIndex: Int,
+    columns: Int,
+    rows: Int,
+    description: String,
+    colorLabel: String,
+    border: Color,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Canvas(
-        Modifier.fillMaxSize()
+        modifier
             .clip(RoundedCornerShape(12.dp))
             .pickerGesture { position, size ->
                 if (size.width > 0 && size.height > 0) {
-                    val column = floor(position.x / size.width * 12).toInt().coerceIn(0, 11)
-                    val row = floor(position.y / size.height * 10).toInt().coerceIn(0, 9)
-                    select(row * 12 + column)
+                    val column = floor(position.x / size.width * columns).toInt().coerceIn(0, columns - 1)
+                    val row = floor(position.y / size.height * rows).toInt().coerceIn(0, rows - 1)
+                    onSelect(row * columns + column)
                 }
             }
             .semantics {
                 contentDescription = description
-                stateDescription = NgColorPickerColors.format(state.color)
-                progressBarRangeInfo = ProgressBarRangeInfo(selectedIndex.coerceAtLeast(0).toFloat(), 0f..119f, 118)
+                stateDescription = colorLabel
+                val last = (palette.size - 1).coerceAtLeast(0).toFloat()
+                progressBarRangeInfo = ProgressBarRangeInfo(selectedIndex.coerceAtLeast(0).toFloat(), 0f..last, (palette.size - 2).coerceAtLeast(0))
                 setProgress { value ->
                     if (value.isFinite()) {
-                        select(value.roundToInt())
+                        onSelect(value.roundToInt())
                         true
                     } else false
                 }
@@ -355,29 +678,28 @@ private fun NgPickerGrid(state: NgColorPickerState, change: (() -> Unit) -> Unit
                     val step = when (event.key) {
                         Key.DirectionLeft -> -1
                         Key.DirectionRight -> 1
-                        Key.DirectionUp -> -12
-                        Key.DirectionDown -> 12
+                        Key.DirectionUp -> -columns
+                        Key.DirectionDown -> columns
                         else -> 0
                     }
-                    if (step != 0) select(selectedIndex.coerceAtLeast(0) + step)
+                    if (step != 0) onSelect(selectedIndex.coerceAtLeast(0) + step)
                     step != 0
                 }
             }
             .focusable(),
     ) {
-        val cellWidth = size.width / 12
-        val cellHeight = size.height / 10
+        val cellWidth = size.width / columns
+        val cellHeight = size.height / rows
         palette.forEachIndexed { index, color ->
             drawRect(
                 Color(color),
-                topLeft = Offset(index % 12 * cellWidth, index / 12 * cellHeight),
+                topLeft = Offset(index % columns * cellWidth, index / columns * cellHeight),
                 size = Size(cellWidth + 0.5f, cellHeight + 0.5f),
             )
         }
         if (selectedIndex >= 0) {
-            val row = selectedIndex / 12
-            val column = selectedIndex % 12
-            // Leave room for the outer stroke and follow the panel's rounded corner at its edges.
+            val row = selectedIndex / columns
+            val column = selectedIndex % columns
             val inset = 3.dp.toPx()
             val position = Offset(column * cellWidth + inset, row * cellHeight + inset)
             val cellSize = Size((cellWidth - 2 * inset).coerceAtLeast(0f), (cellHeight - 2 * inset).coerceAtLeast(0f))
@@ -390,9 +712,9 @@ private fun NgPickerGrid(state: NgColorPickerState, change: (() -> Unit) -> Unit
                     right = position.x + cellSize.width,
                     bottom = position.y + cellSize.height,
                     topLeftCornerRadius = if (row == 0 && column == 0) outerCorner else innerCorner,
-                    topRightCornerRadius = if (row == 0 && column == 11) outerCorner else innerCorner,
-                    bottomRightCornerRadius = if (row == 9 && column == 11) outerCorner else innerCorner,
-                    bottomLeftCornerRadius = if (row == 9 && column == 0) outerCorner else innerCorner,
+                    topRightCornerRadius = if (row == 0 && column == columns - 1) outerCorner else innerCorner,
+                    bottomRightCornerRadius = if (row == rows - 1 && column == columns - 1) outerCorner else innerCorner,
+                    bottomLeftCornerRadius = if (row == rows - 1 && column == 0) outerCorner else innerCorner,
                 ))
             }
             drawPath(outline, Color.Black.copy(alpha = 0.65f), style = Stroke(4.dp.toPx()))
@@ -403,7 +725,11 @@ private fun NgPickerGrid(state: NgColorPickerState, change: (() -> Unit) -> Unit
 }
 
 @Composable
-private fun NgPickerSpectrum(state: NgColorPickerState, change: (() -> Unit) -> Unit) {
+private fun NgPickerSpectrum(
+    state: NgColorPickerState,
+    change: (() -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     // 13dp outer ring + half its 2dp stroke, plus one physical pixel for antialiasing.
     val cursorMargin = with(LocalDensity.current) { 14.dp.toPx() } + 1f
     fun inset(width: Float, height: Float) = minOf(cursorMargin, width / 2f, height / 2f)
@@ -422,7 +748,7 @@ private fun NgPickerSpectrum(state: NgColorPickerState, change: (() -> Unit) -> 
         change { state.setSaturationValue(saturation, value) }
         return true
     }
-    Column(Modifier.fillMaxSize()) {
+    Column(modifier) {
         Canvas(
             Modifier.fillMaxWidth().weight(1f)
                 .pickerGesture { position, size ->
@@ -493,64 +819,274 @@ private fun NgPickerSpectrum(state: NgColorPickerState, change: (() -> Unit) -> 
 }
 
 @Composable
+private fun NgPickerWheel(
+    state: NgColorPickerState,
+    change: (() -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val hueColor = Color(NgColorPickerColors.hsvToColor(state.hue, 1f, 1f))
+    val surface = Color(NgTheme.colors.surface)
+    val outline = Color(NgTheme.colors.outline)
+    Canvas(
+        modifier.pickerGesture { position, size ->
+            if (size.width <= 0 || size.height <= 0) return@pickerGesture
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val minSide = minOf(size.width, size.height).toFloat()
+            val outer = minSide * 0.48f
+            val inner = minSide * 0.32f
+            val dx = position.x - cx
+            val dy = position.y - cy
+            val distance = hypot(dx, dy)
+            if (distance in inner..outer) {
+                var degrees = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                if (degrees < 0f) degrees += 360f
+                change { state.setHue(degrees) }
+            } else {
+                val box = inner * 1.25f
+                val left = cx - box / 2f
+                val top = cy - box / 2f
+                change {
+                    state.setSaturationValue(
+                        (position.x - left) / box,
+                        1f - (position.y - top) / box,
+                    )
+                }
+            }
+        },
+    ) {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val minSide = minOf(size.width, size.height)
+        val outer = minSide * 0.48f
+        val inner = minSide * 0.32f
+        val hues = List(13) { index -> Color(NgColorPickerColors.hsvToColor(index * 30f, 1f, 1f)) }
+        drawCircle(brush = Brush.sweepGradient(hues), radius = outer, center = Offset(cx, cy))
+        drawCircle(color = surface, radius = inner, center = Offset(cx, cy))
+        val box = inner * 1.25f
+        val left = cx - box / 2f
+        val top = cy - box / 2f
+        drawRoundRect(
+            brush = Brush.horizontalGradient(listOf(Color.White, hueColor)),
+            topLeft = Offset(left, top),
+            size = Size(box, box),
+            cornerRadius = CornerRadius(8.dp.toPx()),
+        )
+        drawRoundRect(
+            brush = Brush.verticalGradient(listOf(Color.Transparent, Color.Black)),
+            topLeft = Offset(left, top),
+            size = Size(box, box),
+            cornerRadius = CornerRadius(8.dp.toPx()),
+        )
+        val handle = Offset(left + state.saturation * box, top + (1f - state.value) * box)
+        drawCircle(Color.White, 7.dp.toPx(), handle)
+        drawCircle(outline, 7.dp.toPx(), handle, style = Stroke(1.5.dp.toPx()))
+        val ringAngle = Math.toRadians(state.hue.toDouble())
+        val ringPoint = Offset(
+            cx + cos(ringAngle).toFloat() * ((inner + outer) / 2f),
+            cy + sin(ringAngle).toFloat() * ((inner + outer) / 2f),
+        )
+        drawCircle(Color.White, 6.dp.toPx(), ringPoint)
+        drawCircle(outline, 6.dp.toPx(), ringPoint, style = Stroke(1.5.dp.toPx()))
+    }
+}
+
+@Composable
+private fun NgPickerSliders(
+    state: NgColorPickerState,
+    change: (() -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var hsv by rememberSaveable { mutableStateOf(true) }
+    Column(modifier.fillMaxWidth()) {
+        NgFlatActionRail(
+            items = listOf(
+                NgFlatActionRailItem(label = stringResource(R.string.ng_color_picker_hsv), emphasized = hsv),
+                NgFlatActionRailItem(label = stringResource(R.string.ng_color_picker_rgb), emphasized = !hsv),
+            ),
+            onItemClick = { index -> hsv = index == 0 },
+            variant = NgFlatActionRailVariant.TEXT_MODE_PICKER,
+        )
+        Spacer(Modifier.height(8.dp))
+        if (hsv) NgPickerHsv(state, change) else NgPickerRgb(state, change)
+    }
+}
+
+@Composable
+private fun NgPickerHsv(state: NgColorPickerState, change: (() -> Unit) -> Unit) {
+    var hueText by remember { mutableStateOf<String?>(null) }
+    var satText by remember { mutableStateOf<String?>(null) }
+    var valueText by remember { mutableStateOf<String?>(null) }
+    val hueDraft = hueText
+    val satDraft = satText
+    val valueDraft = valueText
+    val hueShown = state.hue.roundToInt().toString()
+    val satShown = (state.saturation * 100).roundToInt().toString()
+    val valueShown = (state.value * 100).roundToInt().toString()
+    val hueColor = NgColorPickerColors.hsvToColor(state.hue, 1f, 1f)
+    NgPickerNumberRow(
+        label = stringResource(R.string.ng_color_picker_hue),
+        text = hueDraft ?: hueShown,
+        isError = hueDraft != null && hueDraft.toIntOrNull() !in 0..360,
+        onText = { text ->
+            hueText = text
+            val parsed = text.toIntOrNull()
+            if (parsed != null && parsed in 0..360) {
+                change { state.setHue(parsed.toFloat()) }
+                hueText = null
+            }
+        },
+        sliderValue = state.hue,
+        sliderMax = 360f,
+        gradient = listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red),
+        onSlider = {
+            hueText = null
+            change { state.setHue(it) }
+        },
+    )
+    Spacer(Modifier.height(4.dp))
+    NgPickerNumberRow(
+        label = stringResource(R.string.ng_color_picker_saturation),
+        text = satDraft ?: satShown,
+        isError = satDraft != null && satDraft.toIntOrNull() !in 0..100,
+        onText = { text ->
+            satText = text
+            val parsed = text.toIntOrNull()
+            if (parsed != null && parsed in 0..100) {
+                change { state.setSaturationValue(parsed / 100f, state.value) }
+                satText = null
+            }
+        },
+        sliderValue = state.saturation * 100f,
+        sliderMax = 100f,
+        gradient = listOf(
+            Color(NgColorPickerColors.hsvToColor(state.hue, 0f, state.value)),
+            Color(NgColorPickerColors.hsvToColor(state.hue, 1f, state.value)),
+        ),
+        onSlider = {
+            satText = null
+            change { state.setSaturationValue(it / 100f, state.value) }
+        },
+    )
+    Spacer(Modifier.height(4.dp))
+    NgPickerNumberRow(
+        label = stringResource(R.string.ng_color_picker_value),
+        text = valueDraft ?: valueShown,
+        isError = valueDraft != null && valueDraft.toIntOrNull() !in 0..100,
+        onText = { text ->
+            valueText = text
+            val parsed = text.toIntOrNull()
+            if (parsed != null && parsed in 0..100) {
+                change { state.setSaturationValue(state.saturation, parsed / 100f) }
+                valueText = null
+            }
+        },
+        sliderValue = state.value * 100f,
+        sliderMax = 100f,
+        gradient = listOf(Color.Black, Color(hueColor)),
+        onSlider = {
+            valueText = null
+            change { state.setSaturationValue(state.saturation, it / 100f) }
+        },
+    )
+}
+
+@Composable
 private fun NgPickerRgb(state: NgColorPickerState, change: (() -> Unit) -> Unit) {
-    val colors = NgTheme.colors
-    val focusManager = LocalFocusManager.current
-    val keyboard = LocalSoftwareKeyboardController.current
     val labels = listOf(
         stringResource(R.string.ng_color_picker_red),
         stringResource(R.string.ng_color_picker_green),
         stringResource(R.string.ng_color_picker_blue),
     )
     val values = listOf(state.red, state.green, state.blue)
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-        labels.forEachIndexed { channel, label ->
-            Column {
-                Row(Modifier.fillMaxWidth().height(34.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(label, color = Color(colors.onSurface), fontSize = 14.sp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(listOf("R", "G", "B")[channel], color = Color(colors.onSurfaceVariant), fontSize = 12.sp)
-                    Spacer(Modifier.weight(1f))
-                    val isError = state.rgbInputErrors[channel]
-                    BasicTextField(
-                        value = state.rgbInputs[channel],
-                        onValueChange = { text ->
-                            if (text.length <= 3) change { state.editRgbChannel(channel, text) }
-                        },
-                        modifier = Modifier.width(59.dp).height(34.dp).semantics { contentDescription = label },
-                        singleLine = true,
-                        textStyle = TextStyle(
-                            color = Color(if (isError) colors.error else colors.onSurface),
-                            fontSize = 15.sp,
-                            fontFamily = NgTheme.fontFamily,
-                            textAlign = TextAlign.Center,
-                        ),
-                        cursorBrush = SolidColor(Color(colors.primary)),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); keyboard?.hide() }),
-                        decorationBox = { innerTextField ->
-                            Box(
-                                modifier = Modifier.fillMaxSize()
-                                    .background(Color(colors.inputContainer), RoundedCornerShape(8.dp))
-                                    .border(1.dp, Color(if (isError) colors.error else colors.outlineVariant), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 3.dp),
-                                contentAlignment = Alignment.Center,
-                            ) { innerTextField() }
-                        },
-                    )
-                }
-                val shift = (2 - channel) * 8
-                val start = (state.color or (0xFF shl 24)) and (0xFF shl shift).inv()
-                NgPickerSlider(
-                    value = values[channel].toFloat(),
-                    max = 255f,
-                    description = label,
-                    valueDescription = values[channel].toString(),
-                    gradient = listOf(Color(start), Color(start or (0xFF shl shift))),
-                    onValueChange = { change { state.setRgbChannel(channel, it.roundToInt()) } },
-                )
-            }
-        }
+    labels.forEachIndexed { channel, label ->
+        if (channel > 0) Spacer(Modifier.height(4.dp))
+        val shift = (2 - channel) * 8
+        val start = (state.color or (0xFF shl 24)) and (0xFF shl shift).inv()
+        NgPickerNumberRow(
+            label = label,
+            text = state.rgbInputs[channel],
+            isError = state.rgbInputErrors[channel],
+            onText = { text ->
+                if (text.length <= 3) change { state.editRgbChannel(channel, text) }
+            },
+            sliderValue = values[channel].toFloat(),
+            sliderMax = 255f,
+            gradient = listOf(Color(start), Color(start or (0xFF shl shift))),
+            onSlider = { change { state.setRgbChannel(channel, it.roundToInt()) } },
+        )
+    }
+}
+
+@Composable
+private fun NgPickerNumberRow(
+    label: String,
+    text: String,
+    isError: Boolean,
+    onText: (String) -> Unit,
+    sliderValue: Float,
+    sliderMax: Float,
+    gradient: List<Color>,
+    onSlider: (Float) -> Unit,
+) {
+    val colors = NgTheme.colors
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            modifier = Modifier.width(52.dp),
+            color = Color(colors.onSurface),
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        NgSliderStepButton(
+            iconRes = R.drawable.ic_reduce,
+            contentDescription = stringResource(R.string.reduce),
+            enabled = sliderValue > 0.5f,
+            onClick = { onSlider((sliderValue - 1f).coerceAtLeast(0f)) },
+        )
+        NgPickerSlider(
+            value = sliderValue,
+            max = sliderMax,
+            description = label,
+            valueDescription = text,
+            gradient = gradient,
+            trackHeight = 32.dp,
+            modifier = Modifier.weight(1f),
+            onValueChange = onSlider,
+        )
+        NgSliderStepButton(
+            iconRes = R.drawable.ic_add,
+            contentDescription = stringResource(R.string.add),
+            enabled = sliderValue < sliderMax - 0.5f,
+            onClick = { onSlider((sliderValue + 1f).coerceAtMost(sliderMax)) },
+        )
+        BasicTextField(
+            value = text,
+            onValueChange = { if (it.length <= 3 && it.all { char -> char in '0'..'9' }) onText(it) },
+            modifier = Modifier.width(52.dp).height(32.dp).semantics { contentDescription = label },
+            singleLine = true,
+            textStyle = TextStyle(
+                color = Color(if (isError) colors.error else colors.onSurface),
+                fontSize = 15.sp,
+                fontFamily = NgTheme.fontFamily,
+                textAlign = TextAlign.Center,
+            ),
+            cursorBrush = SolidColor(Color(colors.primary)),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); keyboard?.hide() }),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .background(Color(colors.inputContainer), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(if (isError) colors.error else colors.outlineVariant), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 3.dp),
+                    contentAlignment = Alignment.Center,
+                ) { innerTextField() }
+            },
+        )
     }
 }
 
@@ -562,12 +1098,14 @@ private fun NgPickerSlider(
     valueDescription: String,
     gradient: List<Color>,
     checkerboard: Boolean = false,
+    trackHeight: Dp = 44.dp,
+    modifier: Modifier = Modifier,
     onValueChange: (Float) -> Unit,
 ) {
     val currentCallback by rememberUpdatedState(onValueChange)
     val outline = Color(NgTheme.colors.outlineVariant).copy(alpha = 0.4f)
     Canvas(
-        Modifier.fillMaxWidth().height(44.dp)
+        modifier.fillMaxWidth().height(trackHeight)
             .pickerGesture { position, size ->
                 // Match the visible thumb travel, including its radius at both ends.
                 val radius = size.height * 13f / 44f
@@ -635,10 +1173,17 @@ private fun Modifier.pickerGesture(onPosition: (Offset, IntSize) -> Unit): Modif
 }
 
 @Composable
-private fun NgPickerPreview(color: Int, label: String, modifier: Modifier = Modifier) {
+private fun NgPickerPreview(
+    color: Int,
+    label: String,
+    modifier: Modifier = Modifier,
+    embeddedLabel: Boolean = false,
+) {
+    val ink = if (embeddedLabel) highContrastInk(color) else Color.White
     Box(
-        modifier = modifier.size(width = 48.dp, height = 44.dp)
-            .semantics(mergeDescendants = true) { contentDescription = "$label ${NgColorPickerColors.format(color)}" },
+        modifier = modifier.semantics(mergeDescendants = true) {
+            contentDescription = "$label ${NgColorPickerColors.format(color)}"
+        },
     ) {
         Canvas(Modifier.fillMaxSize()) {
             drawPickerCheckerboard()
@@ -646,34 +1191,62 @@ private fun NgPickerPreview(color: Int, label: String, modifier: Modifier = Modi
         }
         Text(
             label,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.3f)),
-            color = Color.White,
+            modifier = if (embeddedLabel) {
+                Modifier.align(Alignment.Center).padding(horizontal = 2.dp)
+            } else {
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.3f))
+            },
+            color = ink,
             fontSize = 10.sp,
-            lineHeight = 16.sp,
+            lineHeight = 12.sp,
+            fontWeight = if (embeddedLabel) FontWeight.Medium else FontWeight.Normal,
             textAlign = TextAlign.Center,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+/** White or black, whichever reads more clearly on this swatch. */
+private fun highContrastInk(color: Int): Color {
+    val surface = NgColorMath.opaque(color)
+    val white = NgColorMath.displayedContrast(0xFFFFFFFF.toInt(), surface)
+    val black = NgColorMath.displayedContrast(0xFF000000.toInt(), surface)
+    return if (white >= black) Color.White else Color.Black
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NgPickerSavedColors(state: NgColorPickerState, change: (() -> Unit) -> Unit) {
     val context = LocalContext.current
     val colors = NgTheme.colors
     var savedColors by remember(context) { mutableStateOf(NgSavedColors.load(context)) }
     var deletingColor by remember { mutableStateOf<Int?>(null) }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.ng_color_picker_saved_colors), color = Color(colors.onSurfaceVariant), fontSize = 13.sp)
-        Text(stringResource(R.string.ng_color_picker_long_press_delete), color = Color(colors.onSurfaceVariant), fontSize = 11.sp)
-    }
-    Spacer(Modifier.height(6.dp))
-    FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(horizontalAlignment = Alignment.Start) {
+            Text(
+                stringResource(R.string.ng_color_picker_saved_colors),
+                color = Color(colors.onSurfaceVariant),
+                style = tightTextStyle(13f, NgTheme.fontFamily).copy(color = Color(colors.onSurfaceVariant)),
+                maxLines = 1,
+            )
+            Text(
+                stringResource(R.string.ng_color_picker_long_press_delete),
+                color = Color(colors.onSurfaceVariant),
+                style = tightTextStyle(9f, NgTheme.fontFamily).copy(color = Color(colors.onSurfaceVariant)),
+                maxLines = 1,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Row(
+            Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
         savedColors.forEach { color ->
             val description = stringResource(R.string.ng_color_picker_saved_color_description, NgColorPickerColors.format(color))
             val selected = state.color == color
             Box(
-                modifier = Modifier.size(44.dp)
+                modifier = Modifier.size(32.dp)
                     .combinedClickable(
                         role = Role.Button,
                         onClick = { change { state.setColor(color) } },
@@ -687,20 +1260,20 @@ private fun NgPickerSavedColors(state: NgColorPickerState, change: (() -> Unit) 
                 contentAlignment = Alignment.Center,
             ) {
                 Canvas(
-                    Modifier.size(34.dp).clip(CircleShape)
+                    Modifier.size(26.dp).clip(CircleShape)
                         .border(1.dp, Color(colors.outlineVariant).copy(alpha = 0.5f), CircleShape),
                 ) {
                     drawPickerCheckerboard()
                     drawRect(Color(color))
                 }
                 if (selected) {
-                    Box(Modifier.size(40.dp).border(1.5.dp, Color(colors.primary), CircleShape))
-                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                    Box(Modifier.size(30.dp).border(1.5.dp, Color(colors.primary), CircleShape))
+                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
                 }
             }
         }
         Box(
-            modifier = Modifier.size(44.dp)
+            modifier = Modifier.size(32.dp)
                 .clickable(enabled = state.isInputValid, role = Role.Button) {
                     val result = NgSavedColors.add(context, state.color)
                     savedColors = NgSavedColors.load(context)
@@ -714,16 +1287,17 @@ private fun NgPickerSavedColors(state: NgColorPickerState, change: (() -> Unit) 
             contentAlignment = Alignment.Center,
         ) {
             Box(
-                Modifier.size(34.dp).background(Color.White, CircleShape),
+                Modifier.size(26.dp).background(Color.White, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Rounded.Add,
                     contentDescription = null,
-                    modifier = Modifier.size(23.dp),
+                    modifier = Modifier.size(16.dp),
                     tint = Color(0xFF1F1F23).copy(alpha = if (state.isInputValid) 1f else 0.4f),
                 )
             }
+        }
         }
     }
     deletingColor?.let { color ->

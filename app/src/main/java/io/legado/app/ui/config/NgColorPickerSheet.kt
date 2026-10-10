@@ -3,6 +3,7 @@ package io.legado.app.ui.config
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.Drawable
@@ -49,13 +50,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -209,27 +214,108 @@ internal fun NgInlineColorPicker(
         state.sampleRgb(sampled)
         if (state.color != previous) onChange(state.color)
     }
-    val maxHeight = minOf(620, (LocalConfiguration.current.screenHeightDp * 0.78f).toInt()).dp
-    Column(modifier = Modifier.fillMaxWidth().heightIn(max = maxHeight)) {
-        NgColorPickerHeader(
-            title = title,
-            onPick = takeColor,
-            onClose = onBack,
-            inline = true,
-            onReset = onReset,
-        )
-        Column(modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-            NgColorPickerContent(
-                state = state,
-                originalColor = originalColor,
-                showAlphaSlider = showAlphaSlider,
-                previewRole = previewRole,
-                previewBackground = previewBackground,
-                previewForeground = previewForeground,
-                previewAccent = previewAccent,
-                onColorChanged = onChange,
+    val configuration = LocalConfiguration.current
+    val portrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    // Leave room for the preset sheet's session bar so the whole drawer stays within the cap.
+    val screenCap = (configuration.screenHeightDp.dp * colorDrawerHeightFraction(portrait) - 80.dp)
+        .coerceAtLeast(220.dp)
+    val scroll = rememberScrollState()
+    NgColorDrawerLayout(
+        screenCap = screenCap,
+        graphic = true,
+        fillCap = previewRole != null,
+        header = {
+            NgColorPickerHeader(
+                title = title,
+                onPick = takeColor,
+                onClose = onBack,
+                inline = true,
+                onReset = onReset,
             )
-            Spacer(Modifier.height(8.dp))
+        },
+        body = { visualHeight, scrolling ->
+            Column(
+                modifier = Modifier.fillMaxWidth().then(
+                    if (previewRole != null) Modifier.fillMaxHeight()
+                    else if (scrolling) Modifier.verticalScroll(scroll)
+                    else Modifier
+                ),
+            ) {
+                NgColorPickerContent(
+                    state = state,
+                    originalColor = originalColor,
+                    showAlphaSlider = showAlphaSlider,
+                    visualHeight = visualHeight,
+                    previewRole = previewRole,
+                    previewBackground = previewBackground,
+                    previewForeground = previewForeground,
+                    previewAccent = previewAccent,
+                    onColorChanged = onChange,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        },
+    )
+}
+
+@Composable
+private fun NgColorDrawerLayout(
+    screenCap: Dp,
+    graphic: Boolean,
+    fillCap: Boolean = false,
+    header: @Composable () -> Unit,
+    body: @Composable (visualHeight: Dp, scrolling: Boolean) -> Unit,
+) {
+    val density = LocalDensity.current
+    val preferred = 168.dp
+    val minimum = 96.dp
+    SubcomposeLayout(modifier = Modifier.fillMaxWidth()) { constraints ->
+        val screenCapPx = with(density) { screenCap.roundToPx() }
+        val capPx = minOf(
+            screenCapPx,
+            if (constraints.maxHeight == Constraints.Infinity) screenCapPx else constraints.maxHeight,
+        ).coerceAtLeast(1)
+        val headerPlaceable = subcompose("header", header).first().measure(
+            constraints.copy(minWidth = 0, minHeight = 0, maxHeight = capPx),
+        )
+        if (fillCap) {
+            val bodyPx = (capPx - headerPlaceable.height).coerceAtLeast(1)
+            val bodyPlaceable = subcompose("body") { body(preferred, false) }.first().measure(
+                Constraints(
+                    minWidth = 0,
+                    maxWidth = constraints.maxWidth,
+                    minHeight = bodyPx,
+                    maxHeight = bodyPx,
+                ),
+            )
+            val width = maxOf(headerPlaceable.width, bodyPlaceable.width, constraints.minWidth)
+            return@SubcomposeLayout layout(width, headerPlaceable.height + bodyPx) {
+                headerPlaceable.place(0, 0)
+                bodyPlaceable.place(0, headerPlaceable.height)
+            }
+        }
+        val preferredPx = with(density) { preferred.roundToPx() }
+        val minPx = with(density) { minimum.roundToPx() }
+        val loose = Constraints(maxWidth = constraints.maxWidth)
+        val naturalBody = subcompose("natural") { body(preferred, false) }.first().measure(
+            loose.copy(maxHeight = Constraints.Infinity),
+        )
+        val plan = measureColorDrawer(
+            capPx = capPx,
+            headerPx = headerPlaceable.height,
+            naturalBodyPx = naturalBody.height,
+            preferredVisualPx = if (graphic) preferredPx else 0,
+            minVisualPx = minPx,
+            graphic = graphic,
+        )
+        val bodyMax = if (plan.scroll) (plan.heightPx - headerPlaceable.height).coerceAtLeast(1) else Constraints.Infinity
+        val bodyPlaceable = subcompose("body") {
+            body(with(density) { plan.visualPx.toDp() }, plan.scroll)
+        }.first().measure(loose.copy(maxHeight = bodyMax))
+        val width = maxOf(headerPlaceable.width, bodyPlaceable.width, constraints.minWidth)
+        layout(width, plan.heightPx.coerceAtMost(capPx)) {
+            headerPlaceable.place(0, 0)
+            bodyPlaceable.place(0, headerPlaceable.height)
         }
     }
 }
