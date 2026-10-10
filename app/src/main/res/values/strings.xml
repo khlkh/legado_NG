@@ -2651,4 +2651,18 @@
     <string name="read_style_sheet_transparency">Sheet</string>
     <string name="read_style_name_required">Enter a preset name</string>
     <string name="read_style_name_kept">Empty name was not saved</string>
+    <string name="read_style_color_custom">Custom colors</string>
+    <string name="read_style_color_ai">AI theme</string>
+    <string name="read_style_ai_hint">Tap a look to set text, background, and accent.</string>
+    <string name="read_style_ai_cream">Cream</string>
+    <string name="read_style_ai_warm">Warm paper</string>
+    <string name="read_style_ai_cool">Cool white</string>
+    <string name="read_style_ai_ink">Ink</string>
+    <string name="read_style_ai_umber">Umber</string>
+    <string name="read_style_ai_slate">Slate</string>
+    <string name="read_palette_sunset">Sunset</string>
+    <string name="read_palette_aurora">Aurora</string>
+    <string name="ng_grid_accent_themes">Last three columns: this theme\'s accents, then complement and triad of the text. Each cell is a different hue. A frame means 4.5:1 on the current background.</string>
+    <string name="ng_grid_text_mark">A check meets 4.5:1 against the current background. A dot does not. The swatch color stays the same.</string>
+    <string name="ng_grid_bg_mark">A check meets 4.5:1 against the current text. A dot does not. The swatch color stays the same.</string>
 </resources>
