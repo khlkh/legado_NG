@@ -1079,17 +1079,19 @@ fun NgFormField(
         } else if (plainUnderlined) {
             inputField(Modifier)
         } else {
-            Text(
-                text = label,
-                modifier = Modifier.padding(start = if (labeledUnderlined) 0.dp else 12.dp),
-                color = Color(colors.onSurfaceVariant).copy(alpha = contentAlpha),
-                fontSize = labelFontSize,
-                lineHeight = 16.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (label.isNotBlank()) {
+                Text(
+                    text = label,
+                    modifier = Modifier.padding(start = if (labeledUnderlined) 0.dp else 12.dp),
+                    color = Color(colors.onSurfaceVariant).copy(alpha = contentAlpha),
+                    fontSize = labelFontSize,
+                    lineHeight = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             inputField(
-                Modifier.padding(top = if (compact) 4.dp else 6.dp)
+                Modifier.padding(top = if (label.isBlank()) 0.dp else if (compact) 4.dp else 6.dp)
             )
         }
         if (!supportingText.isNullOrBlank()) {

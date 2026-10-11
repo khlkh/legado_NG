@@ -70,6 +70,7 @@ object BackupConfig {
         PreferKey.comicStyleSelect,
         PreferKey.readStyleLanguageMap,
         PreferKey.readLatinOpticalScale,
+        PreferKey.aiThemeDeck,
         PreferKey.shareLayout,
         PreferKey.hideStatusBar,
         PreferKey.hideNavigationBar,
@@ -217,6 +218,7 @@ internal object BackupRestorePolicy {
         PreferKey.comicStyleSelect,
         PreferKey.readStyleLanguageMap,
         PreferKey.readLatinOpticalScale,
+        PreferKey.aiThemeDeck,
         PreferKey.shareLayout,
         PreferKey.showBrightnessView,
         PreferKey.brightnessVwPos

@@ -268,6 +268,12 @@ internal data class ReadStyleUiState(
     val editorScriptFonts: List<ReadScriptFontUi> = emptyList(),
     /** null 表示自动。手动值已钳在 0.80–1.20。 */
     val latinScale: Float? = null,
+    val storedDayText: Int = 0,
+    val storedDayBackground: Int = 0,
+    val storedDayAccent: Int = 0,
+    val storedNightText: Int = 0,
+    val storedNightBackground: Int = 0,
+    val storedNightAccent: Int = 0,
 )
 
 /** Language fonts 三行（Latin/CJK/Other）的 UI 状态。 */
@@ -313,6 +319,7 @@ internal data class ReadStyleActions(
     val onBackgroundColorChanged: (Int) -> Unit,
     val onTextAccentColorChanged: (Int) -> Unit,
     val onApplyPaperLook: (Int, Int, Int) -> Unit,
+    val onApplyPaperPair: (NgPaperLook, NgPaperLook) -> Unit,
     val onResetEditorColor: () -> Unit,
     val onBackgroundAlphaChanged: (Int) -> Unit,
     val onSelectBackgroundImage: () -> Unit,
@@ -547,11 +554,22 @@ internal fun ReadStyleScreen(
                     actions = actions,
                 )
 
-                ReadStylePage.EDIT_AI_THEME -> EditorAiThemePage(
-                    state = state,
+                ReadStylePage.EDIT_AI_THEME -> AiThemePage(
+                    night = state.editorMode == 1,
+                    textColor = state.editorTextColor,
+                    backgroundColor = state.editorBackgroundColor,
+                    accentInk = state.editorTextAccentColor,
                     contentColor = contentColor,
-                    accentColor = accentColor,
-                    actions = actions,
+                    pageHeight = StandardPageHeight,
+                    onBack = actions.onBack,
+                    onReset = actions.onResetEditorColor,
+                    dayText = state.storedDayText,
+                    dayBackground = state.storedDayBackground,
+                    dayAccent = state.storedDayAccent,
+                    nightText = state.storedNightText,
+                    nightBackground = state.storedNightBackground,
+                    nightAccent = state.storedNightAccent,
+                    onApplyPair = actions.onApplyPaperPair,
                 )
 
                 ReadStylePage.EDIT_UNDERLINE -> FullLineUnderlinePage(
@@ -1608,7 +1626,7 @@ private fun EditorPage(
                 .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
         ) {
                 EditorNameRow(
-                    name = state.selectedPresetName,
+                    name = state.presetNameDraft ?: state.selectedPresetName,
                     contentColor = contentColor,
                     accentColor = accentColor,
                     onNameChanged = actions.onPresetNameChanged,
@@ -1876,9 +1894,13 @@ private fun EditorNameRow(
             color = contentColor,
             fontSize = 15.sp,
         )
+        var text by remember { mutableStateOf(name) }
         BasicTextField(
-            value = name,
-            onValueChange = onNameChanged,
+            value = text,
+            onValueChange = { next ->
+                text = next
+                onNameChanged(next)
+            },
             modifier = Modifier.width(120.dp),
             singleLine = true,
             textStyle = TextStyle(
@@ -2347,132 +2369,6 @@ private fun EditorColorPage(
                 actions.onPageSelected(editorColorPageForCluster(index))
             },
             slotOriginalColor = slotOriginal,
-        )
-    }
-}
-
-@Composable
-private fun EditorAiThemePage(
-    state: ReadStyleUiState,
-    contentColor: Color,
-    accentColor: Color,
-    actions: ReadStyleActions,
-) {
-    val looks = ngPaperLooks(state.editorMode == 1)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            NgThemeSheetActionButton(
-                onClick = actions.onBack,
-                contentDescription = stringResource(R.string.back),
-                touchSize = 44.dp,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp),
-                    tint = Color(NgTheme.colors.onSurface),
-                )
-            }
-            Text(
-                text = stringResource(R.string.read_style_color_ai),
-                modifier = Modifier.weight(1f),
-                color = Color(NgTheme.colors.onSurface),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-            )
-            NgThemeSheetActionButton(
-                onClick = actions.onResetEditorColor,
-                contentDescription = stringResource(R.string.ng_reset_color),
-                touchSize = 44.dp,
-            ) {
-                Icon(
-                    Icons.Rounded.Restore,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp),
-                    tint = Color(NgTheme.colors.onSurface),
-                )
-            }
-        }
-        Text(
-            text = stringResource(R.string.read_style_ai_hint),
-            color = contentColor.copy(alpha = 0.62f),
-            fontSize = 12.sp,
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
-        looks.forEach { look ->
-            val selected = state.editorBackgroundType == 0 &&
-                state.editorBackgroundColor == look.background &&
-                state.editorTextColor == look.text &&
-                state.editorTextAccentColor == look.accent
-            EditorPaperLookRow(
-                name = stringResource(look.nameRes),
-                look = look,
-                selected = selected,
-                contentColor = contentColor,
-                accentColor = accentColor,
-                onClick = {
-                    actions.onApplyPaperLook(look.text, look.background, look.accent)
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun EditorPaperLookRow(
-    name: String,
-    look: NgPaperLook,
-    selected: Boolean,
-    contentColor: Color,
-    accentColor: Color,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(10.dp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
-            .height(56.dp)
-            .clip(shape)
-            .background(Color(look.background))
-            .border(
-                width = if (selected) 1.5.dp else 0.7.dp,
-                color = if (selected) accentColor else contentColor.copy(alpha = 0.16f),
-                shape = shape,
-            )
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = name,
-            modifier = Modifier.weight(1f),
-            color = Color(look.text),
-            fontSize = 15.sp,
-            maxLines = 1,
-        )
-        Box(
-            modifier = Modifier
-                .size(18.dp)
-                .clip(CircleShape)
-                .background(Color(look.text))
-                .border(0.7.dp, Color(look.background), CircleShape),
-        )
-        Box(
-            modifier = Modifier
-                .padding(start = 6.dp)
-                .size(18.dp)
-                .clip(CircleShape)
-                .background(Color(look.accent))
-                .border(0.7.dp, Color(look.background), CircleShape),
         )
     }
 }
