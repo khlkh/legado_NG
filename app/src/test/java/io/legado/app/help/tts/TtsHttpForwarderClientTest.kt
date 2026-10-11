@@ -456,7 +456,9 @@ class TtsHttpForwarderClientTest {
         assertEquals("audio/mpeg", engine.contentType)
         assertEquals("http://5.45.99.149:8075/tts", engine.baseUrl)
         assertTrue(engine.supportsVoiceFetch())
-        assertTrue(engine.script.contains("// @version 1.0.10"))
+        assertTrue(engine.script.contains("// @version 1.0.11"))
+        assertTrue(engine.script.contains("en-US-JennyNeural"))
+        assertTrue(engine.script.contains("en-GB-SoniaNeural"))
         assertTrue(engine.script.contains("function voiceCatalog()"))
         assertTrue(engine.script.contains("defaultValue: \"http://5.45.99.149:8075/tts\""))
         assertFalse(engine.script.contains("36.248.181.23"))
@@ -510,10 +512,10 @@ class TtsHttpForwarderClientTest {
     fun nextEdgeLazyCatalogUpgradePreservesExistingVoiceDirectory() {
         val upgraded = scriptEngineFromAssetFile("next_edge_proxy.js")
         val saved = upgraded.copy(
-            script = upgraded.script.replace("// @version 1.0.10", "// @version 1.0.9")
+            script = upgraded.script.replace("// @version 1.0.11", "// @version 1.0.9")
         )
 
-        assertTrue(TtsEngineStore.preservesVoiceCatalogOnDefaultUpgrade(saved, upgraded))
+        assertFalse(TtsEngineStore.preservesVoiceCatalogOnDefaultUpgrade(saved, upgraded))
         assertFalse(
             TtsEngineStore.preservesVoiceCatalogOnDefaultUpgrade(
                 saved = saved.copy(
@@ -592,7 +594,7 @@ class TtsHttpForwarderClientTest {
         val nextEdge = scriptEngineFromAssetFile("next_edge_proxy.js")
         val savedNextEdge = TtsEngineStore.scriptEngineFromScript(
             nextEdge.script
-                .replace("// @version 1.0.10", "// @version 1.0.5")
+                .replace("// @version 1.0.11", "// @version 1.0.5")
                 .replace(Regex("// @capabilities style_tags,emotion\\r?\\n"), "")
         )!!
         val updatedNextEdge = TtsEngineStore.updateDefaultScriptForTest(savedNextEdge, nextEdge)
@@ -619,7 +621,7 @@ class TtsHttpForwarderClientTest {
     fun nextEdgeProxyEndpointUpgradeReplacesOnlyRetiredDefault() {
         val builtIn = scriptEngineFromAssetFile("next_edge_proxy.js")
         val saved = TtsEngineStore.scriptEngineFromScript(
-            builtIn.script.replace("// @version 1.0.10", "// @version 1.0.6")
+            builtIn.script.replace("// @version 1.0.11", "// @version 1.0.6")
         )!!.copy(
             enabled = false,
             optionValues = mapOf(

@@ -230,6 +230,7 @@ class TtsVoiceSelectionSheet(
                 },
             )
         }.filter { it.cards.isNotEmpty() }
+            .flatMap { it.expandLocaleSections() }
         val cards = groups.flatMap { it.cards }
         return TtsVoiceDrawerState(
             loading = false,

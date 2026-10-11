@@ -109,6 +109,7 @@ internal object TtsEngineImportResolver {
             builtIn = existing.builtIn,
             optionValues = existing.optionValues,
             activeVoiceId = existing.activeVoiceId,
+            languageVoiceIds = existing.languageVoiceIds,
             disabledVoiceIds = existing.disabledVoiceIds
         )
     }
@@ -495,10 +496,50 @@ object TtsEngineStore {
             return null
         }
         appCtx.putPrefString(PreferKey.ttsEngineV2ActiveId, engineId)
-        val updated = engine.copy(activeVoiceId = selectedVoiceId)
+        val voice = selectedVoiceId?.let { id -> engine.enabledVoices().firstOrNull { it.id == id } }
+        val updated = engine.copy(
+            activeVoiceId = selectedVoiceId,
+            languageVoiceIds = TtsVoiceLanguage.remember(
+                engine.languageVoiceIds,
+                selectedVoiceId,
+                voice?.language,
+            ),
+        )
         saveEngines(engines().map { if (it.id == engineId) updated else it })
         ReadAloud.refreshReadAloudClass()
         return engine(engineId)
+    }
+
+    /**
+     * Point the active speaker at this book's language memory.
+     * A Chinese choice never overwrites the English slot, and the reverse.
+     * Returns true when the active speaker changed.
+     */
+    @Synchronized
+    fun applyBookLanguageVoice(scriptClass: String?): Boolean {
+        val family = TtsVoiceLanguage.scriptFamily(scriptClass) ?: return false
+        val engineId = activeEngineId()
+        val engine = engine(engineId)?.takeIf { it.enabled } ?: return false
+        val active = engine.activeVoice()
+        val seeded = TtsVoiceLanguage.seed(
+            engine.languageVoiceIds,
+            engine.activeVoiceId,
+            active?.language,
+        )
+        val remembered = seeded[family]
+        val nextActive = remembered?.takeIf { id ->
+            engine.enabledVoices().any { it.id == id }
+        } ?: engine.activeVoiceId
+        if (seeded == engine.languageVoiceIds && nextActive == engine.activeVoiceId) {
+            return false
+        }
+        val updated = engine.copy(activeVoiceId = nextActive, languageVoiceIds = seeded)
+        saveEngines(engines().map { if (it.id == engineId) updated else it })
+        val changed = nextActive != engine.activeVoiceId
+        if (changed) {
+            ReadAloud.refreshReadAloudClass()
+        }
+        return changed
     }
 
     @Synchronized
@@ -880,6 +921,7 @@ object TtsEngineStore {
             voicesParser = safeString { voicesParser }.ifBlank { "auto" },
             baseUrl = safeString { baseUrl },
             activeVoiceId = safeNullableString { activeVoiceId },
+            languageVoiceIds = safeLanguageVoiceIds(),
             defaultSpeed = safeInt(50) { defaultSpeed }.coerceIn(0, 100),
             defaultVolume = safeInt(50) { defaultVolume }.coerceIn(0, 100),
             defaultPitch = safeInt(50) { defaultPitch }.coerceIn(0, 100),
@@ -1026,9 +1068,10 @@ object TtsEngineStore {
                                 script.contains("// @version 1.0.6") ||
                                 script.contains("// @version 1.0.7") ||
                                 script.contains("// @version 1.0.8") ||
-                                script.contains("// @version 1.0.9")
+                                script.contains("// @version 1.0.9") ||
+                                script.contains("// @version 1.0.10")
                         ) &&
-                builtIn.script.contains("// @version 1.0.10")
+                builtIn.script.contains("// @version 1.0.11")
         val shouldUpdateMimoExpressiveFields = id == MIMO_V25_TTS_ID &&
                 (script.contains("// @version 1.0.0") ||
                     script.contains("// @version 1.0.1")) &&
@@ -1271,6 +1314,14 @@ object TtsEngineStore {
                     sampleText = runCatching { voice.sampleText }.getOrNull()
                 )
             }.distinctBy { it.id }
+    }
+
+    private fun TtsEngineSetting.safeLanguageVoiceIds(): Map<String, String> {
+        return runCatching { languageVoiceIds }.getOrNull()
+            .orEmpty()
+            .filterKeys { it == TtsVoiceLanguage.FAMILY_ZH || it == TtsVoiceLanguage.FAMILY_EN }
+            .mapValues { it.value.trim() }
+            .filterValues { it.isNotBlank() }
     }
 
     private fun TtsEngineSetting.safeOptionValues(): Map<String, String> {

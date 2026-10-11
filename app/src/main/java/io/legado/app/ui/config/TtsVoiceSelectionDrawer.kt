@@ -70,13 +70,43 @@ import io.legado.app.ui.design.components.compose.NgDrawerContentCardStyle
 import io.legado.app.ui.design.components.compose.NgLazyListFastScroller
 import io.legado.app.ui.design.components.compose.NgLazyListFastScrollerVariant
 import io.legado.app.ui.design.components.compose.NgLongDrawerHeader
+import io.legado.app.help.tts.TtsVoiceLanguage
 import io.legado.app.ui.design.theme.NgTheme
 
 internal data class TtsVoiceDrawerGroup(
     val engineId: String,
     val engineName: String,
     val cards: List<TtsVoiceDrawerCard>,
-)
+    val sectionKey: String = engineId,
+    val sectionLabel: String? = null,
+) {
+    fun title(): String = sectionLabel?.let { "$engineName · $it" } ?: engineName
+}
+
+internal fun TtsVoiceDrawerGroup.expandLocaleSections(): List<TtsVoiceDrawerGroup> {
+    val labeled = cards.map { card -> TtsVoiceFilterSupport.sectionLabel(card.languageLabels) to card }
+    val sections = labeled.mapNotNull { it.first }.distinct()
+    if (sections.size < 2) {
+        return listOf(this)
+    }
+    val order = listOf(
+        TtsVoiceLanguage.CHINESE,
+        TtsVoiceLanguage.EN_US,
+        TtsVoiceLanguage.EN_UK,
+    )
+    val unlabeled = labeled.mapNotNull { (label, card) -> card.takeIf { label == null } }
+    val labeledCards = labeled.mapNotNull { (label, card) -> label?.let { it to card } }
+    return labeledCards.groupBy({ it.first }, { it.second })
+        .entries
+        .sortedBy { (label, _) -> order.indexOf(label).takeIf { it >= 0 } ?: order.size }
+        .mapIndexed { index, (label, sectionCards) ->
+            copy(
+                cards = if (index == 0) unlabeled + sectionCards else sectionCards,
+                sectionKey = "$engineId:$label",
+                sectionLabel = label,
+            )
+        }
+}
 
 /**
  * 发音人卡片的只读展示快照。调用方必须在 IO 线程一次生成，列表滚动期间不得再访问
@@ -185,6 +215,7 @@ internal fun TtsVoiceSelectionDrawerContent(
     titleAction: TtsVoiceDrawerTitleAction? = null,
     enableLongPressPreview: Boolean = false,
     contentCardStyle: NgDrawerContentCardStyle = NgDrawerContentCardStyle.LEGACY,
+    initialLanguages: Set<String> = emptySet(),
     onSelect: (TtsVoiceOption) -> Unit,
     onPreview: (TtsVoiceOption) -> Unit,
     onEditParams: ((TtsVoiceOption) -> Unit)? = null,
@@ -195,6 +226,16 @@ internal fun TtsVoiceSelectionDrawerContent(
     val drawerHeight = (LocalConfiguration.current.screenHeightDp * 0.90f).dp
     var query by remember { mutableStateOf("") }
     var selectedLanguages by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var appliedLanguagePreset by remember { mutableStateOf(false) }
+    LaunchedEffect(state.languageOptions, initialLanguages) {
+        if (appliedLanguagePreset || initialLanguages.isEmpty() || state.languageOptions.isEmpty()) {
+            return@LaunchedEffect
+        }
+        val matched = initialLanguages.filter { it in state.languageOptions }.toSet()
+        if (matched.isEmpty()) return@LaunchedEffect
+        selectedLanguages = matched
+        appliedLanguagePreset = true
+    }
     var selectedGenders by remember { mutableStateOf<Set<String>>(emptySet()) }
     var filtersExpanded by remember { mutableStateOf(false) }
     var locateRequest by remember { mutableIntStateOf(0) }
@@ -334,9 +375,9 @@ internal fun TtsVoiceSelectionDrawerContent(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         filteredGroups.forEach { group ->
-                            item(key = "header:${group.engineId}") {
+                            item(key = "header:${group.sectionKey}") {
                                 Text(
-                                    text = group.engineName,
+                                    text = group.title(),
                                     color = Color(NgTheme.colors.primary),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,

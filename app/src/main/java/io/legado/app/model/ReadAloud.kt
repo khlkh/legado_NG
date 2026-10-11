@@ -96,6 +96,7 @@ object ReadAloud {
             context.toastOnUi("未启用朗读引擎")
             return
         }
+        TtsEngineStore.applyBookLanguageVoice(ReadBook.book?.config?.scriptClass)
         val intent = Intent(context, aloudClass)
         intent.action = IntentAction.play
         intent.putExtra("play", play)

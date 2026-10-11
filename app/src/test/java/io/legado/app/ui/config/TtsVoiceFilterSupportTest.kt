@@ -1,6 +1,8 @@
 package io.legado.app.ui.config
 
+import io.legado.app.help.book.BookScriptClass
 import io.legado.app.help.tts.TtsEngineSetting
+import io.legado.app.help.tts.TtsVoiceLanguage
 import io.legado.app.help.tts.TtsEngineType
 import io.legado.app.help.tts.TtsVoice
 import org.junit.Assert.assertEquals
@@ -19,7 +21,7 @@ class TtsVoiceFilterSupportTest {
         )
 
         assertEquals(
-            listOf("中", "英", "日", "粤"),
+            listOf("中文", "EN US", "日", "粤"),
             TtsVoiceFilterSupport.availableLanguageLabels(voices)
         )
     }
@@ -59,5 +61,31 @@ class TtsVoiceFilterSupportTest {
         assertFalse(option.matchesName("青年"))
         assertFalse(option.matchesName("Mossland"))
         assertFalse(option.matchesName("voice-001"))
+    }
+
+    @Test
+    fun `book language preset selects chinese or both english groups`() {
+        assertEquals(
+            setOf(TtsVoiceLanguage.CHINESE),
+            TtsVoiceFilterSupport.initialLanguageFilter(BookScriptClass.Cjk.storageValue),
+        )
+        assertEquals(
+            setOf(TtsVoiceLanguage.EN_US, TtsVoiceLanguage.EN_UK),
+            TtsVoiceFilterSupport.initialLanguageFilter(BookScriptClass.Latin.storageValue),
+        )
+        assertEquals(emptySet<String>(), TtsVoiceFilterSupport.initialLanguageFilter(null))
+    }
+
+    @Test
+    fun `chinese and english speakers stay in separate slots`() {
+        val chinese = TtsVoiceLanguage.remember(emptyMap(), "zh-CN-YunxiNeural", "zh-CN")
+        val both = TtsVoiceLanguage.remember(chinese, "en-US-JennyNeural", "en-US")
+        val stillBoth = TtsVoiceLanguage.remember(both, "en-GB-SoniaNeural", "en-GB")
+
+        assertEquals("zh-CN-YunxiNeural", stillBoth[TtsVoiceLanguage.FAMILY_ZH])
+        assertEquals("en-GB-SoniaNeural", stillBoth[TtsVoiceLanguage.FAMILY_EN])
+        val seeded = TtsVoiceLanguage.seed(stillBoth, "zh-CN-XiaoxiaoNeural", "zh-CN")
+        assertEquals("zh-CN-YunxiNeural", seeded[TtsVoiceLanguage.FAMILY_ZH])
+        assertEquals("en-GB-SoniaNeural", seeded[TtsVoiceLanguage.FAMILY_EN])
     }
 }
