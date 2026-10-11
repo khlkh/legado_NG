@@ -14,9 +14,19 @@ import splitties.init.appCtx
 internal object AiThemeDeckStore {
 
     const val MAX_DECK_SIZE = 16
+    const val MAX_RECENT_QUERIES = 5
 
     fun load(night: Boolean): List<NgPaperLook> =
         readSnapshot().deckFor(night).mapNotNull { it.toLook() }
+
+    fun loadQueries(): List<String> = readSnapshot().queries.orEmpty()
+
+    fun rememberQuery(text: String): List<String> {
+        val snapshot = readSnapshot()
+        val next = rememberQueries(snapshot.queries.orEmpty(), text)
+        appCtx.putPrefString(PreferKey.aiThemeDeck, GSON.toJson(snapshot.copy(queries = next)))
+        return next
+    }
 
     fun loadPairs(): List<AiThemePair> {
         val snapshot = readSnapshot()
@@ -91,6 +101,16 @@ internal object AiThemeDeckStore {
         return existing.filterIndexed { itemIndex, _ -> itemIndex != index }
     }
 
+    internal fun rememberQueries(
+        existing: List<String>,
+        text: String,
+        maxSize: Int = MAX_RECENT_QUERIES,
+    ): List<String> {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return existing.take(maxSize)
+        return (listOf(trimmed) + existing.filter { it.trim() != trimmed }).take(maxSize)
+    }
+
     internal fun mergePairs(
         existing: List<AiThemePair>,
         incoming: List<AiThemePair>,
@@ -123,6 +143,7 @@ private data class AiThemeDeckSnapshot(
     @SerializedName("day") val day: List<StoredAiTheme> = emptyList(),
     @SerializedName("night") val night: List<StoredAiTheme> = emptyList(),
     @SerializedName("pairs") val pairs: List<StoredAiThemePair> = emptyList(),
+    @SerializedName("queries") val queries: List<String>? = emptyList(),
 ) {
     fun deckFor(isNight: Boolean): List<StoredAiTheme> = if (isNight) night else day
 

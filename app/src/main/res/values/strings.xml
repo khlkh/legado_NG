@@ -2658,6 +2658,7 @@
     <string name="ng_paper_saved">Saved</string>
     <string name="ng_paper_shuffle">Another set</string>
     <string name="ng_paper_query_hint">Describe a reading look</string>
+    <string name="ng_paper_query_placeholder">Color, mode, scene, or ignore the color guidelines</string>
     <string name="ng_paper_generate">Generate</string>
     <string name="ng_paper_generate_empty">No usable palette came back. Try again.</string>
     <string name="ng_paper_need_assistant">Choose an assistant model in AI settings first.</string>

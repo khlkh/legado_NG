@@ -27,6 +27,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Snackbar
@@ -104,6 +106,8 @@ internal fun AiThemePage(
     var shift by remember(night) { mutableIntStateOf(0) }
     var saved by remember { mutableStateOf(AiThemeDeckStore.loadPairs()) }
     var query by remember { mutableStateOf("") }
+    var recentQueries by remember { mutableStateOf(AiThemeDeckStore.loadQueries()) }
+    var historyOpen by remember { mutableStateOf(false) }
     var generating by remember { mutableStateOf(false) }
     var modelPick by remember { mutableIntStateOf(0) }
     val themeModel = remember(modelPick) { AiAssistantConfigUi.themeGenerationModel() }
@@ -119,6 +123,7 @@ internal fun AiThemePage(
             return
         }
         generating = true
+        recentQueries = AiThemeDeckStore.rememberQuery(preference)
         keyboard?.hide()
         scope.launch {
             val outcome = runCatching {
@@ -327,6 +332,7 @@ internal fun AiThemePage(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 val hint = stringResource(R.string.ng_paper_query_hint)
+                val placeholder = stringResource(R.string.ng_paper_query_placeholder)
                 val modelLabel = themeModel?.model?.let { model ->
                     model.displayName.ifBlank { model.name.ifBlank { model.id } }
                 } ?: stringResource(R.string.ng_paper_need_assistant)
@@ -378,15 +384,57 @@ internal fun AiThemePage(
                         )
                     }
                 }
-                NgFormField(
-                    label = "",
-                    placeholder = hint,
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { generate() }),
-                )
+                val historyShown = recentQueries.filter { item ->
+                    query.isBlank() || item.contains(query.trim(), ignoreCase = true)
+                }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    NgFormField(
+                        label = "",
+                        placeholder = placeholder,
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { generate() }),
+                        onFocusChanged = { focused ->
+                            if (focused && recentQueries.isNotEmpty()) historyOpen = true
+                        },
+                        trailingContent = if (recentQueries.isEmpty()) {
+                            null
+                        } else {
+                            {
+                                Icon(
+                                    Icons.Rounded.ExpandMore,
+                                    contentDescription = hint,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable(role = Role.Button) { historyOpen = !historyOpen },
+                                    tint = Color(NgTheme.colors.onSurfaceVariant),
+                                )
+                            }
+                        },
+                    )
+                    DropdownMenu(
+                        expanded = historyOpen && historyShown.isNotEmpty(),
+                        onDismissRequest = { historyOpen = false },
+                    ) {
+                        historyShown.forEach { item ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = item,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                                onClick = {
+                                    query = item
+                                    historyOpen = false
+                                },
+                            )
+                        }
+                    }
+                }
             }
             Spacer(Modifier.width(8.dp))
             Box(

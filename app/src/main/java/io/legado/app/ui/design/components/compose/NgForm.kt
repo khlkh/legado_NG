@@ -896,6 +896,7 @@ fun NgFormField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     onFocusLost: () -> Unit = {},
+    onFocusChanged: (Boolean) -> Unit = {},
     trailingContent: (@Composable () -> Unit)? = null,
     density: NgFormDensity = NgFormDensity.REGULAR,
     variant: NgFormFieldVariant = NgFormFieldVariant.OUTLINED,
@@ -909,6 +910,7 @@ fun NgFormField(
     val focused by interactionSource.collectIsFocusedAsState()
     var wasFocused by remember { mutableStateOf(false) }
     LaunchedEffect(focused) {
+        onFocusChanged(focused)
         if (focused) {
             wasFocused = true
         } else if (wasFocused) {
