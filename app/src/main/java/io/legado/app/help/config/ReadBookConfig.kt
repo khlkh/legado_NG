@@ -1351,6 +1351,56 @@ object ReadBookConfig {
             }
         }
 
+        fun setDayAndNightPaper(
+            dayText: Int,
+            dayBackground: Int,
+            dayAccent: Int,
+            nightText: Int,
+            nightBackground: Int,
+            nightAccent: Int,
+        ) {
+            textColor = "#${dayText.hexString}"
+            textColorInt = dayText
+            bgType = 0
+            bgStr = "#${dayBackground.hexString}"
+            textAccentColor = "#${dayAccent.hexString}"
+            textAccentColorInt = dayAccent
+            textColorNight = "#${nightText.hexString}"
+            textColorIntNight = nightText
+            bgTypeNight = 0
+            bgStrNight = "#${nightBackground.hexString}"
+            textAccentColorNight = "#${nightAccent.hexString}"
+            textAccentColorIntNight = nightAccent
+            initColorInt = true
+            initAccentColorInt = true
+        }
+
+        fun storedDayText(): Int {
+            if (!initColorInt) initColorInt()
+            return textColorInt
+        }
+
+        fun storedNightText(): Int {
+            if (!initColorInt) initColorInt()
+            return textColorIntNight
+        }
+
+        fun storedDayAccent(): Int {
+            if (!initAccentColorInt) initAccentColorInt()
+            return textAccentColorInt
+        }
+
+        fun storedNightAccent(): Int {
+            if (!initAccentColorInt) initAccentColorInt()
+            return textAccentColorIntNight
+        }
+
+        fun storedDayBackground(): Int =
+            if (bgType == 0) runCatching { bgStr.toColorInt() }.getOrDefault(0) else 0
+
+        fun storedNightBackground(): Int =
+            if (bgTypeNight == 0) runCatching { bgStrNight.toColorInt() }.getOrDefault(0) else 0
+
         fun setCurTextAccentColor(color: Int) {
             when {
                 AppConfig.isEInkMode -> {

@@ -19,16 +19,22 @@ class EditorColorEntryTest {
     }
 
     @Test
-    fun paperLooksKeepReadableTextAndTheDayAccent() {
-        val dayAccent = 0xFF2B579A.toInt()
-        ngPaperLooks(night = false).forEach { look ->
-            assertEquals(dayAccent, look.accent)
+    fun paperLooksKeepTheExamplePairs() {
+        val day = ngPaperLooks(night = false)
+        val night = ngPaperLooks(night = true)
+        assertEquals(10, day.size)
+        assertEquals(10, night.size)
+        assertEquals(0xFFF6F1E7.toInt(), day.first().background)
+        assertEquals(0xFF2E2A24.toInt(), day.first().text)
+        assertEquals(0xFF2F5F7A.toInt(), day.first().accent)
+        assertEquals(0xFF1E1D1A.toInt(), night.first().background)
+        assertEquals(0xFFE8E0D4.toInt(), night.first().text)
+        assertEquals(0xFF6FB0C9.toInt(), night.first().accent)
+        assertEquals(0xFFB06A2E.toInt(), day[3].accent)
+        (day + night).forEach { look ->
             assertTrue(NgColorMath.displayedContrast(look.text, look.background) >= 7.0)
         }
-        ngPaperLooks(night = true).forEach { look ->
-            assertTrue(NgColorMath.displayedContrast(look.text, look.background) >= 7.0)
-        }
-        assertEquals(3, ngPaperLooks(night = false).size)
-        assertEquals(3, ngPaperLooks(night = true).size)
+        assertEquals(10, rotatedDefaultPairs(0).size)
+        assertTrue(rotatedDefaultPairs(1).first().id != day.first().id)
     }
 }

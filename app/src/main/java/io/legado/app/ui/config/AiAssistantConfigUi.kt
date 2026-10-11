@@ -60,6 +60,16 @@ object AiAssistantConfigUi {
         val model: AiModel
     )
 
+    fun themeGenerationModel(): AssistantModelOption? {
+        selectedModel()?.let { return it }
+        return AiProviderStore.providers().firstNotNullOfOrNull { provider ->
+            if (!provider.enabled || provider.model.isBlank()) return@firstNotNullOfOrNull null
+            val model = provider.assistantEligibleModels().firstOrNull { it.safeId() == provider.model }
+                ?: return@firstNotNullOfOrNull null
+            AssistantModelOption(provider, model)
+        }
+    }
+
     fun selectedModel(): AssistantModelOption? {
         val providerId = AiConfig.assistantProviderId
         val modelId = AiConfig.assistantModelId
