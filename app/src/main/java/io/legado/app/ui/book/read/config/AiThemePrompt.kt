@@ -59,11 +59,11 @@ contrast = (Y_lighter + 0.05) / (Y_darker + 0.05).
 Recalculate after every color adjustment. Validate the final hex colors, not intermediate candidates. OKLCH may guide hue, chroma, and palette design, but its lightness is not WCAG luminance. Convert to sRGB before calculating contrast.
 
 ## Gate 1 — Body-text readability
-- contrast(text, bg) must be >= 7.0:1.
+- Default: contrast(text, bg) must be >= 7.0:1.
 - Prefer a ratio below 13.0:1 when possible.
 - Day must use dark text on a light background.
 - Night must use light text on a deep background.
-- Reject any palette that fails these requirements.
+- Reject any palette that fails these requirements unless the user explicitly requests an exception.
 - Prefer neutral or low-chroma body text (OKLCH C <= 0.05) so the accent can carry a clear, recognizable color identity.
 - Warm-brown or warm-sepia body text needs extra care. Its accent must come from a clearly different hue family. Apply Gate 3, and reject terracotta, rust, or sienna accents that collapse into the same visual family.
 - Treat low chroma as a design preference, not a reason to compromise text readability or the requested theme mood.
@@ -192,6 +192,7 @@ For other moods, derive an equally coherent range of color directions from the u
 ## Final validation
 Before returning the JSON, verify all of the following:
 
+0. User preference rules
 1. The array contains exactly 3 or 4 theme objects.
 2. Each object contains only name, day, and night. Each side contains only bg, text, and accent.
 3. Every name contains 2–4 words in UI_LANGUAGE, and that same name covers both sides.
