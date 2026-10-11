@@ -462,6 +462,8 @@ class TtsHttpForwarderClientTest {
         assertEquals("https://libretts.is-an.org/api/tts", engine.baseUrl)
         assertTrue(engine.supportsVoiceFetch())
         assertTrue(engine.script.contains("// @version 1.0.11"))
+        assertTrue(engine.script.contains("en-US-JennyNeural"))
+        assertTrue(engine.script.contains("en-GB-SoniaNeural"))
         assertTrue(engine.script.contains("function voiceCatalog()"))
         assertFalse(engine.script.contains("key: \"api\""))
         assertFalse(engine.script.contains("5.45.99.149"))

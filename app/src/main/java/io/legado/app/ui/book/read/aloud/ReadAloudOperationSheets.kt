@@ -102,6 +102,7 @@ import io.legado.app.ui.config.TtsVoicePreviewController
 import io.legado.app.ui.config.TtsVoiceSelectionDrawerContent
 import io.legado.app.ui.config.refreshTtsVoiceCatalogs
 import io.legado.app.ui.config.showTtsVoiceParamsDialog
+import io.legado.app.ui.config.expandLocaleSections
 import io.legado.app.ui.config.toDrawerCard
 import io.legado.app.ui.config.withUpdatedEngine
 import io.legado.app.ui.design.components.NgButtonVariant
@@ -1267,6 +1268,9 @@ internal class ReadAloudVoiceDialog : ReadAloudComposeBottomSheet() {
                     searchHint = "搜索引擎或发音人",
                     emptyText = "没有可选发音人",
                     state = state,
+                    initialLanguages = TtsVoiceFilterSupport.initialLanguageFilter(
+                        ReadBook.book?.config?.scriptClass
+                    ),
                     contentCardStyle = NgDrawerContentCardStyle.ADAPTIVE,
                     enableLongPressPreview = true,
                     onSelect = ::selectVoice,
@@ -1299,6 +1303,7 @@ internal class ReadAloudVoiceDialog : ReadAloudComposeBottomSheet() {
                 activity?.toastOnUi(result.feedback())
             }
             val snapshot = withContext(IO) {
+                TtsEngineStore.applyBookLanguageVoice(ReadBook.book?.config?.scriptClass)
                 var engines = TtsEngineStore.engines().filter { it.enabled }
                 val activeEngineId = runCatching {
                     TtsEngineStore.activeEngineId()
@@ -1342,6 +1347,7 @@ internal class ReadAloudVoiceDialog : ReadAloudComposeBottomSheet() {
                         },
                     )
                 }.filter { it.cards.isNotEmpty() }
+                    .flatMap { it.expandLocaleSections() }
                 val voices = groups.flatMap { group ->
                     group.cards.map { it.option.voice }
                 }

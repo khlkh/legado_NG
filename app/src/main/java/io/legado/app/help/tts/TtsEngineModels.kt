@@ -266,6 +266,9 @@ data class TtsEngineSetting(
     val baseUrl: String = "",
     @SerializedName("active_voice_id")
     val activeVoiceId: String? = null,
+    /** Last chosen speaker per language family (`zh`, `en`). The two slots do not overwrite each other. */
+    @SerializedName("language_voice_ids")
+    val languageVoiceIds: Map<String, String> = emptyMap(),
     @SerializedName("default_speed")
     val defaultSpeed: Int = 50,
     @SerializedName("default_volume")
