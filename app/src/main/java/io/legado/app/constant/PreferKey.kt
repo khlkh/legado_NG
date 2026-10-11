@@ -192,6 +192,7 @@ object PreferKey {
     const val readStyleSelect = "readStyleSelect"
     const val readStyleLanguageMap = "readStyleLanguageMap"
     const val readLatinOpticalScale = "readLatinOpticalScale"
+    const val aiThemeDeck = "aiThemeDeck.v1"
     const val readNightTheme = "readNightTheme"
     const val readThemeMode = "readThemeMode.v1"
     const val systemTypefaces = "system_typefaces"

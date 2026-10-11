@@ -350,6 +350,7 @@ internal object NgSwatchFamilies {
         chroma: Float,
         startL: Float,
         background: Int,
+        target: Double = TEXT_CONTRAST,
     ): Int {
         fun at(lightness: Float, amount: Float): Pair<Int, Double> {
             val color = oklch(lightness.coerceIn(0.18f, 0.94f), amount, wrapHue(hue))
@@ -364,13 +365,72 @@ internal object NgSwatchFamilies {
         for (ignored in 0 until 16) {
             val sample = at(lightness, amount)
             if (sample.second > best.second) best = sample
-            if (sample.second >= TEXT_CONTRAST) return sample.first
+            if (sample.second >= target) return sample.first
             val next = lightness + step
             if (next !in 0.18f..0.94f) break
             lightness = next
         }
         return best.first
     }
+
+    /** Body ink on the page. Walks lightness until contrast is at least 7:1. */
+    internal fun fitBodyInk(color: Int, background: Int, night: Boolean): Int {
+        val hue = srgbHue(color) ?: 40f
+        val start = if (night) 0.78f else 0.32f
+        return fitAccentOnPage(hue, 0.012f, start, background, target = 7.0)
+    }
+
+    /**
+     * Accent ink on the page. Candidates are the theme hues plus complement, split-complement,
+     * and triad of the text. Lightness is walked toward 7:1, and 4.5:1 is the floor.
+     * A proposed hue joins the pool only when it is at least 40° from the text.
+     */
+    internal fun harmonizedAccent(
+        proposed: Int?,
+        foreground: Int,
+        background: Int,
+        familyId: String,
+        preferIndex: Int = 0,
+    ): Int {
+        val family = families.firstOrNull { it.id == familyId } ?: families.first { it.id == "paper" }
+        val textHue = srgbHue(foreground) ?: family.targetHue
+        val startL = if (nightPage(background)) 0.74f else 0.42f
+        val proposedHue = proposed?.let { srgbHue(it) }
+        val hues = family.accentHues.ifEmpty { listOf(family.targetHue) }
+        val pool = buildList {
+            if (proposedHue != null && hueDistance(proposedHue, textHue) >= 40f) add(proposedHue)
+            addAll(hues)
+            addAll(shifted(textHue, COMPLEMENT_OFFSETS))
+            addAll(shifted(textHue, TRIAD_OFFSETS))
+        }
+        val preferred = hues[preferIndex.mod(hues.size)]
+        var best: Int? = null
+        var bestScore = -1f
+        var strongest: Int? = null
+        var strongestRatio = -1.0
+        for (hue in pool) {
+            val wrapped = wrapHue(hue)
+            if (hueDistance(wrapped, textHue) < 40f) continue
+            val color = fitAccentOnPage(wrapped, family.accentChroma, startL, background, target = 7.0)
+            val ratio = NgColorMath.contrastRatio(color, background)
+            if (ratio > strongestRatio) {
+                strongestRatio = ratio
+                strongest = color
+            }
+            if (ratio < TEXT_CONTRAST) continue
+            val score = accentScore(color, wrapped, family, foreground, background, preferTheme = true) +
+                if (hueDistance(wrapped, preferred) < 14f) 0.12f else 0f
+            if (score > bestScore) {
+                bestScore = score
+                best = color
+            }
+        }
+        return best ?: strongest ?: fitAccentOnPage(preferred, family.accentChroma, startL, background, target = 7.0)
+    }
+
+    private fun nightPage(background: Int): Boolean =
+        NgColorMath.contrastRatio(0xFFFFFFFF.toInt(), background) >
+            NgColorMath.contrastRatio(0xFF000000.toInt(), background)
 
     /**
      * Move lightness, then chroma, until sRGB relative-luminance contrast reaches AA.

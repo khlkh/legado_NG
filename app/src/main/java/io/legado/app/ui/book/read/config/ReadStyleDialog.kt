@@ -123,6 +123,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
     private var editingHighlightIndex: Int? = null
     private var creatingPreset = false
     private var namingPreset = false
+    private var latestPresetNameDraft: String? = null
     private val appliedPresetRebinds = ArrayDeque<Pair<String, String>>()
     private var highlightDraft: ReadHighlightRule? = null
     private val editorSession by viewModels<ReadStyleEditorSession>()
@@ -414,6 +415,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
         onBack = ::navigateBack,
         onEditorThemeModeToggle = ::toggleEditorThemeMode,
         onPresetNameChanged = { value ->
+            latestPresetNameDraft = value
             updateEditorState { copy(presetNameDraft = value) }
         },
         onTextColorChanged = ::applyEditorTextColor,
@@ -424,6 +426,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
             refreshUi(reusePresetThumbnails = true)
         },
         onApplyPaperLook = ::applyPaperLook,
+        onApplyPaperPair = ::applyPaperPair,
         onResetEditorColor = ::resetEditorColor,
         onBackgroundAlphaChanged = { alpha ->
             val safeAlpha = alpha.coerceIn(0, 100)
@@ -669,6 +672,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
     private fun computeUnsaved(): Boolean = sessionSnapshot != null && currentSnapshotJson() != sessionSnapshotJson
 
     private fun commitDone() {
+        if (!commitPresetNameDraft()) return
         // EPUB 渲染失败的脚本字体视为不可用：保存时恢复为跟随预设，忽略本次选择。
         if (EpubScriptFontHealth.failedScopes.value.isNotEmpty()) {
             val editorPage = page.isEditorPage()
@@ -684,6 +688,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
             EpubScriptFontHealth.clear()
             refreshUi()
         }
+        closing = true
         dismissAllowingStateLoss()
     }
 
@@ -819,6 +824,15 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
             },
             selectedPresetIndex = ReadBookConfig.styleSelect,
             selectedPresetName = name,
+            presetNameDraft = latestPresetNameDraft ?: if (
+                previous != null &&
+                previous.selectedPresetIndex == ReadBookConfig.styleSelect &&
+                (page.isEditorPage() || page == ReadStylePage.EDIT_AI_THEME)
+            ) {
+                previous.presetNameDraft
+            } else {
+                null
+            },
             canRestoreCurrentDefault = ReadBookConfig.hasDefaultForCurrent(),
             highlightSummary = getString(
                 R.string.read_highlight_summary,
@@ -855,7 +869,13 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
             editorBackgroundName = backgroundName,
             editorTextColor = config.textColorForMode(mode),
             editorBackgroundColor = backgroundColor,
-            editorTextAccentColor = config.textAccentColorForMode(mode),
+            editorTextAccentColor = config.curTextAccentColor(),
+            storedDayText = config.storedDayText(),
+            storedDayBackground = config.storedDayBackground(),
+            storedDayAccent = config.storedDayAccent(),
+            storedNightText = config.storedNightText(),
+            storedNightBackground = config.storedNightBackground(),
+            storedNightAccent = config.storedNightAccent(),
             editorBackgroundAlpha = ReadBookConfig.bgAlpha.coerceIn(0, 100),
             editorFloatingColorSeed = ReadBookConfig.currentGlobalFloatingSeed(),
             editorFloatingColorFromBackground = !ReadBookConfig.readFloatingFollowAppGlobally,
@@ -998,9 +1018,10 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
 
     /** 离开编辑或关闭界面时才收名字。空名字不写入：已有名字的预设保持原名。 */
     private fun commitPresetNameDraft(): Boolean {
-        val draft = screenState?.presetNameDraft ?: return true
+        val draft = latestPresetNameDraft ?: screenState?.presetNameDraft ?: return true
         val oldName = ReadBookConfig.durConfig.name
         val saved = ReadBookConfig.commitPresetName(draft)
+        latestPresetNameDraft = null
         screenState = screenState?.copy(presetNameDraft = null)
         if (saved == null) {
             toastOnUi(
@@ -1041,6 +1062,7 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
     }
 
     private fun openEditor(index: Int, isNew: Boolean = false) {
+        latestPresetNameDraft = null
         creatingPreset = isNew
         if (editorSession.presetMode == null) editorSession.presetMode = ReadAppearanceMode.current()
         currentPage = ReadStylePage.EDIT
@@ -1245,6 +1267,8 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
             }
 
             page == ReadStylePage.EDIT -> {
+                commitPresetNameDraft()
+                creatingPreset = false
                 page = ReadStylePage.PRESET
                 clearEditorThemeOverride()
                 refreshUi()
@@ -1301,6 +1325,37 @@ class ReadStyleDialog : BaseComposeDialogFragment() {
         applyEditorTextColor(text)
         applyEditorBackgroundColor(background)
         applyEditorAccentColor(accent)
+    }
+
+    private fun applyPaperPair(day: NgPaperLook, night: NgPaperLook) {
+        ReadBookConfig.durConfig.setDayAndNightPaper(
+            dayText = day.text,
+            dayBackground = day.background,
+            dayAccent = day.accent,
+            nightText = night.text,
+            nightBackground = night.background,
+            nightAccent = night.accent,
+        )
+        val active = if (ReadBookConfig.isNightTheme) night else day
+        val config = ReadBookConfig.durConfig
+        updateEditorState {
+            copy(
+                editorTextColor = active.text,
+                editorTextAccentColor = active.accent,
+                editorPreviewBackground = null,
+                editorBackgroundType = 0,
+                editorBackgroundName = "#${active.background.hexString}",
+                editorBackgroundColor = active.background,
+                storedDayText = config.storedDayText(),
+                storedDayBackground = config.storedDayBackground(),
+                storedDayAccent = config.storedDayAccent(),
+                storedNightText = config.storedNightText(),
+                storedNightBackground = config.storedNightBackground(),
+                storedNightAccent = config.storedNightAccent(),
+            )
+        }
+        postEditorTextColorChanged()
+        postEditorBackgroundChanged()
     }
 
     private fun restoreEditorBackgroundSession(state: ReadStyleUiState) {
