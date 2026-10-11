@@ -1,6 +1,7 @@
 package io.legado.app.ui.config
 
 import io.legado.app.help.tts.TtsVoice
+import io.legado.app.help.tts.TtsVoiceLanguage
 
 object TtsVoiceFilterSupport {
 
@@ -40,8 +41,21 @@ object TtsVoiceFilterSupport {
         }
     }
 
+    fun sectionLabel(labels: List<String>): String? {
+        return TtsVoiceLanguage.section(labels)
+    }
+
+    fun initialLanguageFilter(scriptClass: String?): Set<String> {
+        return TtsVoiceLanguage.initialFilter(scriptClass)
+    }
+
     private fun sortLanguageLabels(labels: List<String>): List<String> {
-        val preferredOrder = listOf("中", "英", "日", "韩", "法", "德", "西", "葡", "粤", "吴")
+        val preferredOrder = listOf(
+            TtsVoiceLanguage.CHINESE,
+            TtsVoiceLanguage.EN_US,
+            TtsVoiceLanguage.EN_UK,
+            "日", "韩", "法", "德", "西", "葡", "粤", "吴",
+        )
         return labels.sortedWith(
             compareBy<String> {
                 preferredOrder.indexOf(it).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE
@@ -50,23 +64,6 @@ object TtsVoiceFilterSupport {
     }
 
     private fun languageLabel(language: String?): String? {
-        val code = language?.takeIf { it.isNotBlank() }
-            ?.substringBefore("-")
-            ?.substringBefore("_")
-            ?.lowercase()
-            ?: return null
-        return when (code) {
-            "zh", "cmn" -> "中"
-            "yue" -> "粤"
-            "wuu" -> "吴"
-            "en" -> "英"
-            "ja", "jp", "jpn" -> "日"
-            "ko", "kr", "kor" -> "韩"
-            "fr", "fra", "fre" -> "法"
-            "de", "deu", "ger" -> "德"
-            "es", "esp", "spa" -> "西"
-            "pt", "por" -> "葡"
-            else -> code.uppercase()
-        }
+        return TtsVoiceLanguage.label(language)
     }
 }

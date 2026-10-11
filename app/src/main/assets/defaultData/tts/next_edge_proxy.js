@@ -1,6 +1,6 @@
 // @name Next Edge TTS
 // @schema 1
-// @version 1.0.10
+// @version 1.0.11
 // @uuid next_edge_proxy
 // @author Legado
 // @url http://5.45.99.149:8075/tts
@@ -126,6 +126,160 @@ var API_OPTIONS = [
 
 var VOICES;
 
+function englishVoiceCatalog() {
+    return [
+        { name: "Ava Dragon HD Latest", id: "en-US-Ava:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Andrew Dragon HD Latest", id: "en-US-Andrew:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Adam Dragon HD Latest", id: "en-US-Adam:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Alloy Dragon HD Latest", id: "en-US-Alloy:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Aria Dragon HD Latest", id: "en-US-Aria:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Bree Dragon HD Latest", id: "en-US-Bree:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Brian Dragon HD Latest", id: "en-US-Brian:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Davis Dragon HD Latest", id: "en-US-Davis:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Emma Dragon HD Latest", id: "en-US-Emma:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jane Dragon HD Latest", id: "en-US-Jane:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jenny Dragon HD Latest", id: "en-US-Jenny:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Nova Dragon HD Latest", id: "en-US-Nova:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Phoebe Dragon HD Latest", id: "en-US-Phoebe:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Serena Dragon HD Latest", id: "en-US-Serena:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Steffan Dragon HD Latest", id: "en-US-Steffan:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Andrew Dragon HD Omni Latest", id: "en-US-Andrew:DragonHDOmniLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Brian Dragon HD Omni Latest", id: "en-US-Brian:DragonHDOmniLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Caleb Dragon HD Omni Latest", id: "en-US-Caleb:DragonHDOmniLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Dana Dragon HD Omni Latest", id: "en-US-Dana:DragonHDOmniLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Lewis Dragon HD Omni Latest", id: "en-US-Lewis:DragonHDOmniLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Phoebe Dragon HD Omni Latest", id: "en-US-Phoebe:DragonHDOmniLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ava Multilingual", id: "en-US-AvaMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Andrew Multilingual", id: "en-US-AndrewMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["empathetic", "relieved"], roles: [], roleHints: [] },
+        { name: "Amanda Multilingual", id: "en-US-AmandaMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Adam Multilingual", id: "en-US-AdamMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Emma Multilingual", id: "en-US-EmmaMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Phoebe Multilingual", id: "en-US-PhoebeMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["empathetic", "sad", "serious"], roles: [], roleHints: [] },
+        { name: "Alloy Turbo Multilingual", id: "en-US-AlloyTurboMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Echo Turbo Multilingual", id: "en-US-EchoTurboMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Fable Turbo Multilingual", id: "en-US-FableTurboMultilingualNeural", gender: "neutral", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Onyx Turbo Multilingual", id: "en-US-OnyxTurboMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Nova Turbo Multilingual", id: "en-US-NovaTurboMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Shimmer Turbo Multilingual", id: "en-US-ShimmerTurboMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Brian Multilingual", id: "en-US-BrianMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ava", id: "en-US-AvaNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "fearful", "sad"], roles: [], roleHints: [] },
+        { name: "Andrew", id: "en-US-AndrewNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Emma", id: "en-US-EmmaNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Brian", id: "en-US-BrianNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jenny", id: "en-US-JennyNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["assistant", "chat", "customerservice", "newscast", "angry", "cheerful", "sad", "excited", "friendly", "terrified", "shouting", "unfriendly", "whispering", "hopeful"], roles: [], roleHints: [] },
+        { name: "Guy", id: "en-US-GuyNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["newscast", "angry", "cheerful", "sad", "excited", "friendly", "terrified", "shouting", "unfriendly", "whispering", "hopeful"], roles: [], roleHints: [] },
+        { name: "Aria", id: "en-US-AriaNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["chat", "customerservice", "narration-professional", "newscast-casual", "newscast-formal", "cheerful", "empathetic", "angry", "sad", "excited", "friendly", "terrified", "shouting", "unfriendly", "whispering", "hopeful"], roles: [], roleHints: [] },
+        { name: "Davis", id: "en-US-DavisNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["chat", "angry", "cheerful", "excited", "friendly", "hopeful", "sad", "shouting", "terrified", "unfriendly", "whispering"], roles: [], roleHints: [] },
+        { name: "Jane", id: "en-US-JaneNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "cheerful", "excited", "friendly", "hopeful", "sad", "shouting", "terrified", "unfriendly", "whispering"], roles: [], roleHints: [] },
+        { name: "Jason", id: "en-US-JasonNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["angry", "cheerful", "excited", "friendly", "hopeful", "sad", "shouting", "terrified", "unfriendly", "whispering"], roles: [], roleHints: [] },
+        { name: "Kai", id: "en-US-KaiNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["conversation"], roles: [], roleHints: [] },
+        { name: "Luna", id: "en-US-LunaNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["conversation"], roles: [], roleHints: [] },
+        { name: "Sara", id: "en-US-SaraNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "cheerful", "excited", "friendly", "hopeful", "sad", "shouting", "terrified", "unfriendly", "whispering"], roles: [], roleHints: [] },
+        { name: "Tony", id: "en-US-TonyNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["angry", "cheerful", "excited", "friendly", "hopeful", "sad", "shouting", "terrified", "unfriendly", "whispering"], roles: [], roleHints: [] },
+        { name: "Nancy", id: "en-US-NancyNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "cheerful", "excited", "friendly", "hopeful", "sad", "shouting", "terrified", "unfriendly", "whispering"], roles: [], roleHints: [] },
+        { name: "Cora Multilingual", id: "en-US-CoraMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Christopher Multilingual", id: "en-US-ChristopherMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Brandon Multilingual", id: "en-US-BrandonMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "AIGenerate1", id: "en-US-AIGenerate1Neural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "AIGenerate2", id: "en-US-AIGenerate2Neural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Amber", id: "en-US-AmberNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ana", id: "en-US-AnaNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ashley", id: "en-US-AshleyNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Brandon", id: "en-US-BrandonNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Christopher", id: "en-US-ChristopherNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Cora", id: "en-US-CoraNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Davis Multilingual", id: "en-US-DavisMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["empathetic", "funny", "relieved"], roles: [], roleHints: [] },
+        { name: "Derek Multilingual", id: "en-US-DerekMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["empathetic", "excited", "relieved", "shy"], roles: [], roleHints: [] },
+        { name: "Dustin Multilingual", id: "en-US-DustinMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Elizabeth", id: "en-US-ElizabethNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Eric", id: "en-US-EricNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Evelyn Multilingual", id: "en-US-EvelynMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jacob", id: "en-US-JacobNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jenny Multilingual", id: "en-US-JennyMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jimmie Dragon HD Flash Latest", id: "en-US-Jimmie:DragonHDFlashLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Lewis Multilingual", id: "en-US-LewisMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Lola Multilingual", id: "en-US-LolaMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Michelle", id: "en-US-MichelleNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Monica", id: "en-US-MonicaNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Nancy Multilingual", id: "en-US-NancyMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["excited", "friendly", "funny", "relieved", "shy"], roles: [], roleHints: [] },
+        { name: "Roger", id: "en-US-RogerNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ryan Multilingual", id: "en-US-RyanMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Samuel Multilingual", id: "en-US-SamuelMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Serena Multilingual", id: "en-US-SerenaMultilingualNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["empathetic", "excited", "friendly", "shy", "serious", "relieved", "sad"], roles: [], roleHints: [] },
+        { name: "Steffan Multilingual", id: "en-US-SteffanMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Steffan", id: "en-US-SteffanNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Tiana Dragon HD Flash Latest", id: "en-US-Tiana:DragonHDFlashLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Tyler Dragon HD Flash Latest", id: "en-US-Tyler:DragonHDFlashLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Andrew Dragon Latest", id: "en-US-Andrew:DragonLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ash Turbo Multilingual", id: "en-US-AshTurboMultilingualNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ava Dragon Latest", id: "en-US-Ava:DragonLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Blue", id: "en-US-BlueNeural", gender: "neutral", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ethan MAI-Voice-2-Flash", id: "en-US-Ethan:MAI-Voice-2-Flash", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "disgusted", "embarrassed", "excited", "fearful", "happy", "hopeful", "jealous", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "surprised", "whispering"], roles: [], roleHints: [] },
+        { name: "Ethan MAI-Voice-2.1-Flash", id: "en-US-Ethan:MAI-Voice-2.1-Flash", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "disgusted", "embarrassed", "excited", "fearful", "happy", "hopeful", "jealous", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "surprised", "whispering"], roles: [], roleHints: [] },
+        { name: "Grant MAI-Voice-2-Flash", id: "en-US-Grant:MAI-Voice-2-Flash", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Grant MAI-Voice-2.1-Flash", id: "en-US-Grant:MAI-Voice-2.1-Flash", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Harper MAI-Voice-2-Flash", id: "en-US-Harper:MAI-Voice-2-Flash", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "embarrassed", "excited", "happy", "hopeful", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "whispering"], roles: [], roleHints: [] },
+        { name: "Harper MAI-Voice-2.1-Flash", id: "en-US-Harper:MAI-Voice-2.1-Flash", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "embarrassed", "excited", "happy", "hopeful", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "whispering"], roles: [], roleHints: [] },
+        { name: "Iris MAI-Voice-2-Flash", id: "en-US-Iris:MAI-Voice-2-Flash", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Iris MAI-Voice-2.1-Flash", id: "en-US-Iris:MAI-Voice-2.1-Flash", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jasper MAI-Voice-2-Flash", id: "en-US-Jasper:MAI-Voice-2-Flash", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jasper MAI-Voice-2.1-Flash", id: "en-US-Jasper:MAI-Voice-2.1-Flash", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Olivia MAI-Voice-2-Flash", id: "en-US-Olivia:MAI-Voice-2-Flash", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "disgusted", "embarrassed", "excited", "fearful", "happy", "hopeful", "jealous", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "surprised", "whispering"], roles: [], roleHints: [] },
+        { name: "Olivia MAI-Voice-2.1-Flash", id: "en-US-Olivia:MAI-Voice-2.1-Flash", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "disgusted", "embarrassed", "excited", "fearful", "happy", "hopeful", "jealous", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "surprised", "whispering"], roles: [], roleHints: [] },
+        { name: "Evelyn Dragon HD Latest", id: "en-US-Evelyn:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jimmie Dragon HD Latest", id: "en-US-Jimmie:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Juno Dragon HD Latest", id: "en-US-Juno:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Mila Dragon HD Latest", id: "en-US-Mila:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Tessa Dragon HD Latest", id: "en-US-Tessa:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Tiana Dragon HD Latest", id: "en-US-Tiana:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Tyler Dragon HD Latest", id: "en-US-Tyler:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Vance Dragon HD Latest", id: "en-US-Vance:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Andrew Preview Dragon HD Latest", id: "en-US-Andrew-Preview:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ava Preview Dragon HD Latest", id: "en-US-Ava-Preview:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ava Dragon HD Omni Latest", id: "en-us-ava:DragonHDOmniLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Blushzephyr Dragon HD Omni Latest", id: "en-us-blushzephyr:DragonHDOmniLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Colin Dragon HD Latest", id: "en-US-Colin:DragonHDLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Emma Dragon HD Omni Latest", id: "en-us-emma:DragonHDOmniLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ethan MAI-Voice-2", id: "en-US-Ethan:MAI-Voice-2", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "disgusted", "embarrassed", "excited", "fearful", "happy", "hopeful", "jealous", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "surprised", "whispering"], roles: [], roleHints: [] },
+        { name: "Ethan MAI-Voice-2.1", id: "en-US-Ethan:MAI-Voice-2.1", gender: "male", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "disgusted", "embarrassed", "excited", "fearful", "happy", "hopeful", "jealous", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "surprised", "whispering"], roles: [], roleHints: [] },
+        { name: "Goldenspark Dragon HD Omni Latest", id: "en-us-goldenspark:DragonHDOmniLatestNeural", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Grant MAI-Voice-2", id: "en-US-Grant:MAI-Voice-2", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Grant MAI-Voice-2.1", id: "en-US-Grant:MAI-Voice-2.1", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Harper MAI-Voice-2", id: "en-US-Harper:MAI-Voice-2", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "embarrassed", "excited", "happy", "hopeful", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "whispering"], roles: [], roleHints: [] },
+        { name: "Harper MAI-Voice-2.1", id: "en-US-Harper:MAI-Voice-2.1", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "embarrassed", "excited", "happy", "hopeful", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "whispering"], roles: [], roleHints: [] },
+        { name: "Iris MAI-Voice-2", id: "en-US-Iris:MAI-Voice-2", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Iris MAI-Voice-2.1", id: "en-US-Iris:MAI-Voice-2.1", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jasper MAI-Voice-2", id: "en-US-Jasper:MAI-Voice-2", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jasper MAI-Voice-2.1", id: "en-US-Jasper:MAI-Voice-2.1", gender: "male", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Jelly Dragon HD Omni Latest", id: "en-us-jelly:DragonHDOmniLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Olivia MAI-Voice-2", id: "en-US-Olivia:MAI-Voice-2", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "disgusted", "embarrassed", "excited", "fearful", "happy", "hopeful", "jealous", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "surprised", "whispering"], roles: [], roleHints: [] },
+        { name: "Olivia MAI-Voice-2.1", id: "en-US-Olivia:MAI-Voice-2.1", gender: "female", profile: "EN US", categories: [], personalities: [], styles: ["angry", "confused", "determined", "disgusted", "embarrassed", "excited", "fearful", "happy", "hopeful", "jealous", "joyful", "regretful", "relieved", "sad", "shouting", "softvoice", "surprised", "whispering"], roles: [], roleHints: [] },
+        { name: "Paige Dragon HD Latest", id: "en-US-Paige:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Serena Preview Dragon HD Latest", id: "en-US-Serena-Preview:DragonHDLatestNeural", gender: "female", profile: "EN US", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ada Dragon HD Latest", id: "en-GB-Ada:DragonHDLatestNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ollie Dragon HD Latest", id: "en-GB-Ollie:DragonHDLatestNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ada Multilingual", id: "en-GB-AdaMultilingualNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ollie Multilingual", id: "en-GB-OllieMultilingualNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Sonia", id: "en-GB-SoniaNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: ["cheerful", "sad"], roles: [], roleHints: [] },
+        { name: "Ryan", id: "en-GB-RyanNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: ["cheerful", "chat", "whispering", "sad"], roles: [], roleHints: [] },
+        { name: "Libby", id: "en-GB-LibbyNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Abbi", id: "en-GB-AbbiNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Alfie", id: "en-GB-AlfieNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Bella", id: "en-GB-BellaNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Elliot", id: "en-GB-ElliotNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ethan", id: "en-GB-EthanNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Hollie", id: "en-GB-HollieNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Maisie", id: "en-GB-MaisieNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Noah", id: "en-GB-NoahNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Oliver", id: "en-GB-OliverNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Olivia", id: "en-GB-OliviaNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Thomas", id: "en-GB-ThomasNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Mia", id: "en-GB-MiaNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Ryan Dragon HD Latest", id: "en-GB-Ryan:DragonHDLatestNeural", gender: "male", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+        { name: "Sonia Dragon HD Latest", id: "en-GB-Sonia:DragonHDLatestNeural", gender: "female", profile: "EN UK", categories: [], personalities: [], styles: [], roles: [], roleHints: [] },
+    ];
+}
+
 function voiceCatalog() {
     if (VOICES) {
         return VOICES;
@@ -250,7 +404,7 @@ function voiceCatalog() {
     { name: "晓宸_繁", id: "zh-TW-HsiaoChenNeural", gender: "female", profile: "台配女青年-自然亲和", categories: ["General"], personalities: ["Friendly", "Positive"], styles: [], roles: [], roleHints: ["繁中女声", "女青年", "旁白"] },
     { name: "晓语_繁", id: "zh-TW-HsiaoYuNeural", gender: "female", profile: "台配成熟女声-明亮", categories: ["General"], personalities: ["Friendly", "Positive"], styles: [], roles: [], roleHints: ["繁中女声", "成熟女性", "旁白"] },
     { name: "云喆_繁", id: "zh-TW-YunJheNeural", gender: "male", profile: "台配男声-温和低沉", categories: ["General"], personalities: ["Friendly", "Positive"], styles: [], roles: [], roleHints: ["繁中男声", "成熟男性", "旁白"] }
-    ];
+    ].concat(englishVoiceCatalog());
     return VOICES;
 }
 
@@ -272,7 +426,8 @@ function voices(options, ctx) {
     var catalog = voiceCatalog();
     for (var i = 0; i < catalog.length; i++) {
         var item = catalog[i];
-        var tags = ["Edge", item.profile];
+        var tags = ["Edge"];
+        if (item.profile) tags.push(item.profile);
         appendAll(tags, item.categories);
         appendAll(tags, item.personalities);
         if (item.hd) {
@@ -417,8 +572,15 @@ function containsStyle(styles, expected) {
 }
 
 function languageOf(voiceId) {
-    if (String(voiceId).indexOf("zh-TW-") === 0) {
+    var id = String(voiceId).toLowerCase();
+    if (id.indexOf("zh-tw-") === 0 || id.indexOf("zh-tw:") === 0) {
         return "zh-TW";
+    }
+    if (id.indexOf("en-gb-") === 0 || id.indexOf("en-gb:") === 0) {
+        return "en-GB";
+    }
+    if (id.indexOf("en-us-") === 0 || id.indexOf("en-us:") === 0) {
+        return "en-US";
     }
     return "zh-CN";
 }
