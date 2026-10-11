@@ -2561,6 +2561,7 @@
     <string name="ng_paper_saved">已保存</string>
     <string name="ng_paper_shuffle">换一组</string>
     <string name="ng_paper_query_hint">描述想要的阅读配色</string>
+    <string name="ng_paper_query_placeholder">颜色、模式、场景，或忽略配色规范</string>
     <string name="ng_paper_generate">生成</string>
     <string name="ng_paper_generate_empty">没有得到可用的配色，再试一次。</string>
     <string name="ng_paper_need_assistant">请先在 AI 设置里选择助理模型。</string>

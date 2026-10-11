@@ -141,6 +141,21 @@ class AiThemePromptTest {
     }
 
     @Test
+    fun recentDescriptionsKeepTheNewestFiveAndMoveARepeatToTheFront() {
+        val first = AiThemeDeckStore.rememberQueries(emptyList(), "  warm paper  ")
+        assertEquals(listOf("warm paper"), first)
+        val filled = (1..5).fold(first) { current, index ->
+            AiThemeDeckStore.rememberQueries(current, "look $index")
+        }
+        assertEquals(listOf("look 5", "look 4", "look 3", "look 2", "look 1"), filled)
+        assertEquals(
+            listOf("warm paper", "look 5", "look 4", "look 3", "look 2"),
+            AiThemeDeckStore.rememberQueries(filled, "warm paper"),
+        )
+        assertEquals(filled, AiThemeDeckStore.rememberQueries(filled, "   "))
+    }
+
+    @Test
     fun savedDeckDropsTheOldestWhenItPassesSixteen() {
         val existing = List(14) { index ->
             NgPaperLook(id = "ai", name = "e$index", background = 0xFF101010.toInt() + index, text = 0xFFE0E0E0.toInt(), accent = 0xFF4488AA.toInt())
