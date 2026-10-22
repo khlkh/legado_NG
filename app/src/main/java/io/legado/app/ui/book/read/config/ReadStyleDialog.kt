@@ -77,6 +77,7 @@ import io.legado.app.utils.longToast
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.outputStream
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.readBytes
 import io.legado.app.utils.readUri
@@ -111,7 +112,7 @@ private fun showReadStyleAdjust(
     }.show(manager, returnTag ?: ReadStyleDialog::class.java.simpleName)
 }
 
-class ReadStyleDialog : BaseComposeDialogFragment() {
+class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
 
     private val callBack get() = activity as? ReadBookActivity
     private lateinit var composeView: ComposeView

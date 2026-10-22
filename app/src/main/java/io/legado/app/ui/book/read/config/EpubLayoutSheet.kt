@@ -32,7 +32,6 @@ import io.legado.app.help.config.EpubLayoutPreferences
 import io.legado.app.ui.book.read.readFloatingGlassStyle
 import io.legado.app.ui.design.components.compose.NgGlassSurface
 import io.legado.app.help.config.EpubPublisherProfile
-import io.legado.app.ui.book.read.rememberReadDrawerThemeProfile
 import io.legado.app.ui.design.components.compose.NgBottomDrawerSurface
 import io.legado.app.ui.design.components.compose.NgDrawerDefaults
 import io.legado.app.ui.design.theme.NgTheme

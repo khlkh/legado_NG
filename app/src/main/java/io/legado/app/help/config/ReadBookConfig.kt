@@ -1197,6 +1197,8 @@ object ReadBookConfig {
             exportConfig.showHeaderBackButton = shareConfig.showHeaderBackButton
             exportConfig.footerMode = shareConfig.footerMode
         }
+        return exportConfig
+    }
 
     fun import(byteArray: ByteArray): Config = importWithReport(byteArray).config
 
