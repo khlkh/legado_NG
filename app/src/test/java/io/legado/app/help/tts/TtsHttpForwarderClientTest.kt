@@ -461,7 +461,7 @@ class TtsHttpForwarderClientTest {
         assertEquals("audio/mpeg", engine.contentType)
         assertEquals("https://libretts.is-an.org/api/tts", engine.baseUrl)
         assertTrue(engine.supportsVoiceFetch())
-        assertTrue(engine.script.contains("// @version 1.0.11"))
+        assertTrue(engine.script.contains("// @version 1.0.12"))
         assertTrue(engine.script.contains("en-US-JennyNeural"))
         assertTrue(engine.script.contains("en-GB-SoniaNeural"))
         assertTrue(engine.script.contains("function voiceCatalog()"))
@@ -685,23 +685,15 @@ class TtsHttpForwarderClientTest {
     }
 
     @Test
-    fun nextEdgeLazyCatalogUpgradePreservesExistingVoiceDirectory() {
+    fun nextEdgeEnglishCatalogUpgradeClearsExistingVoiceDirectory() {
         val upgraded = scriptEngineFromAssetFile("next_edge_proxy.js")
-        listOf("1.0.8", "1.0.9", "1.0.10").forEach { version ->
+        listOf("1.0.8", "1.0.9", "1.0.10", "1.0.11").forEach { version ->
             val saved = upgraded.copy(
-                script = upgraded.script.replaceFirst("// @version 1.0.11", "// @version $version")
+                script = upgraded.script.replaceFirst("// @version 1.0.12", "// @version $version")
             )
 
-            assertTrue(TtsEngineStore.preservesVoiceCatalogOnDefaultUpgrade(saved, upgraded))
+            assertFalse(TtsEngineStore.preservesVoiceCatalogOnDefaultUpgrade(saved, upgraded))
         }
-        assertFalse(
-            TtsEngineStore.preservesVoiceCatalogOnDefaultUpgrade(
-                saved = upgraded.copy(
-                    script = upgraded.script.replaceFirst("// @version 1.0.11", "// @version 1.0.7")
-                ),
-                upgraded = upgraded
-            )
-        )
     }
 
     @Test
@@ -772,7 +764,7 @@ class TtsHttpForwarderClientTest {
         val nextEdge = scriptEngineFromAssetFile("next_edge_proxy.js")
         val savedNextEdge = TtsEngineStore.scriptEngineFromScript(
             nextEdge.script
-                .replace("// @version 1.0.11", "// @version 1.0.5")
+                .replace("// @version 1.0.12", "// @version 1.0.5")
                 .replace(Regex("// @capabilities style_tags,emotion\\r?\\n"), "")
         )!!
         val updatedNextEdge = TtsEngineStore.updateDefaultScriptForTest(savedNextEdge, nextEdge)
@@ -798,10 +790,10 @@ class TtsHttpForwarderClientTest {
     @Test
     fun nextEdgeLibreTtsUpgradePreservesUserSettingsWithoutMigratingStoredEndpoint() {
         val builtIn = scriptEngineFromAssetFile("next_edge_proxy.js")
-        for (patchVersion in 0..10) {
+        for (patchVersion in 0..11) {
             val saved = builtIn.copy(
                 script = builtIn.script.replaceFirst(
-                    "// @version 1.0.11", "// @version 1.0.$patchVersion"
+                    "// @version 1.0.12", "// @version 1.0.$patchVersion"
                 ),
                 name = "我的 Edge",
                 baseUrl = "http://146.56.188.115:8080/tts",
@@ -837,9 +829,9 @@ class TtsHttpForwarderClientTest {
     @Test
     fun nextEdgeLibreTtsUpgradeDoesNotDowngradeFutureScriptVersion() {
         val builtIn = scriptEngineFromAssetFile("next_edge_proxy.js")
-        listOf("1.0.11", "1.0.12", "1.0.100", "2.0.0").forEach { version ->
+        listOf("1.0.12", "1.0.100", "2.0.0").forEach { version ->
             val saved = builtIn.copy(
-                script = builtIn.script.replaceFirst("// @version 1.0.11", "// @version $version") +
+                script = builtIn.script.replaceFirst("// @version 1.0.12", "// @version $version") +
                     "\n// retained script"
             )
 

@@ -995,7 +995,6 @@ object ReadBook : CoroutineScope by MainScope() {
         } else {
             val msg = if (book.isLocal) "无内容" else "没有书源"
             contentLoadFinish(book, chapter, "加载正文失败\n$msg",
-            contentLoadFinish(book, chapter, "加载正文失败\n$msg",
                 resetPageOffset = resetPageOffset, generation = generation, styleEpoch = styleEpoch)
             completeChapterLoad(book, generation, chapter.index, IllegalStateException(msg))
         }

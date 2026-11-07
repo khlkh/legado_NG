@@ -1,6 +1,6 @@
 // @name Next Edge TTS
 // @schema 1
-// @version 1.0.11
+// @version 1.0.12
 // @uuid next_edge_proxy
 // @author Legado
 // @url https://libretts.is-an.org/api/tts

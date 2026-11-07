@@ -1064,9 +1064,9 @@ object TtsEngineStore {
         val shouldUpdateNextEdgeProxy = id == NEXT_EDGE_PROXY_ID &&
                 parseScriptMetadata(script)["version"] in setOf(
                     "1.0.0", "1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5",
-                    "1.0.6", "1.0.7", "1.0.8", "1.0.9", "1.0.10"
+                    "1.0.6", "1.0.7", "1.0.8", "1.0.9", "1.0.10", "1.0.11"
                 ) &&
-                parseScriptMetadata(builtIn.script)["version"] == "1.0.11"
+                parseScriptMetadata(builtIn.script)["version"] == "1.0.12"
         val shouldUpdateTranslatorChineseNames = id == MICROSOFT_TRANSLATOR_ID &&
                 parseScriptMetadata(script)["version"] == "1.0.0" &&
                 parseScriptMetadata(builtIn.script)["version"] == "1.0.1"
@@ -1567,6 +1567,7 @@ object TtsEngineStore {
         saved: TtsEngineSetting,
         upgraded: TtsEngineSetting,
     ): Boolean {
+        // 1.0.12 adds EN speakers; do not keep the Chinese-only Room cache.
         return saved.id == NEXT_EDGE_PROXY_ID &&
             upgraded.id == NEXT_EDGE_PROXY_ID &&
             parseScriptMetadata(saved.script)["version"] in setOf("1.0.8", "1.0.9", "1.0.10") &&
