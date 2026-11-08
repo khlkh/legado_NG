@@ -94,10 +94,14 @@ object WordAnnotationPrompt {
             appendLine("Return up to $cap items.")
             appendLine()
             appendLine(selectionLine)
-            appendLine(
-                "For each item, set \"occurrence\" to the 1-based count of that exact text in the passage, " +
-                    "counting only occurrences that are not part of a longer word."
-            )
+            if (superset) {
+                appendLine("For each item, set \"occurrence\" to 1.")
+            } else {
+                appendLine(
+                    "For each item, set \"occurrence\" to the 1-based count of that exact text in the passage, " +
+                        "counting only occurrences that are not part of a longer word."
+                )
+            }
             appendLine("Write each hint in $hintLanguage, using $hintCap.")
             appendLine()
             appendLine(

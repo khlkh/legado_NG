@@ -2225,7 +2225,6 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             ?: WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL
         val hintCap = ReadBook.book?.getWordAnnotationHintCap()
             ?: WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP
-        val prefetchChapters = AiConfig.wordAnnotationPrefetchChapters
         val dialog = BottomSheetDialog(requireContext())
         dialog.setContentView(
             requireContext().createNgBottomDrawerComposeHost(
@@ -2235,7 +2234,6 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                 WordAnnotationSettingsSheet(
                     level = level,
                     hintCap = hintCap,
-                    prefetchChapters = prefetchChapters,
                     modelSummary = wordAnnotationModelSummaryText(),
                     bookActive = ReadBook.book != null,
                     onSelectModel = {
@@ -2254,11 +2252,6 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                         if (ReadBook.book?.getWordAnnotationEnabled() == true) {
                             ReadBook.loadContent(false)
                         }
-                        refreshMain()
-                        dialog.dismiss()
-                    },
-                    onPrefetchSelected = { newN ->
-                        AiConfig.wordAnnotationPrefetchChapters = newN
                         refreshMain()
                         dialog.dismiss()
                     },

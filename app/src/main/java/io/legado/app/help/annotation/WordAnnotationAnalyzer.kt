@@ -4,6 +4,7 @@ import android.util.Log
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.constant.PreferKey
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.ai.AiConfig
@@ -15,6 +16,7 @@ import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.BookLanguageDetector
 import io.legado.app.help.book.BookScriptClass
+import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isEpub
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.entities.TextChapter
@@ -28,19 +30,19 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Word Wise analysis pipeline: canonical paragraphs -> cache -> model -> resolve
- * -> superset cache -> publish.
+ * Book-level Word Wise pool.
  *
- * The cache stores one broad candidate pool per chapter (superset). The
- * reader's level floor and per-book cap are applied locally at attach time by
- * [WordAnnotationFilter], so changing level/cap re-filters instantly and never
- * re-calls the model. The cache identity therefore contains only generation
- * parameters: schema, frequency asset, hint language, provider, and model.
+ * The pool is built once per book from a few sampled chapters and cached in a
+ * single book-level file. Every chapter then resolves its annotations locally
+ * from the pool ([WordAnnotationPoolResolver]), filtered by the reader's level
+ * floor and per-book cap ([WordAnnotationFilter]) — changing either re-filters
+ * instantly and never re-calls the model.
  */
 object WordAnnotationAnalyzer {
 
     const val FAILURE_COOLDOWN_MILLIS = 60_000L
     private const val MAX_FAILURE_ENTRIES = 64
+    private const val FALLBACK_SAMPLE_HASH = "current-chapter-only"
 
     private val inFlight = ConcurrentHashMap.newKeySet<String>()
     private val lastFailureAt = ConcurrentHashMap<String, Long>()
@@ -68,10 +70,10 @@ object WordAnnotationAnalyzer {
             CanonicalParagraph(index, content)
         }
 
-    fun annotationFile(book: Book, bookChapter: BookChapter): File =
+    fun poolFile(book: Book): File =
         File(
             File(BookHelp.cachePath, book.getFolderName()),
-            WordAnnotationStore.annotationFileName(bookChapter.getFileName()),
+            WordAnnotationPoolStore.POOL_FILE_NAME,
         )
 
     /** The app UI language, following the explicit app setting like AppContextWrapper does. */
@@ -114,23 +116,20 @@ object WordAnnotationAnalyzer {
         )
     }
 
-    private fun identityFor(
-        book: Book,
-        bookChapter: BookChapter,
-        hash: String,
-        config: AnalysisConfig,
-    ) = WordAnnotationIdentity(
-        bookUrl = book.bookUrl,
-        chapterUrl = bookChapter.url,
-        chapterIndex = bookChapter.index,
-        canonicalHash = hash,
-        hintCharCap = config.hintCharCap,
-        providerId = config.providerId,
-        modelId = config.modelId,
-    )
+    /** True when the book has a readable pool (including an empty success). */
+    fun hasPool(book: Book, bookChapter: BookChapter, bookContent: BookContent): Boolean {
+        if (!book.getWordAnnotationEnabled() || book.isEpub) return false
+        val paragraphs = canonicalParagraphs(bookContent)
+        if (paragraphs.isEmpty()) return false
+        val uiLocaleChinese = appUiLocaleChinese()
+        val language = bookLanguage(paragraphs.joinToString("\n") { it.text }, book.config.scriptClass)
+        val config = analysisConfig(book, language, uiLocaleChinese)
+        val hash = sampleHashFor(book, bookChapter, bookContent)
+        return readPool(book, hash, config) != null
+    }
 
-    /** Attaches a cache hit before the first layout; a miss leaves annotations empty. */
-    fun attachCached(
+    /** Attaches pool annotations before the first layout; a pool miss leaves annotations empty. */
+    fun attachPool(
         textChapter: TextChapter,
         book: Book,
         bookChapter: BookChapter,
@@ -139,94 +138,88 @@ object WordAnnotationAnalyzer {
         if (!book.getWordAnnotationEnabled() || book.isEpub) return
         val paragraphs = canonicalParagraphs(bookContent)
         if (paragraphs.isEmpty()) return
-        val hash = WordAnnotationStore.canonicalHash(paragraphs.map { it.text })
         val uiLocaleChinese = appUiLocaleChinese()
         val language = bookLanguage(paragraphs.joinToString("\n") { it.text }, book.config.scriptClass)
         val config = analysisConfig(book, language, uiLocaleChinese)
-        val cached = WordAnnotationStore.read(
-            annotationFile(book, bookChapter),
-            identityFor(book, bookChapter, hash, config),
-        ) ?: return
-        // The file already stores layout source paragraph indices; the current
-        // level/cap filter the superset locally without another model call.
-        // English frequency floor/ordering applies to English books only.
-        textChapter.wordAnnotations = WordAnnotationFilter.filter(
-            cached,
-            book.getWordAnnotationLevel(),
-            book.getWordAnnotationHintCap(),
+        val hash = sampleHashFor(book, bookChapter, bookContent)
+        val items = readPool(book, hash, config) ?: return
+        textChapter.wordAnnotations = WordAnnotationPoolResolver.resolveChapter(
+            paragraphs = paragraphs,
+            items = items,
+            level = book.getWordAnnotationLevel(),
+            cap = book.getWordAnnotationHintCap(),
             rankAware = language != WordAnnotationLanguage.CHINESE,
         )
     }
 
-    /** True when this chapter already has a readable cache (including an empty success). */
-    fun hasCached(book: Book, bookChapter: BookChapter, bookContent: BookContent): Boolean {
-        if (!book.getWordAnnotationEnabled() || book.isEpub) return false
-        val paragraphs = canonicalParagraphs(bookContent)
-        if (paragraphs.isEmpty()) return false
-        val hash = WordAnnotationStore.canonicalHash(paragraphs.map { it.text })
-        val uiLocaleChinese = appUiLocaleChinese()
-        val language = bookLanguage(paragraphs.joinToString("\n") { it.text }, book.config.scriptClass)
-        val config = analysisConfig(book, language, uiLocaleChinese)
-        return WordAnnotationStore.read(
-            annotationFile(book, bookChapter),
-            identityFor(book, bookChapter, hash, config),
-        ) != null
-    }
-
-    suspend fun analyzeAndPublish(
+    /** Builds (or reuses) the book pool, then re-renders the current chapter from it. */
+    suspend fun ensureBookPoolAndPublish(
         book: Book,
         bookChapter: BookChapter,
         bookContent: BookContent,
         textChapter: TextChapter,
-        prefetch: Boolean = false,
     ) {
         if (!book.getWordAnnotationEnabled()) {
-            Log.d("WordAnnotation", "skip flag off chapter=${bookChapter.index}")
-            AppLog.put("WordAnnotation skip: flag off chapter=${bookChapter.index}")
+            Log.d("WordAnnotation", "skip flag off")
+            AppLog.put("WordAnnotation skip: flag off")
             return
         }
         if (book.isEpub) {
-            Log.d("WordAnnotation", "skip epub chapter=${bookChapter.index}")
+            Log.d("WordAnnotation", "skip epub")
             return
         }
         val paragraphs = canonicalParagraphs(bookContent)
         if (paragraphs.isEmpty()) {
-            Log.d("WordAnnotation", "skip no paragraphs chapter=${bookChapter.index}")
-            AppLog.put("WordAnnotation skip: no eligible paragraphs chapter=${bookChapter.index}")
+            Log.d("WordAnnotation", "skip no paragraphs")
+            AppLog.put("WordAnnotation skip: no eligible paragraphs")
             return
         }
-        val hash = WordAnnotationStore.canonicalHash(paragraphs.map { it.text })
-        val passage = paragraphs.joinToString("\n") { it.text }
         val uiLocaleChinese = appUiLocaleChinese()
-        val language = bookLanguage(passage, book.config.scriptClass)
+        val language = bookLanguage(paragraphs.joinToString("\n") { it.text }, book.config.scriptClass)
         val config = analysisConfig(book, language, uiLocaleChinese)
-        val identity = identityFor(book, bookChapter, hash, config)
-        val file = annotationFile(book, bookChapter)
+        val samples = sampleSet(book, bookChapter, bookContent)
+        if (samples.texts.isEmpty()) {
+            AppLog.put("WordAnnotation skip: no pool samples")
+            return
+        }
+        val hash = if (samples.fallback) {
+            FALLBACK_SAMPLE_HASH
+        } else {
+            WordAnnotationPoolStore.canonicalHash(samples.texts)
+        }
+        sampleHashCache[book.bookUrl] = hash
+        val identity = WordAnnotationPoolIdentity(
+            bookUrl = book.bookUrl,
+            sampleHash = hash,
+            hintCharCap = config.hintCharCap,
+            providerId = config.providerId,
+            modelId = config.modelId,
+        )
+        val file = poolFile(book)
 
-        // An existing hit (including an empty success) never calls the model again.
-        if (WordAnnotationStore.read(file, identity) != null) {
-            Log.d("WordAnnotation", "skip cache hit chapter=${bookChapter.index}")
-            AppLog.put("WordAnnotation skip: cache hit chapter=${bookChapter.index}")
-            if (!prefetch) ReadBook.prefetchWordAnnotationAhead()
+        if (WordAnnotationPoolStore.read(file, identity) != null) {
+            Log.d("WordAnnotation", "skip pool cache hit")
+            AppLog.put("WordAnnotation skip: pool cache hit")
             return
         }
 
-        val key = "${book.bookUrl}|${bookChapter.index}|$hash|${config.key}"
+        val key = "${book.bookUrl}|$hash|${config.key}"
         val now = System.currentTimeMillis()
         val lastFailure = lastFailureAt[key]
         if (lastFailure != null && now - lastFailure < FAILURE_COOLDOWN_MILLIS) {
-            Log.d("WordAnnotation", "skip cooldown chapter=${bookChapter.index}")
-            AppLog.put("WordAnnotation skip: cooldown chapter=${bookChapter.index}")
+            Log.d("WordAnnotation", "skip pool cooldown")
+            AppLog.put("WordAnnotation skip: pool cooldown")
             return
         }
         if (!inFlight.add(key)) {
-            Log.d("WordAnnotation", "skip in-flight chapter=${bookChapter.index}")
-            AppLog.put("WordAnnotation skip: already in flight chapter=${bookChapter.index}")
+            Log.d("WordAnnotation", "skip pool in-flight")
+            AppLog.put("WordAnnotation skip: pool already in flight")
             return
         }
 
-        Log.d("WordAnnotation", "analyze start chapter=${bookChapter.index} paragraphs=${paragraphs.size}")
-        AppLog.put("WordAnnotation analyze start chapter=${bookChapter.index} paragraphs=${paragraphs.size}")
+        val sampleTexts = samples.texts
+        Log.d("WordAnnotation", "pool build start chapters=${sampleTexts.size} chars=${sampleTexts.sumOf { it.length }}")
+        AppLog.put("WordAnnotation pool build start samples=${sampleTexts.size}")
         try {
             val result = withContext(Dispatchers.IO) {
                 AiManager.generateText(
@@ -236,11 +229,14 @@ object WordAnnotationAnalyzer {
                             WordAnnotationPrompt.system(
                                 language = language,
                                 uiLocaleChinese = uiLocaleChinese,
-                                cap = WordAnnotationConfig.MAX_SUPERSET_ITEMS,
+                                cap = WordAnnotationPoolConfig.MAX_BOOK_POOL_ITEMS,
                                 superset = true,
                             ),
                         ),
-                        AiMessage(AiMessage.Role.USER, WordAnnotationPrompt.user(passage)),
+                        AiMessage(
+                            AiMessage.Role.USER,
+                            WordAnnotationPrompt.user(sampleTexts.joinToString("\n")),
+                        ),
                     ),
                     params = AiTextParams(temperature = 0f, disableThinking = true, jsonResponse = true),
                     providerId = config.providerId,
@@ -248,91 +244,144 @@ object WordAnnotationAnalyzer {
                 )
             }
             val items = WordAnnotationParser.parse(result.content)
-            val resolved: List<WordAnnotation>?
-            var stats: String? = null
+            val pool: List<WordAnnotationPoolItem>?
             if (items == null) {
-                resolved = null
+                pool = null
             } else {
-                // No floor gate at analysis time: the cache stores the broad
-                // pool, and the local filter applies level floor + cap later.
+                // Pool items have no occurrence meaning; validate hint length,
+                // dedupe surfaces (first wins), and attach English ranks.
                 val frequencyIndex = WordFrequencyAssets.load(appCtx)
-                val hybrid = WordAnnotationHybrid.resolveDetailed(
-                    paragraphs = paragraphs.map { it.text },
-                    items = items,
-                    uiLocaleChinese = config.hintCharCap,
-                    frequencyIndex = frequencyIndex,
-                    options = WordAnnotationHybrid.Options(
-                        frequencyFirst = false,
-                        lemmaFallback = WordAnnotationConfig.USE_FUSION_PROTOTYPE,
-                        maxHintsPerChapter = WordAnnotationConfig.MAX_SUPERSET_ITEMS,
-                        minRankFloor = 0,
-                    ),
-                    maxHintWords = config.maxHintWords,
-                )
-                stats = hybridStats(hybrid.results)
-                resolved = hybrid.results.map { result ->
-                    result.annotation.copy(
-                        paragraphIndex = paragraphs[result.annotation.paragraphIndex].sourceIndex,
-                        rank = frequencyIndex?.minRankOf(result.annotation.surface),
+                val deduped = LinkedHashMap<String, WordAnnotationPoolItem>()
+                for (item in items) {
+                    if (!WordAnnotationResolver.hintWithinCap(
+                            item.hint,
+                            config.hintCharCap,
+                            config.maxHintWords,
+                        )
+                    ) continue
+                    if (deduped.containsKey(item.text)) continue
+                    deduped[item.text] = WordAnnotationPoolItem(
+                        surface = item.text,
+                        hint = item.hint,
+                        rank = frequencyIndex?.minRankOf(item.text),
                     )
                 }
+                pool = deduped.values.take(WordAnnotationPoolConfig.MAX_BOOK_POOL_ITEMS).toList()
             }
-            if (resolved == null) {
-                // Invalid model output must not be cached as an empty success.
+            if (pool == null) {
                 recordFailure(key)
-                Log.e("WordAnnotation", "invalid json body chapter=${bookChapter.index}")
-                AppLog.put("WordAnnotation invalid json chapter=${bookChapter.index}")
+                Log.e("WordAnnotation", "invalid pool json")
+                AppLog.put("WordAnnotation invalid pool json")
                 return
             }
             AppLog.put(
-                "WordAnnotation tokens=${result.promptTokens ?: -1}/${result.completionTokens ?: -1} " +
-                    "items=${items?.size ?: 0} resolved=${resolved.size} chapter=${bookChapter.index}" +
-                    " prefetch=$prefetch" +
-                    (stats?.let { " $it" } ?: ""),
+                "WordAnnotation pool tokens=${result.promptTokens ?: -1}/${result.completionTokens ?: -1} " +
+                    "items=${items?.size ?: 0} pooled=${pool.size}",
             )
 
-            // Publish only when the open book, chapter, flag, hash, and the
-            // live generation config still match the ones we analyzed with.
-            if (!isPublishable(book, bookChapter, textChapter, identity, prefetch)) {
-                AppLog.put("WordAnnotation publish rejected: not current chapter=${bookChapter.index}")
+            // Publish only when the same book is still open with the flag on.
+            val currentBook = ReadBook.book ?: return
+            if (currentBook.bookUrl != book.bookUrl || !currentBook.getWordAnnotationEnabled()) {
+                AppLog.put("WordAnnotation pool publish rejected: book changed")
                 return
             }
-            if (!WordAnnotationStore.write(file, identity, resolved)) {
-                AppLog.put("WordAnnotation write failed chapter=${bookChapter.index}")
+            if (!WordAnnotationPoolStore.write(file, identity, pool)) {
+                AppLog.put("WordAnnotation pool write failed")
                 return
             }
-
-            if (resolved.isNotEmpty() && !prefetch) {
-                // Re-render the in-memory chapter so the freshly written superset
-                // is filtered locally and laid out.
+            if (pool.isNotEmpty()) {
                 ReadBook.loadContent(false)
-            }
-            if (!prefetch) {
-                // After the current chapter is cached, warm the chapters ahead
-                // in the background so their hints are ready on arrival.
-                ReadBook.prefetchWordAnnotationAhead()
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             recordFailure(key)
-            Log.e("WordAnnotation", "failed chapter=${bookChapter.index}", e)
-            AppLog.put("WordAnnotation failed chapter=${bookChapter.index}: ${e.message}", e)
+            Log.e("WordAnnotation", "pool build failed", e)
+            AppLog.put("WordAnnotation pool build failed: ${e.message}", e)
         } finally {
             inFlight.remove(key)
         }
     }
 
-    private fun hybridStats(results: List<WordAnnotationHybrid.Result>): String {
-        val viaLemma = results.count { it.viaLemmaFallback }
-        val bands = results.groupingBy { it.frequencyBand }.eachCount()
-            .entries.joinToString(",") { "${it.key.name}=${it.value}" }
-        val preview = results.take(8).joinToString(",") {
-            "${it.annotation.surface}:${it.frequencyBand.name}"
+    private data class SampleSet(val texts: List<String>, val fallback: Boolean)
+
+    private val sampleHashCache = ConcurrentHashMap<String, String>()
+
+    /**
+     * Deterministic sample: first, middle, and last chapters when their content
+     * is available; only when none is available does it fall back to the current
+     * chapter (hash fixed to a constant in that case, so later chapters reuse
+     * the pool instead of rebuilding it).
+     */
+    private fun sampleSet(
+        book: Book,
+        currentChapter: BookChapter,
+        currentContent: BookContent,
+    ): SampleSet {
+        val chapters = ArrayList<Pair<BookChapter, BookContent>>()
+        val total = ReadBook.chapterSize
+        val candidates = linkedSetOf(0, total / 2, total - 1).filter { it in 0 until total }
+        for (index in candidates) {
+            if (chapters.size >= WordAnnotationPoolConfig.MAX_POOL_SAMPLE_CHAPTERS) break
+            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index) ?: continue
+            val raw = BookHelp.getContent(book, chapter) ?: continue
+            val processor = ContentProcessor.get(book.name, book.origin)
+            val contents = processor.getContent(book, chapter, raw, includeTitle = false)
+            if (contents.textList.isEmpty()) continue
+            chapters += chapter to contents
         }
-        val more = if (results.size > 8) ",+${results.size - 8}" else ""
-        return "hybrid viaLemma=$viaLemma bands={$bands} selected=[$preview$more]"
+        val fallback = chapters.isEmpty()
+        if (fallback) {
+            val currentParagraphs = canonicalParagraphs(currentContent)
+            if (currentParagraphs.isEmpty()) return SampleSet(emptyList(), true)
+            chapters += currentChapter to currentContent
+        }
+        // Bound the prompt by characters across all samples.
+        val budget = WordAnnotationPoolConfig.MAX_POOL_SAMPLE_CHARS
+        val texts = ArrayList<String>()
+        var used = 0
+        for ((_, contents) in chapters) {
+            for (paragraph in canonicalParagraphs(contents)) {
+                if (used >= budget) break
+                val text = paragraph.text
+                val remaining = budget - used
+                texts += if (text.length > remaining) text.substring(0, remaining) else text
+                used += texts.last().length
+            }
+            if (used >= budget) break
+        }
+        return SampleSet(texts, fallback)
     }
+
+    private fun sampleHashFor(
+        book: Book,
+        currentChapter: BookChapter,
+        currentContent: BookContent,
+    ): String = sampleHashCache[book.bookUrl] ?: run {
+        val set = sampleSet(book, currentChapter, currentContent)
+        val hash = if (set.fallback) {
+            FALLBACK_SAMPLE_HASH
+        } else {
+            WordAnnotationPoolStore.canonicalHash(set.texts)
+        }
+        sampleHashCache[book.bookUrl] = hash
+        hash
+    }
+
+    private fun readPool(
+        book: Book,
+        hash: String,
+        config: AnalysisConfig,
+    ): List<WordAnnotationPoolItem>? = WordAnnotationPoolStore.read(
+        poolFile(book),
+        WordAnnotationPoolIdentity(
+            bookUrl = book.bookUrl,
+            sampleHash = hash,
+            hintCharCap = config.hintCharCap,
+            providerId = config.providerId,
+            modelId = config.modelId,
+        ),
+    )
 
     private fun recordFailure(key: String) {
         lastFailureAt[key] = System.currentTimeMillis()
@@ -342,45 +391,5 @@ object WordAnnotationAnalyzer {
                 .take(lastFailureAt.size / 2)
             oldest.forEach { lastFailureAt.remove(it.key) }
         }
-    }
-
-    private fun isPublishable(
-        book: Book,
-        bookChapter: BookChapter,
-        textChapter: TextChapter,
-        identity: WordAnnotationIdentity,
-        prefetch: Boolean,
-    ): Boolean {
-        val currentBook = ReadBook.book ?: return false
-        if (currentBook.bookUrl != book.bookUrl) return false
-        if (!currentBook.getWordAnnotationEnabled()) return false
-        if (prefetch) {
-            // A prefetch result is only cached while its chapter is still ahead
-            // of the current chapter and within the configured prefetch window.
-            val prefetchN = AiConfig.wordAnnotationPrefetchChapters
-            val offset = bookChapter.index - ReadBook.durChapterIndex
-            if (offset < 1 || offset > prefetchN) return false
-        } else if (ReadBook.durChapterIndex != bookChapter.index) {
-            return false
-        }
-        // The in-memory chapter must still be the text we analyzed.
-        val currentBookContent = BookContent(
-            sameTitleRemoved = textChapter.sameTitleRemoved,
-            textList = textChapter.sourceParagraphs,
-            effectiveReplaceRules = textChapter.effectiveReplaceRules,
-        )
-        val currentHash = WordAnnotationStore.canonicalHash(
-            canonicalParagraphs(currentBookContent).map { it.text },
-        )
-        if (currentHash != identity.canonicalHash) return false
-        // The live generation config must still be the one we analyzed with.
-        val currentLanguage = bookLanguage(
-            textChapter.sourceParagraphs.joinToString("\n"),
-            currentBook.config.scriptClass,
-        )
-        val currentConfig = analysisConfig(currentBook, currentLanguage, appUiLocaleChinese())
-        return currentConfig.hintCharCap == identity.hintCharCap &&
-            currentConfig.providerId == identity.providerId &&
-            currentConfig.modelId == identity.modelId
     }
 }
