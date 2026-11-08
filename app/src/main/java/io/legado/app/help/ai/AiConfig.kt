@@ -31,8 +31,6 @@ object AiConfig {
     const val DEFAULT_READ_ALOUD_STORYBOARD_PRELOAD_COUNT = 3
     const val MIN_READ_ALOUD_STORYBOARD_PRELOAD_COUNT = 0
     const val MAX_READ_ALOUD_STORYBOARD_PRELOAD_COUNT = 5
-    const val DEFAULT_WORD_ANNOTATION_PREFETCH_CHAPTERS = 1
-    const val MAX_WORD_ANNOTATION_PREFETCH_CHAPTERS = 3
     const val DEFAULT_ASSISTANT_CONTEXT_WINDOW_TOKENS = 1_000_000
     const val DEFAULT_CONTEXT_COMPACTION_THRESHOLD_PERCENT = 90
     val ASSISTANT_CONTEXT_WINDOW_OPTIONS = listOf(
@@ -125,18 +123,6 @@ object AiConfig {
         get() = appCtx.getPrefString(PreferKey.aiWordAnnotationModelId).orEmpty()
         set(value) {
             appCtx.putPrefString(PreferKey.aiWordAnnotationModelId, value.trim())
-        }
-
-    var wordAnnotationPrefetchChapters: Int
-        get() = appCtx.getPrefInt(
-            PreferKey.aiWordAnnotationPrefetchChapters,
-            DEFAULT_WORD_ANNOTATION_PREFETCH_CHAPTERS,
-        ).coerceIn(0, MAX_WORD_ANNOTATION_PREFETCH_CHAPTERS)
-        set(value) {
-            appCtx.putPrefInt(
-                PreferKey.aiWordAnnotationPrefetchChapters,
-                value.coerceIn(0, MAX_WORD_ANNOTATION_PREFETCH_CHAPTERS),
-            )
         }
 
     var readAloudStoryboardProviderId: String

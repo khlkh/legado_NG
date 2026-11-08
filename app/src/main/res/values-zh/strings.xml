@@ -462,10 +462,7 @@
     <string name="ai_word_annotation_level_3">高中 · ≈B2–C1</string>
     <string name="ai_word_annotation_level_4">大学 · ≈C1–C2</string>
     <string name="ai_word_annotation_level_5">研究生 · ≈C2+</string>
-    <string name="ai_word_annotation_prefetch_chapters">预取章节数</string>
     <string name="ai_word_annotation_hint_cap">每章上限</string>
-    <string name="ai_word_annotation_prefetch_summary">提前 %1$d 章</string>
-    <string name="ai_word_annotation_prefetch_off">关闭</string>
     <string name="ai_word_annotation_note">词频门槛仅对英文生效 · Gutenberg 2006/04</string>
     <string name="ai_purify_model_not_selected">未选择</string>
     <string name="ai_purify_model_unavailable">已选择的模型不可用</string>

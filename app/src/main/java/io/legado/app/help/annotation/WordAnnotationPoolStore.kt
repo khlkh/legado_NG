@@ -7,30 +7,18 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * File cache for one chapter's resolved word annotations.
+ * File cache for the book-level Word Wise pool.
  *
- * The file is a sibling of the chapter body file
- * (`book_cache/<bookFolder>/<index>-<titleMd5>.wordwise.json`). The JSON stores
- * the book/chapter identity, the canonical-text hash, the prompt/schema version,
- * and the resolved annotation list.
- *
- * A read is a hit only when every identity field matches and the body parses.
- * An empty, truncated, or invalid file is a miss — never an empty success. An
- * empty success is a complete file whose annotation list is empty.
- *
- * Writes go to a sibling temp file and are renamed onto the final name, so a
- * reader never opens a half-written final file.
+ * One file per book (`book_cache/<bookFolder>/wordwise-pool.json`). The JSON
+ * stores the book identity, the sampled-passage hash, the prompt/schema and
+ * generation config, and the pool items. A read is a hit only when every
+ * identity field matches and the body parses; an empty pool is a valid empty
+ * success. Writes go to a sibling temp file and are renamed into place.
  */
-object WordAnnotationStore {
+object WordAnnotationPoolStore {
 
-    const val FILE_SUFFIX = ".wordwise.json"
+    const val POOL_FILE_NAME = "wordwise-pool.json"
     const val TEMP_SUFFIX = ".tmp"
-
-    fun annotationFileName(chapterFileName: String): String {
-        if (chapterFileName.endsWith(FILE_SUFFIX)) return chapterFileName
-        val base = chapterFileName.substringBeforeLast('.', chapterFileName)
-        return "$base$FILE_SUFFIX"
-    }
 
     fun canonicalHash(
         paragraphs: List<String>,
@@ -44,7 +32,7 @@ object WordAnnotationStore {
         return digest.joinToString("") { "%02x".format(it) }
     }
 
-    fun read(file: File, identity: WordAnnotationIdentity): List<WordAnnotation>? {
+    fun read(file: File, identity: WordAnnotationPoolIdentity): List<WordAnnotationPoolItem>? {
         if (!file.exists() || !file.isFile) return null
         val json = runCatching { file.readText() }.getOrNull() ?: return null
         if (json.isBlank()) return null
@@ -52,31 +40,23 @@ object WordAnnotationStore {
         if (!root.isJsonObject) return null
         val obj = root.asJsonObject
         if (obj.string("bookUrl") != identity.bookUrl) return null
-        if (obj.string("chapterUrl") != identity.chapterUrl) return null
-        if (obj.int("chapterIndex") != identity.chapterIndex) return null
-        if (obj.string("canonicalHash") != identity.canonicalHash) return null
+        if (obj.string("sampleHash") != identity.sampleHash) return null
         if (obj.int("schemaVersion") != identity.schemaVersion) return null
         if (obj.string("frequencyVersion") != identity.frequencyVersion) return null
         if (obj.boolean("hintCharCap") != identity.hintCharCap) return null
         if (obj.string("providerId") != identity.providerId) return null
         if (obj.string("modelId") != identity.modelId) return null
-        val annotations = obj.get("annotations") ?: return null
-        if (!annotations.isJsonArray) return null
+        val items = obj.get("items") ?: return null
+        if (!items.isJsonArray) return null
 
-        val result = ArrayList<WordAnnotation>(annotations.asJsonArray.size())
-        for (element in annotations.asJsonArray) {
+        val result = ArrayList<WordAnnotationPoolItem>(items.asJsonArray.size())
+        for (element in items.asJsonArray) {
             if (!element.isJsonObject) continue
             val item = element.asJsonObject
-            val paragraphIndex = item.intOrNull("paragraphIndex") ?: continue
-            val start = item.intOrNull("start") ?: continue
-            val end = item.intOrNull("end") ?: continue
             val surface = item.string("surface") ?: continue
             val hint = item.string("hint") ?: continue
-            if (start < 0 || end <= start || hint.isBlank()) continue
-            result += WordAnnotation(
-                paragraphIndex = paragraphIndex,
-                start = start,
-                end = end,
+            if (surface.isBlank() || hint.isBlank()) continue
+            result += WordAnnotationPoolItem(
                 surface = surface,
                 hint = hint,
                 rank = item.intOrNull("rank"),
@@ -88,15 +68,14 @@ object WordAnnotationStore {
     /** Returns true when the final file is complete; failures leave no final file. */
     fun write(
         file: File,
-        identity: WordAnnotationIdentity,
-        annotations: List<WordAnnotation>,
+        identity: WordAnnotationPoolIdentity,
+        items: List<WordAnnotationPoolItem>,
     ): Boolean {
         val parent = file.parentFile ?: return false
         if (!parent.exists() && !parent.mkdirs()) return false
         val temp = File(parent, file.name + TEMP_SUFFIX)
         return try {
-            val json = toJson(identity, annotations)
-            temp.writeText(json)
+            temp.writeText(toJson(identity, items))
             renameIntoPlace(temp, file)
         } catch (_: Exception) {
             runCatching { temp.delete() }
@@ -106,36 +85,30 @@ object WordAnnotationStore {
 
     private fun renameIntoPlace(temp: File, file: File): Boolean {
         if (temp.renameTo(file)) return true
-        // renameTo may refuse to replace an existing file on some platforms.
         if (file.exists()) file.delete()
         if (temp.renameTo(file)) return true
         temp.delete()
         return false
     }
 
-    private fun toJson(identity: WordAnnotationIdentity, annotations: List<WordAnnotation>): String {
+    private fun toJson(identity: WordAnnotationPoolIdentity, items: List<WordAnnotationPoolItem>): String {
         val root = JsonObject()
         root.addProperty("bookUrl", identity.bookUrl)
-        root.addProperty("chapterUrl", identity.chapterUrl)
-        root.addProperty("chapterIndex", identity.chapterIndex)
-        root.addProperty("canonicalHash", identity.canonicalHash)
+        root.addProperty("sampleHash", identity.sampleHash)
         root.addProperty("schemaVersion", identity.schemaVersion)
         root.addProperty("frequencyVersion", identity.frequencyVersion)
         root.addProperty("hintCharCap", identity.hintCharCap)
         root.addProperty("providerId", identity.providerId)
         root.addProperty("modelId", identity.modelId)
         val array = JsonArray()
-        annotations.forEach { annotation ->
-            val item = JsonObject()
-            item.addProperty("paragraphIndex", annotation.paragraphIndex)
-            item.addProperty("start", annotation.start)
-            item.addProperty("end", annotation.end)
-            item.addProperty("surface", annotation.surface)
-            item.addProperty("hint", annotation.hint)
-            annotation.rank?.let { item.addProperty("rank", it) }
-            array.add(item)
+        items.forEach { item ->
+            val element = JsonObject()
+            element.addProperty("surface", item.surface)
+            element.addProperty("hint", item.hint)
+            item.rank?.let { element.addProperty("rank", it) }
+            array.add(element)
         }
-        root.add("annotations", array)
+        root.add("items", array)
         return root.toString()
     }
 
@@ -159,15 +132,3 @@ object WordAnnotationStore {
 
     private fun JsonObject.intOrNull(name: String): Int? = int(name)
 }
-
-data class WordAnnotationIdentity(
-    val bookUrl: String,
-    val chapterUrl: String,
-    val chapterIndex: Int,
-    val canonicalHash: String,
-    val schemaVersion: Int = WordAnnotationConfig.SCHEMA_VERSION,
-    val frequencyVersion: String = WordAnnotationConfig.FREQUENCY_VERSION,
-    val hintCharCap: Boolean = false,
-    val providerId: String = "",
-    val modelId: String = "",
-)

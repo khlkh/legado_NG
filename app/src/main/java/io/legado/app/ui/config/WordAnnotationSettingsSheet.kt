@@ -14,23 +14,20 @@ import io.legado.app.ui.design.components.compose.NgSettingsItem
 
 /**
  * Word Wise settings sheet: model, five-level vocabulary slider, and the
- * prefetch-chapters window. The per-book on/off switch stays in the reader.
+ * per-book chapter cap. The per-book on/off switch stays in the reader.
  */
 @Composable
 internal fun WordAnnotationSettingsSheet(
     level: Int,
     hintCap: Int,
-    prefetchChapters: Int,
     modelSummary: String,
     bookActive: Boolean,
     onSelectModel: () -> Unit,
     onLevelSelected: (Int) -> Unit,
     onHintCapSelected: (Int) -> Unit,
-    onPrefetchSelected: (Int) -> Unit,
 ) {
     var showLevelPicker by rememberSaveable { mutableStateOf(false) }
     var showHintCapPicker by rememberSaveable { mutableStateOf(false) }
-    var showPrefetchPicker by rememberSaveable { mutableStateOf(false) }
     val normalizedLevel = WordAnnotationLevels.normalize(level)
     val normalizedCap = hintCap.coerceIn(
         WordAnnotationConfig.MIN_WORD_ANNOTATION_HINT_CAP,
@@ -58,15 +55,6 @@ internal fun WordAnnotationSettingsSheet(
             summary = normalizedCap.toString(),
             enabled = bookActive,
             onClick = { showHintCapPicker = true },
-        )
-        NgSettingsItem(
-            title = stringResource(R.string.ai_word_annotation_prefetch_chapters),
-            summary = if (prefetchChapters <= 0) {
-                stringResource(R.string.ai_word_annotation_prefetch_off)
-            } else {
-                stringResource(R.string.ai_word_annotation_prefetch_summary, prefetchChapters)
-            },
-            onClick = { showPrefetchPicker = true },
         )
     }
 
@@ -99,27 +87,6 @@ internal fun WordAnnotationSettingsSheet(
             onSelected = { value ->
                 showHintCapPicker = false
                 value.toIntOrNull()?.let(onHintCapSelected)
-            },
-        )
-    }
-    if (showPrefetchPicker) {
-        ConfigChoiceDialog(
-            title = stringResource(R.string.ai_word_annotation_prefetch_chapters),
-            options = (0..3).map { value ->
-                ConfigChoiceOption(
-                    label = if (value == 0) {
-                        stringResource(R.string.ai_word_annotation_prefetch_off)
-                    } else {
-                        stringResource(R.string.ai_word_annotation_prefetch_summary, value)
-                    },
-                    value = value.toString(),
-                )
-            },
-            selectedValue = prefetchChapters.coerceIn(0, 3).toString(),
-            onDismissRequest = { showPrefetchPicker = false },
-            onSelected = { value ->
-                showPrefetchPicker = false
-                value.toIntOrNull()?.let(onPrefetchSelected)
             },
         )
     }

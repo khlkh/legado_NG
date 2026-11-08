@@ -11,7 +11,6 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.annotation.WordAnnotationAnalyzer
-import io.legado.app.help.ai.AiConfig
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
@@ -582,72 +581,15 @@ object ReadBook : CoroutineScope by MainScope() {
             effectiveReplaceRules = textChapter.effectiveReplaceRules,
         )
         if (textChapter.wordAnnotations.isEmpty() &&
-            WordAnnotationAnalyzer.hasCached(currentBook, textChapter.chapter, contents)
+            WordAnnotationAnalyzer.hasPool(currentBook, textChapter.chapter, contents)
         ) {
-            // A prefetched cache arrived after this chapter was laid out;
-            // re-lay out once so the hints attach.
+            // The pool arrived after this chapter was laid out; re-lay out once
+            // so the pool annotations attach.
             loadContent(false)
             return
         }
         launch {
-            WordAnnotationAnalyzer.analyzeAndPublish(currentBook, textChapter.chapter, contents, textChapter)
-        }
-    }
-
-    fun prefetchWordAnnotationAhead() {
-        val currentBook = book ?: return
-        if (!currentBook.getWordAnnotationEnabled() || currentBook.isEpub) return
-        val prefetchN = AiConfig.wordAnnotationPrefetchChapters
-        if (prefetchN <= 0) return
-        for (offset in 1..prefetchN) {
-            val index = durChapterIndex + offset
-            if (index >= chapterSize) break
-            val chapter = appDb.bookChapterDao.getChapter(currentBook.bookUrl, index) ?: continue
-            if (offset == 1) {
-                val textChapter = nextTextChapter
-                if (textChapter != null &&
-                    textChapter.chapter.bookUrl == currentBook.bookUrl &&
-                    textChapter.chapter.index == index
-                ) {
-                    val contents = BookContent(
-                        sameTitleRemoved = textChapter.sameTitleRemoved,
-                        textList = textChapter.sourceParagraphs,
-                        effectiveReplaceRules = textChapter.effectiveReplaceRules,
-                    )
-                    launch {
-                        WordAnnotationAnalyzer.analyzeAndPublish(
-                            currentBook, chapter, contents, textChapter, prefetch = true,
-                        )
-                    }
-                    continue
-                }
-            }
-            // Chapters beyond the reader's preload are warmed from cached/local
-            // content only; never download just for Word Wise.
-            val raw = BookHelp.getContent(currentBook, chapter) ?: continue
-            val processor = ContentProcessor.get(currentBook.name, currentBook.origin)
-            val displayTitle = chapter.getDisplayTitle(
-                processor.getTitleReplaceRules(),
-                currentBook.getUseReplaceRule(),
-                replaceBook = currentBook.toReplaceBook(),
-            )
-            val contents = processor.getContent(currentBook, chapter, raw, includeTitle = false)
-            val textChapter = TextChapter(
-                chapter = chapter,
-                position = chapter.index,
-                title = displayTitle,
-                chaptersSize = chapterSize,
-                sameTitleRemoved = currentBook.getRemoveSameTitle(),
-                sourceParagraphs = contents.textList,
-                isVip = false,
-                isPay = false,
-                effectiveReplaceRules = contents.effectiveReplaceRules,
-            )
-            launch {
-                WordAnnotationAnalyzer.analyzeAndPublish(
-                    currentBook, chapter, contents, textChapter, prefetch = true,
-                )
-            }
+            WordAnnotationAnalyzer.ensureBookPoolAndPublish(currentBook, textChapter.chapter, contents, textChapter)
         }
     }
 
@@ -1237,7 +1179,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 // Detached from the chapter job so completeChapterLoad is not
                 // delayed, but cancelled with it when the reader moves on.
                 val analysisJob = this@ReadBook.launch {
-                    WordAnnotationAnalyzer.analyzeAndPublish(book, chapter, contents, textChapter)
+                    WordAnnotationAnalyzer.ensureBookPoolAndPublish(book, chapter, contents, textChapter)
                 }
                 coroutineContext[Job]?.invokeOnCompletion { cause ->
                     // Cancel the detached analysis only when the chapter load

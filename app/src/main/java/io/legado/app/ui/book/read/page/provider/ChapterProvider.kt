@@ -205,7 +205,7 @@ object ChapterProvider {
         ).apply {
             contentPositionMap = bookContent.positionMap
         }
-        WordAnnotationAnalyzer.attachCached(textChapter, book, bookChapter, bookContent)
+        WordAnnotationAnalyzer.attachPool(textChapter, book, bookChapter, bookContent)
         textChapter.createLayout(scope, book, bookContent)
 
         return textChapter
