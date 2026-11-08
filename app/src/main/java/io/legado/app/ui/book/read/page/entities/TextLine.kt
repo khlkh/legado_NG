@@ -9,10 +9,12 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.os.Build
 import android.text.TextPaint
+import android.text.TextUtils
 import androidx.annotation.Keep
 import androidx.core.graphics.PathParser
 import androidx.core.graphics.withSave
 import io.legado.app.help.PaintPool
+import io.legado.app.help.annotation.WordAnnotationLayout
 import io.legado.app.help.book.isImage
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -20,6 +22,7 @@ import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextPage.Companion.emptyTextPage
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
+import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.ui.book.read.page.entities.column.TextColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.ReadCharStyle
@@ -28,6 +31,19 @@ import io.legado.app.ui.book.read.page.provider.ReadHighlightImageRenderer
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.canvasrecorder.recordIfNeededThenDraw
 import io.legado.app.utils.dpToPx
+
+/**
+ * A word-annotation hint run attached to a visual line.
+ *
+ * [start] and [end] are line-local UTF-16 offsets into [TextLine.text]. The run
+ * is presentation only: it is never appended to [TextLine.text], never spoken,
+ * and never part of search or selection.
+ */
+data class TextHintRun(
+    val start: Int,
+    val end: Int,
+    val hint: String,
+)
 
 /**
  * 行信息
@@ -56,6 +72,8 @@ data class TextLine(
     var wordSpacing: Float = 0f,
     var exceed: Boolean = false,
     var onlyTextColumn: Boolean = true,
+    /** Word-annotation hint runs; presentation only, absent from [text]. */
+    var hintRuns: List<TextHintRun> = emptyList(),
 ) {
 
     val columns: List<BaseColumn> get() = textColumns
@@ -216,6 +234,65 @@ data class TextLine(
         ) {
             drawFullLineUnderline(canvas)
         }
+        drawHintRuns(canvas)
+    }
+
+    private fun drawHintRuns(canvas: Canvas) {
+        if (hintRuns.isEmpty()) return
+        val paint = PaintPool.obtain()
+        paint.set(ChapterProvider.hintPaint)
+        paint.color = ReadBookConfig.textAccentColor
+        val band = WordAnnotationLayout.bandHeight(ChapterProvider.contentPaintTextHeight, hasHints = true)
+        val baseline = band - paint.fontMetrics.descent - 1.dpToPx()
+        for (run in hintRuns) {
+            val span = hintRunXSpan(run) ?: continue
+            val availableWidth = span.second - span.first
+            if (availableWidth <= 0f) continue
+            val hintText = TextUtils.ellipsize(
+                run.hint,
+                TextPaint(paint),
+                availableWidth,
+                TextUtils.TruncateAt.END,
+            )?.toString() ?: continue
+            canvas.withSave {
+                clipRect(span.first, 0f, span.second, band)
+                canvas.drawText(hintText, span.first, baseline, paint)
+            }
+        }
+        PaintPool.recycle(paint)
+    }
+
+    /**
+     * X-span of a line-local hint run, from the charData walk: summing column
+     * charData lengths maps source offsets to columns without using the string
+     * offset as a column index.
+     */
+    internal fun hintRunXSpan(run: TextHintRun): Pair<Float, Float>? {
+        var offset = 0
+        var startX = -1f
+        var endX = -1f
+        var skippedIndentColumns = 0
+        for (column in columns) {
+            if (column !is TextBaseColumn) continue
+            // Justified first lines prepend synthetic indent columns whose
+            // charData is presentation, not source text. Their offsets do not
+            // count toward the line-local hint range.
+            if (skippedIndentColumns < indentSize) {
+                skippedIndentColumns++
+                continue
+            }
+            val columnEnd = offset + column.charData.length
+            if (columnEnd <= run.start) {
+                offset = columnEnd
+                continue
+            }
+            if (offset >= run.end) break
+            if (startX < 0f) startX = column.start
+            endX = column.end
+            offset = columnEnd
+        }
+        if (startX < 0f) return null
+        return startX to endX
     }
 
     private fun drawTextLineWithInlineNoteSpacers(

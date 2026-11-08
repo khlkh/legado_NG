@@ -113,6 +113,18 @@ object AiConfig {
             appCtx.putPrefString(PreferKey.aiPurifyReasoningLevel, value.prefValue)
         }
 
+    var wordAnnotationProviderId: String
+        get() = appCtx.getPrefString(PreferKey.aiWordAnnotationProviderId).orEmpty()
+        set(value) {
+            appCtx.putPrefString(PreferKey.aiWordAnnotationProviderId, value.trim())
+        }
+
+    var wordAnnotationModelId: String
+        get() = appCtx.getPrefString(PreferKey.aiWordAnnotationModelId).orEmpty()
+        set(value) {
+            appCtx.putPrefString(PreferKey.aiWordAnnotationModelId, value.trim())
+        }
+
     var readAloudStoryboardProviderId: String
         get() = appCtx.getPrefString(PreferKey.aiReadAloudStoryboardProviderId).orEmpty()
         set(value) {
@@ -339,6 +351,11 @@ object AiConfig {
     fun savePurifyModel(providerId: String, modelId: String) {
         purifyProviderId = providerId
         purifyModelId = modelId
+    }
+
+    fun saveWordAnnotationModel(providerId: String, modelId: String) {
+        wordAnnotationProviderId = providerId
+        wordAnnotationModelId = modelId
     }
 
     fun requireReadAloudStoryboardModel(): AiModelSelection {

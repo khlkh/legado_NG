@@ -5,6 +5,7 @@ import androidx.annotation.Keep
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.help.annotation.WordAnnotation
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.ContentPositionMap
 import io.legado.app.help.tts.ReadAloudTextSource
@@ -54,6 +55,10 @@ data class TextChapter(
     @Transient
     @Volatile
     internal var layoutReadAloudPages: io.legado.app.help.tts.ReadAloudPageText? = null
+
+    /** Resolved word annotations for this chapter, keyed by paragraph index. */
+    @Transient
+    var wordAnnotations: List<WordAnnotation> = emptyList()
 
     val readAloudText: ReadAloudTextSource get() = NativeReadAloudTextSource(this, layoutReadAloudPages)
 

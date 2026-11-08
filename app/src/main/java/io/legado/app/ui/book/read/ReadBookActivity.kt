@@ -50,6 +50,7 @@ import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isEpub
+import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.menuCapabilities
 import io.legado.app.help.book.isLocalTxt
@@ -531,6 +532,10 @@ class ReadBookActivity : BaseReadBookActivity(),
                     R.id.menu_enable_replace -> item.isChecked = book.getUseReplaceRule()
                     R.id.menu_same_title_removed -> item.isChecked = book.getRemoveSameTitle()
                     R.id.menu_re_segment -> item.isChecked = book.getReSegment()
+                    R.id.menu_word_annotation -> {
+                        item.isChecked = book.getWordAnnotationEnabled()
+                        item.isVisible = !book.isImage
+                    }
 //                    R.id.menu_enable_review -> {
 //                        item.isVisible = BuildConfig.DEBUG
 //                        item.isChecked = AppConfig.enableReview
@@ -584,6 +589,13 @@ class ReadBookActivity : BaseReadBookActivity(),
             R.id.menu_re_segment -> ReadBook.book?.let {
                 it.setReSegment(!it.getReSegment())
                 item.isChecked = it.getReSegment()
+                ReadBook.loadContent(false)
+            }
+
+            R.id.menu_word_annotation -> ReadBook.book?.let {
+                it.setWordAnnotationEnabled(!it.getWordAnnotationEnabled())
+                item.isChecked = it.getWordAnnotationEnabled()
+                binding.readMenu.updateWordAnnotationState(it.getWordAnnotationEnabled())
                 ReadBook.loadContent(false)
             }
 

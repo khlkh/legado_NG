@@ -456,6 +456,8 @@
     <string name="ai_purify_chapter_section">Chapter clean</string>
     <string name="ai_purify_model_setting">Clean model</string>
     <string name="ai_model_function_summary">Model: %1$s · Reasoning: %2$s</string>
+    <string name="ai_word_annotation_model_summary">Model: %1$s</string>
+    <string name="ai_word_annotation_model_not_selected">Not selected (uses active provider)</string>
     <string name="ai_purify_model_not_selected">Not selected</string>
     <string name="ai_purify_model_unavailable">Selected model is unavailable</string>
     <string name="ai_purify_model_selected_summary">%1$s (%2$s)</string>
@@ -1692,6 +1694,7 @@
     <string name="auto_clear_expired">"Clear expired search histories automatically "</string>
     <string name="auto_clear_expired_summary">Search histories more than one day</string>
     <string name="re_segment">Re-segment</string>
+    <string name="word_annotation">AI Word Wise</string>
     <string name="style_name">Style name:</string>
     <string name="empty_msg_import_book">Click the folder icon in the upper right corner and select the folder</string>
     <string name="scan_folder">Intelligent scanning</string>

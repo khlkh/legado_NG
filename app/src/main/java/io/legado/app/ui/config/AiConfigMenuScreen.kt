@@ -25,7 +25,8 @@ internal data class AiConfigMenuScreenState(
     val chatEntryStyle: AiChatEntryStyle = AiChatEntryStyle.NONE,
     val purifySummary: String = "",
     val assistantSummary: String = "",
-    val readAloudSummary: String = ""
+    val readAloudSummary: String = "",
+    val wordAnnotationSummary: String = "",
 )
 
 @Composable
@@ -77,6 +78,12 @@ internal fun AiConfigMenuScreen(
                 summary = state.readAloudSummary,
                 iconRes = R.drawable.ic_ai_capability_tts,
                 onClick = { onOpenPage(AiConfigFragment.PAGE_READ_ALOUD) }
+            )
+            AiConfigMenuEntry(
+                title = stringResource(R.string.word_annotation),
+                summary = state.wordAnnotationSummary,
+                iconRes = R.drawable.ic_translate,
+                onClick = { onOpenPage(AiConfigFragment.PAGE_WORD_ANNOTATION) }
             )
         }
     }

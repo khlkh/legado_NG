@@ -84,6 +84,8 @@ internal fun ReadFloatingToolRail(
     onThemeModeSelected: (ReadThemeMode) -> Unit,
     onAiPurify: () -> Unit,
     onAiSettings: () -> Unit,
+    wordAnnotationEnabled: Boolean,
+    onWordAnnotation: () -> Unit,
     onToggleDockSide: () -> Unit
 ) {
     val dockRight = dockSide.isRight
@@ -115,6 +117,8 @@ internal fun ReadFloatingToolRail(
             onSearch = onSearch,
             onReplace = onReplace,
             onAutoPage = onAutoPage,
+            wordAnnotationEnabled = wordAnnotationEnabled,
+            onWordAnnotation = onWordAnnotation,
             onToggleDockSide = onToggleDockSide
         )
 
@@ -147,6 +151,8 @@ private fun ToolRail(
     onSearch: () -> Unit,
     onReplace: () -> Unit,
     onAutoPage: () -> Unit,
+    wordAnnotationEnabled: Boolean,
+    onWordAnnotation: () -> Unit,
     onToggleDockSide: () -> Unit
 ) {
     NgGlassSurface(
@@ -202,6 +208,13 @@ private fun ToolRail(
             onClick = {
                 onExpansionChange(expansion.toggle(ReadFloatingToolExpansion.AI))
             }
+        )
+        ToolButton(
+            iconRes = R.drawable.ic_translate,
+            labelRes = R.string.word_annotation,
+            iconSize = 20.dp,
+            selected = wordAnnotationEnabled,
+            onClick = onWordAnnotation
         )
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),

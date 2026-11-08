@@ -138,6 +138,8 @@ object PreferKey {
     const val aiPurifyProviderId = "aiPurifyProviderId"
     const val aiPurifyModelId = "aiPurifyModelId"
     const val aiPurifyReasoningLevel = "aiPurifyReasoningLevel"
+    const val aiWordAnnotationProviderId = "aiWordAnnotationProviderId"
+    const val aiWordAnnotationModelId = "aiWordAnnotationModelId"
     const val aiReadAloudStoryboardProviderId = "aiReadAloudStoryboardProviderId"
     const val aiReadAloudStoryboardModelId = "aiReadAloudStoryboardModelId"
     const val aiReadAloudStoryboardReasoningLevel = "aiReadAloudStoryboardReasoningLevel"
