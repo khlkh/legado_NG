@@ -2223,6 +2223,8 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
     private fun showWordAnnotationSettingsSheet() {
         val level = ReadBook.book?.getWordAnnotationLevel()
             ?: WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL
+        val hintCap = ReadBook.book?.getWordAnnotationHintCap()
+            ?: WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP
         val prefetchChapters = AiConfig.wordAnnotationPrefetchChapters
         val dialog = BottomSheetDialog(requireContext())
         dialog.setContentView(
@@ -2232,13 +2234,23 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             ) {
                 WordAnnotationSettingsSheet(
                     level = level,
+                    hintCap = hintCap,
                     prefetchChapters = prefetchChapters,
                     modelSummary = wordAnnotationModelSummaryText(),
+                    bookActive = ReadBook.book != null,
                     onSelectModel = {
                         showComposeModelSelectionSheet(AiModelSelectionTarget.WORD_ANNOTATION)
                     },
                     onLevelSelected = { newLevel ->
                         ReadBook.book?.setWordAnnotationLevel(newLevel)
+                        if (ReadBook.book?.getWordAnnotationEnabled() == true) {
+                            ReadBook.loadContent(false)
+                        }
+                        refreshMain()
+                        dialog.dismiss()
+                    },
+                    onHintCapSelected = { newCap ->
+                        ReadBook.book?.setWordAnnotationHintCap(newCap)
                         if (ReadBook.book?.getWordAnnotationEnabled() == true) {
                             ReadBook.loadContent(false)
                         }

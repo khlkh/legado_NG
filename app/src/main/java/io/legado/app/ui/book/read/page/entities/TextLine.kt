@@ -244,18 +244,23 @@ data class TextLine(
         paint.color = ReadBookConfig.textAccentColor
         val band = WordAnnotationLayout.bandHeight(ChapterProvider.contentPaintTextHeight, hasHints = true)
         val baseline = band - paint.fontMetrics.descent - 1.dpToPx()
-        for (run in hintRuns) {
-            val span = hintRunXSpan(run) ?: continue
-            val availableWidth = span.second - span.first
-            if (availableWidth <= 0f) continue
+        val runs = hintRuns.sortedBy { it.start }
+        runs.forEachIndexed { index, run ->
+            val span = hintRunXSpan(run) ?: return@forEachIndexed
+            // The hint may use the rest of the line, but never into the next
+            // hint's span, so two hints on one line cannot overlap.
+            val nextSpan = runs.getOrNull(index + 1)?.let { hintRunXSpan(it) }
+            val clipEnd = nextSpan?.first ?: lineEnd
+            val availableWidth = maxOf(span.second - span.first, clipEnd - span.first)
+            if (availableWidth <= 0f) return@forEachIndexed
             val hintText = TextUtils.ellipsize(
                 run.hint,
                 TextPaint(paint),
                 availableWidth,
                 TextUtils.TruncateAt.END,
-            )?.toString() ?: continue
+            )?.toString() ?: return@forEachIndexed
             canvas.withSave {
-                clipRect(span.first, 0f, span.second, band)
+                clipRect(span.first, 0f, clipEnd, band)
                 canvas.drawText(hintText, span.first, baseline, paint)
             }
         }

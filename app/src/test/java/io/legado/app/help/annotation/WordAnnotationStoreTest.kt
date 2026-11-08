@@ -84,6 +84,15 @@ class WordAnnotationStoreTest {
     }
 
     @Test
+    fun `hint cap or model mismatch is a miss`() {
+        val file = cacheFile()
+        assertTrue(WordAnnotationStore.write(file, identity, annotations))
+        assertNull(WordAnnotationStore.read(file, identity.copy(hintCap = 21)))
+        assertNull(WordAnnotationStore.read(file, identity.copy(modelId = "other-model")))
+        assertNull(WordAnnotationStore.read(file, identity.copy(hintCharCap = true)))
+    }
+
+    @Test
     fun `empty success is stored and returned as empty not null`() {
         val file = cacheFile()
         assertTrue(WordAnnotationStore.write(file, identity, emptyList()))
@@ -124,8 +133,9 @@ class WordAnnotationStoreTest {
         file.writeText(
             """
             {"bookUrl":"https://book/1","chapterUrl":"https://book/1/chapter/3",
-             "chapterIndex":2,"canonicalHash":"hash-abc","schemaVersion":2,
+             "chapterIndex":2,"canonicalHash":"hash-abc","schemaVersion":7,
              "level":4,"frequencyVersion":"gutenberg-2006-04",
+             "hintCap":13,"hintCharCap":false,"providerId":"","modelId":"",
              "annotations":"[]"}
             """.trimIndent(),
         )
@@ -142,9 +152,13 @@ class WordAnnotationStoreTest {
               "chapterUrl": "https://book/1/chapter/3",
               "chapterIndex": 2,
               "canonicalHash": "hash-abc",
-              "schemaVersion": 2,
+              "schemaVersion": 7,
               "level": 4,
               "frequencyVersion": "gutenberg-2006-04",
+              "hintCap": 13,
+              "hintCharCap": false,
+              "providerId": "",
+              "modelId": "",
               "annotations": [
                 {"paragraphIndex":0,"start":17,"end":26,"surface":"untenable","hint":"impossible to defend"},
                 {"paragraphIndex":0,"start":-1,"end":26,"surface":"bad","hint":"bad"},

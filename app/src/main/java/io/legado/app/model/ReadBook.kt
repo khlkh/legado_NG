@@ -605,7 +605,10 @@ object ReadBook : CoroutineScope by MainScope() {
             val chapter = appDb.bookChapterDao.getChapter(currentBook.bookUrl, index) ?: continue
             if (offset == 1) {
                 val textChapter = nextTextChapter
-                if (textChapter != null) {
+                if (textChapter != null &&
+                    textChapter.chapter.bookUrl == currentBook.bookUrl &&
+                    textChapter.chapter.index == index
+                ) {
                     val contents = BookContent(
                         sameTitleRemoved = textChapter.sameTitleRemoved,
                         textList = textChapter.sourceParagraphs,

@@ -15,6 +15,7 @@ object WordAnnotationPrompt {
         language: WordAnnotationLanguage,
         uiLocaleChinese: Boolean,
         level: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL,
+        cap: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP,
     ): String {
         val selectionLine = when (language) {
             WordAnnotationLanguage.ENGLISH ->
@@ -24,13 +25,27 @@ object WordAnnotationPrompt {
                 "For Chinese text, target meaningful 成语, literary expressions, uncommon words, " +
                     "and context-dependent meanings in continuous text. Do not split on spaces."
         }
-        val hintLanguage = if (uiLocaleChinese) "Simplified Chinese" else "English"
-        val hintCap = if (uiLocaleChinese) {
+        // Chinese books always get English hints; English books follow the app UI locale.
+        val hintLanguage = if (language == WordAnnotationLanguage.CHINESE) {
+            "English"
+        } else if (uiLocaleChinese) {
+            "Simplified Chinese"
+        } else {
+            "English"
+        }
+        val hintCap = if (language == WordAnnotationLanguage.CHINESE) {
+            "no more than ${WordAnnotationConfig.MAX_HINT_WORDS_CHINESE_BOOK} words"
+        } else if (uiLocaleChinese) {
             "no more than ${WordAnnotationConfig.MAX_HINT_CHINESE_CHARS} characters"
         } else {
             "no more than ${WordAnnotationConfig.MAX_HINT_WORDS} words"
         }
-        val levelGuidance = WordAnnotationLevels.promptGuidance(level, uiLocaleChinese)
+        // Level guidance must match the hint language; for Chinese books the
+        // guidance stays English so it cannot contradict the English-hint rule.
+        val levelGuidance = WordAnnotationLevels.promptGuidance(
+            level,
+            uiLocaleChinese && language != WordAnnotationLanguage.CHINESE,
+        )
         return buildString {
             appendLine("You are a vocabulary assistant for a long-form ebook reader.")
             appendLine()
@@ -68,6 +83,7 @@ object WordAnnotationPrompt {
             appendLine()
             appendLine("Reader level guidance (this overrides rules 3 and 4):")
             appendLine(levelGuidance)
+            appendLine("Return up to $cap items.")
             appendLine()
             appendLine(selectionLine)
             appendLine(
