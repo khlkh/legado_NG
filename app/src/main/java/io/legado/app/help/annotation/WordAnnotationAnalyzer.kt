@@ -29,13 +29,13 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Word Wise analysis pipeline: canonical paragraphs -> cache -> model -> resolve
- * -> cache -> publish. The cache-hit path runs before the first layout; the
- * network path runs in the background and re-renders only after a publish
- * check confirms the book, chapter, flag, canonical hash, and the full
- * analysis config are still current.
+ * -> superset cache -> publish.
  *
- * The cache file stores annotations with the layout's source paragraph index,
- * so [attachCached] assigns them directly without a second index mapping.
+ * The cache stores one broad candidate pool per chapter (superset). The
+ * reader's level floor and per-book cap are applied locally at attach time by
+ * [WordAnnotationFilter], so changing level/cap re-filters instantly and never
+ * re-calls the model. The cache identity therefore contains only generation
+ * parameters: schema, frequency asset, hint language, provider, and model.
  */
 object WordAnnotationAnalyzer {
 
@@ -48,16 +48,14 @@ object WordAnnotationAnalyzer {
     data class CanonicalParagraph(val sourceIndex: Int, val text: String)
 
     data class AnalysisConfig(
-        val level: Int,
-        val hintCap: Int,
         val hintCharCap: Boolean,
         val maxHintWords: Int,
         val providerId: String,
         val modelId: String,
     ) {
         val key: String =
-            "level=$level;cap=$hintCap;char=$hintCharCap;words=$maxHintWords;" +
-                "provider=$providerId;model=$modelId;freq=${WordAnnotationConfig.FREQUENCY_VERSION}"
+            "char=$hintCharCap;words=$maxHintWords;provider=$providerId;model=$modelId;" +
+                "freq=${WordAnnotationConfig.FREQUENCY_VERSION}"
     }
 
     /** Plain paragraphs only; titles, [newpage], <usehtml> blocks, and image paragraphs are skipped. */
@@ -109,11 +107,6 @@ object WordAnnotationAnalyzer {
             AiProviderStore.provider(providerId)?.model.orEmpty()
         }
         return AnalysisConfig(
-            level = WordAnnotationLevels.normalize(book.getWordAnnotationLevel()),
-            hintCap = book.getWordAnnotationHintCap().coerceIn(
-                WordAnnotationConfig.MIN_WORD_ANNOTATION_HINT_CAP,
-                WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
-            ),
             hintCharCap = hintCharCap,
             maxHintWords = maxHintWords,
             providerId = providerId,
@@ -131,8 +124,6 @@ object WordAnnotationAnalyzer {
         chapterUrl = bookChapter.url,
         chapterIndex = bookChapter.index,
         canonicalHash = hash,
-        level = config.level,
-        hintCap = config.hintCap,
         hintCharCap = config.hintCharCap,
         providerId = config.providerId,
         modelId = config.modelId,
@@ -156,8 +147,13 @@ object WordAnnotationAnalyzer {
             annotationFile(book, bookChapter),
             identityFor(book, bookChapter, hash, config),
         ) ?: return
-        // The file already stores layout source paragraph indices.
-        textChapter.wordAnnotations = cached
+        // The file already stores layout source paragraph indices; the current
+        // level/cap filter the superset locally without another model call.
+        textChapter.wordAnnotations = WordAnnotationFilter.filter(
+            cached,
+            book.getWordAnnotationLevel(),
+            book.getWordAnnotationHintCap(),
+        )
     }
 
     /** True when this chapter already has a readable cache (including an empty success). */
@@ -235,7 +231,12 @@ object WordAnnotationAnalyzer {
                     messages = listOf(
                         AiMessage(
                             AiMessage.Role.SYSTEM,
-                            WordAnnotationPrompt.system(language, uiLocaleChinese, config.level, config.hintCap),
+                            WordAnnotationPrompt.system(
+                                language = language,
+                                uiLocaleChinese = uiLocaleChinese,
+                                cap = WordAnnotationConfig.MAX_SUPERSET_ITEMS,
+                                superset = true,
+                            ),
                         ),
                         AiMessage(AiMessage.Role.USER, WordAnnotationPrompt.user(passage)),
                     ),
@@ -250,9 +251,8 @@ object WordAnnotationAnalyzer {
             if (items == null) {
                 resolved = null
             } else {
-                // The rank asset is a soft prior in both paths; the prototype
-                // flag only controls the inflection fallback. Level floor and
-                // the per-book cap therefore apply in every build.
+                // No floor gate at analysis time: the cache stores the broad
+                // pool, and the local filter applies level floor + cap later.
                 val frequencyIndex = WordFrequencyAssets.load(appCtx)
                 val hybrid = WordAnnotationHybrid.resolveDetailed(
                     paragraphs = paragraphs.map { it.text },
@@ -260,19 +260,18 @@ object WordAnnotationAnalyzer {
                     uiLocaleChinese = config.hintCharCap,
                     frequencyIndex = frequencyIndex,
                     options = WordAnnotationHybrid.Options(
-                        frequencyFirst = true,
+                        frequencyFirst = false,
                         lemmaFallback = WordAnnotationConfig.USE_FUSION_PROTOTYPE,
-                        maxHintsPerChapter = config.hintCap,
-                        minRankFloor = WordAnnotationLevels.floorFor(config.level),
+                        maxHintsPerChapter = WordAnnotationConfig.MAX_SUPERSET_ITEMS,
+                        minRankFloor = 0,
                     ),
                     maxHintWords = config.maxHintWords,
                 )
-                stats = hybridStats(hybrid.results) +
-                    " level=${config.level} floor=${WordAnnotationLevels.floorFor(config.level)}" +
-                    " cap=${config.hintCap} gated=${hybrid.gatedByFloor}"
+                stats = hybridStats(hybrid.results)
                 resolved = hybrid.results.map { result ->
                     result.annotation.copy(
                         paragraphIndex = paragraphs[result.annotation.paragraphIndex].sourceIndex,
+                        rank = frequencyIndex?.minRankOf(result.annotation.surface),
                     )
                 }
             }
@@ -286,12 +285,12 @@ object WordAnnotationAnalyzer {
             AppLog.put(
                 "WordAnnotation tokens=${result.promptTokens ?: -1}/${result.completionTokens ?: -1} " +
                     "items=${items?.size ?: 0} resolved=${resolved.size} chapter=${bookChapter.index}" +
-                    " level=${config.level} prefetch=$prefetch" +
+                    " prefetch=$prefetch" +
                     (stats?.let { " $it" } ?: ""),
             )
 
             // Publish only when the open book, chapter, flag, hash, and the
-            // live analysis config still match the ones we analyzed with.
+            // live generation config still match the ones we analyzed with.
             if (!isPublishable(book, bookChapter, textChapter, identity, prefetch)) {
                 AppLog.put("WordAnnotation publish rejected: not current chapter=${bookChapter.index}")
                 return
@@ -302,7 +301,8 @@ object WordAnnotationAnalyzer {
             }
 
             if (resolved.isNotEmpty() && !prefetch) {
-                // Re-render the in-memory chapter so the freshly written cache is laid out.
+                // Re-render the in-memory chapter so the freshly written superset
+                // is filtered locally and laid out.
                 ReadBook.loadContent(false)
             }
             if (!prefetch) {
@@ -371,15 +371,13 @@ object WordAnnotationAnalyzer {
             canonicalParagraphs(currentBookContent).map { it.text },
         )
         if (currentHash != identity.canonicalHash) return false
-        // The live analysis config must still be the one we analyzed with.
+        // The live generation config must still be the one we analyzed with.
         val currentLanguage = bookLanguage(
             textChapter.sourceParagraphs.joinToString("\n"),
             currentBook.config.scriptClass,
         )
         val currentConfig = analysisConfig(currentBook, currentLanguage, appUiLocaleChinese())
-        return currentConfig.level == identity.level &&
-            currentConfig.hintCap == identity.hintCap &&
-            currentConfig.hintCharCap == identity.hintCharCap &&
+        return currentConfig.hintCharCap == identity.hintCharCap &&
             currentConfig.providerId == identity.providerId &&
             currentConfig.modelId == identity.modelId
     }
