@@ -140,6 +140,7 @@ object PreferKey {
     const val aiPurifyReasoningLevel = "aiPurifyReasoningLevel"
     const val aiWordAnnotationProviderId = "aiWordAnnotationProviderId"
     const val aiWordAnnotationModelId = "aiWordAnnotationModelId"
+    const val aiWordAnnotationPrefetchChapters = "aiWordAnnotationPrefetchChapters"
     const val aiReadAloudStoryboardProviderId = "aiReadAloudStoryboardProviderId"
     const val aiReadAloudStoryboardModelId = "aiReadAloudStoryboardModelId"
     const val aiReadAloudStoryboardReasoningLevel = "aiReadAloudStoryboardReasoningLevel"

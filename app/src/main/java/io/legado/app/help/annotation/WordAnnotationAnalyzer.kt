@@ -71,7 +71,13 @@ object WordAnnotationAnalyzer {
         val paragraphs = canonicalParagraphs(bookContent)
         if (paragraphs.isEmpty()) return
         val hash = WordAnnotationStore.canonicalHash(paragraphs.map { it.text })
-        val identity = WordAnnotationIdentity(book.bookUrl, bookChapter.url, bookChapter.index, hash)
+        val identity = WordAnnotationIdentity(
+            bookUrl = book.bookUrl,
+            chapterUrl = bookChapter.url,
+            chapterIndex = bookChapter.index,
+            canonicalHash = hash,
+            level = WordAnnotationLevels.normalize(book.getWordAnnotationLevel()),
+        )
         val cached = WordAnnotationStore.read(annotationFile(book, bookChapter), identity) ?: return
         // The file already stores layout source paragraph indices.
         textChapter.wordAnnotations = cached
@@ -83,7 +89,13 @@ object WordAnnotationAnalyzer {
         val paragraphs = canonicalParagraphs(bookContent)
         if (paragraphs.isEmpty()) return false
         val hash = WordAnnotationStore.canonicalHash(paragraphs.map { it.text })
-        val identity = WordAnnotationIdentity(book.bookUrl, bookChapter.url, bookChapter.index, hash)
+        val identity = WordAnnotationIdentity(
+            bookUrl = book.bookUrl,
+            chapterUrl = bookChapter.url,
+            chapterIndex = bookChapter.index,
+            canonicalHash = hash,
+            level = WordAnnotationLevels.normalize(book.getWordAnnotationLevel()),
+        )
         return WordAnnotationStore.read(annotationFile(book, bookChapter), identity) != null
     }
 
@@ -139,13 +151,21 @@ object WordAnnotationAnalyzer {
             return
         }
         val hash = WordAnnotationStore.canonicalHash(paragraphs.map { it.text })
-        val identity = WordAnnotationIdentity(book.bookUrl, bookChapter.url, bookChapter.index, hash)
+        val level = WordAnnotationLevels.normalize(book.getWordAnnotationLevel())
+        val identity = WordAnnotationIdentity(
+            bookUrl = book.bookUrl,
+            chapterUrl = bookChapter.url,
+            chapterIndex = bookChapter.index,
+            canonicalHash = hash,
+            level = level,
+        )
         val file = annotationFile(book, bookChapter)
 
         // An existing hit (including an empty success) never calls the model again.
         if (WordAnnotationStore.read(file, identity) != null) {
             Log.d("WordAnnotation", "skip cache hit chapter=${bookChapter.index}")
             AppLog.put("WordAnnotation skip: cache hit chapter=${bookChapter.index}")
+            if (!prefetch) ReadBook.prefetchWordAnnotationAhead()
             return
         }
 
@@ -185,7 +205,7 @@ object WordAnnotationAnalyzer {
             val result = withContext(Dispatchers.IO) {
                 AiManager.generateText(
                     messages = listOf(
-                        AiMessage(AiMessage.Role.SYSTEM, WordAnnotationPrompt.system(language, uiLocaleChinese)),
+                        AiMessage(AiMessage.Role.SYSTEM, WordAnnotationPrompt.system(language, uiLocaleChinese, level)),
                         AiMessage(AiMessage.Role.USER, WordAnnotationPrompt.user(passage)),
                     ),
                     params = AiTextParams(temperature = 0f, disableThinking = true, jsonResponse = true),
@@ -203,15 +223,21 @@ object WordAnnotationAnalyzer {
                 // Generated Gutenberg rank asset; null on a missing/corrupt
                 // asset, in which case every band is UNKNOWN.
                 val frequencyIndex = WordFrequencyAssets.load(appCtx)
-                val hybridResults = WordAnnotationHybrid.resolve(
+                val hybrid = WordAnnotationHybrid.resolveDetailed(
                     paragraphs = paragraphs.map { it.text },
                     items = items,
                     uiLocaleChinese = uiLocaleChinese,
                     frequencyIndex = frequencyIndex,
-                    options = WordAnnotationHybrid.Options(frequencyFirst = true),
+                    options = WordAnnotationHybrid.Options(
+                        frequencyFirst = true,
+                        maxHintsPerChapter = WordAnnotationLevels.capFor(level),
+                        minRankFloor = WordAnnotationLevels.floorFor(level),
+                    ),
                 )
-                prototypeStats = hybridStats(hybridResults)
-                resolved = hybridResults.map { result ->
+                prototypeStats = hybridStats(hybrid.results) +
+                    " level=$level floor=${WordAnnotationLevels.floorFor(level)}" +
+                    " cap=${WordAnnotationLevels.capFor(level)} gated=${hybrid.gatedByFloor}"
+                resolved = hybrid.results.map { result ->
                     result.annotation.copy(
                         paragraphIndex = paragraphs[result.annotation.paragraphIndex].sourceIndex,
                     )
@@ -229,6 +255,7 @@ object WordAnnotationAnalyzer {
             AppLog.put(
                 "WordAnnotation tokens=${result.promptTokens ?: -1}/${result.completionTokens ?: -1} " +
                     "items=${items?.size ?: 0} resolved=${resolved.size} chapter=${bookChapter.index}" +
+                    " level=$level prefetch=$prefetch" +
                     (prototypeStats?.let { " $it" } ?: ""),
             )
 
@@ -250,7 +277,7 @@ object WordAnnotationAnalyzer {
             if (!prefetch) {
                 // After the current chapter is cached, warm the preloaded next
                 // chapter in the background so its hints are ready on arrival.
-                ReadBook.prefetchWordAnnotationForNext()
+                ReadBook.prefetchWordAnnotationAhead()
             }
         } catch (e: CancellationException) {
             throw e
@@ -294,11 +321,11 @@ object WordAnnotationAnalyzer {
         if (currentBook.bookUrl != book.bookUrl) return false
         if (!currentBook.getWordAnnotationEnabled()) return false
         if (prefetch) {
-            // A prefetch result is only cached while its chapter is the
-            // adjacent preload; never for a chapter the reader has left behind.
-            val adjacent = ReadBook.durChapterIndex - 1 == bookChapter.index ||
-                ReadBook.durChapterIndex + 1 == bookChapter.index
-            if (!adjacent) return false
+            // A prefetch result is only cached while its chapter is still ahead
+            // of the current chapter and within the configured prefetch window.
+            val prefetchN = AiConfig.wordAnnotationPrefetchChapters
+            val offset = bookChapter.index - ReadBook.durChapterIndex
+            if (offset < 1 || offset > prefetchN) return false
         } else if (ReadBook.durChapterIndex != bookChapter.index) {
             return false
         }

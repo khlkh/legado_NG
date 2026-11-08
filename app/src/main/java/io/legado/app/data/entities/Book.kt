@@ -233,6 +233,14 @@ data class Book(
         return config.wordAnnotationEnabled
     }
 
+    fun setWordAnnotationLevel(level: Int) {
+        config.wordAnnotationLevel = level
+    }
+
+    fun getWordAnnotationLevel(): Int {
+        return config.wordAnnotationLevel
+    }
+
     fun setRemoveSameTitle(removeSameTitle: Boolean) {
         config.removeSameTitle = removeSameTitle
     }
@@ -504,6 +512,8 @@ data class Book(
         var independentOverrides: String? = null,
         @SerializedName("wordAnnotationEnabled")
         var wordAnnotationEnabled: Boolean = false,
+        @SerializedName("wordAnnotationLevel")
+        var wordAnnotationLevel: Int = 4,
     ) : Parcelable
 
     class Converters {

@@ -37,6 +37,12 @@ object WordAnnotationHybrid {
          */
         val dedupeIdenticalSpans: Boolean = true,
         val maxHintsPerChapter: Int = WordAnnotationConfig.MAX_HINTS_PER_CHAPTER,
+        /**
+         * Soft frequency gate. Only single-word hints whose rank is known and
+         * below this floor are dropped; multiword expressions and unknown-rank
+         * words stay eligible. 0 disables the gate.
+         */
+        val minRankFloor: Int = 0,
     )
 
     data class Result(
@@ -45,18 +51,32 @@ object WordAnnotationHybrid {
         val viaLemmaFallback: Boolean,
     )
 
+    data class Resolution(
+        val results: List<Result>,
+        val gatedByFloor: Int,
+    )
+
     fun resolve(
         paragraphs: List<String>,
         items: List<WordAnnotationItem>,
         uiLocaleChinese: Boolean,
         frequencyIndex: WordFrequencyIndex? = null,
         options: Options = Options(),
-    ): List<Result> {
-        if (paragraphs.isEmpty() || items.isEmpty()) return emptyList()
+    ): List<Result> = resolveDetailed(paragraphs, items, uiLocaleChinese, frequencyIndex, options).results
+
+    fun resolveDetailed(
+        paragraphs: List<String>,
+        items: List<WordAnnotationItem>,
+        uiLocaleChinese: Boolean,
+        frequencyIndex: WordFrequencyIndex? = null,
+        options: Options = Options(),
+    ): Resolution {
+        if (paragraphs.isEmpty() || items.isEmpty()) return Resolution(emptyList(), 0)
 
         val windows = WordAnnotationResolver.paragraphWindows(paragraphs)
         val joined = windows.joinToString(separator = "\n") { it.text }
         val candidates = ArrayList<Candidate>(items.size)
+        var gatedByFloor = 0
 
         items.forEachIndexed { itemIndex, item ->
             if (!WordAnnotationResolver.hintWithinCap(item.hint, uiLocaleChinese)) {
@@ -65,6 +85,10 @@ object WordAnnotationHybrid {
 
             val exactStart = WordAnnotationResolver.findOccurrence(joined, item.text, item.occurrence)
             if (exactStart != null) {
+                if (!passesFloorGate(joined, exactStart, item.text.length, frequencyIndex, options)) {
+                    gatedByFloor++
+                    return@forEachIndexed
+                }
                 addCandidate(
                     candidates, windows, joined, exactStart, item.text.length,
                     item.hint, viaLemmaFallback = false, sourceOrder = itemIndex,
@@ -82,6 +106,10 @@ object WordAnnotationHybrid {
             val forms = WordAnnotationInflector.candidateForms(item.text)
             if (forms.isEmpty()) return@forEachIndexed
             val match = findFormOccurrence(joined, forms, item.occurrence) ?: return@forEachIndexed
+            if (!passesFloorGate(joined, match.start, match.length, frequencyIndex, options)) {
+                gatedByFloor++
+                return@forEachIndexed
+            }
             addCandidate(
                 candidates, windows, joined, match.start, match.length,
                 item.hint, viaLemmaFallback = true, sourceOrder = itemIndex,
@@ -114,7 +142,25 @@ object WordAnnotationHybrid {
         } else {
             results.sortedWith(readingOrder).take(options.maxHintsPerChapter)
         }
-        return selected.sortedWith(readingOrder)
+        return Resolution(selected.sortedWith(readingOrder), gatedByFloor)
+    }
+
+    private val SINGLE_TOKEN = Regex("^[A-Za-z]+(?:['’][A-Za-z]+)?$")
+
+    private fun passesFloorGate(
+        joined: String,
+        start: Int,
+        length: Int,
+        frequencyIndex: WordFrequencyIndex?,
+        options: Options,
+    ): Boolean {
+        if (options.minRankFloor <= 0 || frequencyIndex == null) return true
+        val surface = joined.substring(start, start + length)
+        // Phrases pass; only single-word hints are gated, and only when their
+        // rank is known. Unknown words are eligible everywhere.
+        if (!SINGLE_TOKEN.matches(surface)) return true
+        val minRank = frequencyIndex.minRankOf(surface) ?: return true
+        return minRank >= options.minRankFloor
     }
 
     private fun addCandidate(

@@ -56,6 +56,8 @@ object WordAnnotationStore {
         if (obj.int("chapterIndex") != identity.chapterIndex) return null
         if (obj.string("canonicalHash") != identity.canonicalHash) return null
         if (obj.int("schemaVersion") != identity.schemaVersion) return null
+        if (obj.int("level") != identity.level) return null
+        if (obj.string("frequencyVersion") != identity.frequencyVersion) return null
         val annotations = obj.get("annotations") ?: return null
         if (!annotations.isJsonArray) return null
 
@@ -115,6 +117,8 @@ object WordAnnotationStore {
         root.addProperty("chapterIndex", identity.chapterIndex)
         root.addProperty("canonicalHash", identity.canonicalHash)
         root.addProperty("schemaVersion", identity.schemaVersion)
+        root.addProperty("level", identity.level)
+        root.addProperty("frequencyVersion", identity.frequencyVersion)
         val array = JsonArray()
         annotations.forEach { annotation ->
             val item = JsonObject()
@@ -150,4 +154,6 @@ data class WordAnnotationIdentity(
     val chapterIndex: Int,
     val canonicalHash: String,
     val schemaVersion: Int = WordAnnotationConfig.SCHEMA_VERSION,
+    val level: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL,
+    val frequencyVersion: String = WordAnnotationConfig.FREQUENCY_VERSION,
 )

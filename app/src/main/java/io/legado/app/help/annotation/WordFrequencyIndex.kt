@@ -60,6 +60,24 @@ class WordFrequencyIndex private constructor(
     }
 
     /**
+     * Minimum rank across the tokens of a surface, or null when the surface
+     * has no letters or any token is absent from the index. Unknown words make
+     * the whole surface unknown, matching [bandOf].
+     */
+    fun minRankOf(surface: String): Int? {
+        val tokens = TOKEN.findAll(surface)
+            .mapNotNull { normalizeToken(it.value) }
+            .toList()
+        if (tokens.isEmpty()) return null
+        var min = Int.MAX_VALUE
+        for (token in tokens) {
+            val rank = rankByWord[token] ?: return null
+            if (rank < min) min = rank
+        }
+        return min
+    }
+
+    /**
      * Band for a word or multiword surface. A phrase is only banded when every
      * token is known; one unknown token makes the whole phrase [FrequencyBand.UNKNOWN],
      * which is the conservative choice for a hint candidate.
