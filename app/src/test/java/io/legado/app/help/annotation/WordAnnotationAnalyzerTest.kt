@@ -84,4 +84,24 @@ class WordAnnotationAnalyzerTest {
 
         assertTrue(resolved.isEmpty())
     }
+
+    @Test
+    fun `fusion option recovers an inflected form and keeps the source index`() {
+        val paragraphs = listOf(
+            WordAnnotationAnalyzer.CanonicalParagraph(sourceIndex = 3, text = "He ran home."),
+        )
+
+        val resolved = WordAnnotationAnalyzer.resolveItems(
+            paragraphs = paragraphs,
+            items = listOf(WordAnnotationItem(text = "run", occurrence = 1, hint = "move fast")),
+            uiLocaleChinese = false,
+            hybridOptions = WordAnnotationHybrid.Options(),
+        )!!
+
+        assertEquals(1, resolved.size)
+        assertEquals(3, resolved.single().paragraphIndex)
+        assertEquals("ran", resolved.single().surface)
+        assertEquals(3, resolved.single().start)
+        assertEquals(6, resolved.single().end)
+    }
 }

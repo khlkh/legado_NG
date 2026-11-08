@@ -1,0 +1,14 @@
+{
+  "version": "gutenberg-2006-04",
+  "source_url": "https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/English/Project_Gutenberg",
+  "snapshot": "2006-04-16",
+  "license": "CC BY-SA 4.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "underlying_texts": "Project Gutenberg (public domain in the US)",
+  "rows": 36663,
+  "first": "the",
+  "last": "zoetrope",
+  "sha256": "76ffdf0cb0593cf0a130e88c707853e8cd0b77535712da6cb1cd8108fecc42d1",
+  "parser": "generate_frequency_rank.py 1.0",
+  "generated_utc": "2026-11-08T03:43:52+00:00"
+}

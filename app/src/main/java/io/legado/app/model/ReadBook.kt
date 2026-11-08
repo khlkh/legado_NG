@@ -11,6 +11,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.annotation.WordAnnotationAnalyzer
+import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isEpub
@@ -520,6 +521,7 @@ object ReadBook : CoroutineScope by MainScope() {
             }
             loadContent(durChapterIndex.plus(1), upContent, false)
             saveRead()
+            launchWordAnnotationForCurrent()
             callBack?.upMenuView()
             AppLog.putDebug("moveToNextChapter-curPageChanged()")
             curPageChanged(restartReadAloud = restartReadAloud)
@@ -558,6 +560,7 @@ object ReadBook : CoroutineScope by MainScope() {
             if (!isLoadCurrent(requestBook.bookUrl, generation)) return false
             loadContent(durChapterIndex.plus(1), upContent, false)
             saveRead()
+            launchWordAnnotationForCurrent()
             callBack?.upMenuView()
             AppLog.putDebug("moveToNextChapter-curPageChanged()")
             curPageChanged()
@@ -565,6 +568,44 @@ object ReadBook : CoroutineScope by MainScope() {
         } else {
             AppLog.putDebug("跳转下一章失败,没有下一章")
             return false
+        }
+    }
+
+    private fun launchWordAnnotationForCurrent() {
+        val currentBook = book ?: return
+        if (!currentBook.getWordAnnotationEnabled() || currentBook.isEpub) return
+        val textChapter = curTextChapter ?: return
+        val contents = BookContent(
+            sameTitleRemoved = textChapter.sameTitleRemoved,
+            textList = textChapter.sourceParagraphs,
+            effectiveReplaceRules = textChapter.effectiveReplaceRules,
+        )
+        if (textChapter.wordAnnotations.isEmpty() &&
+            WordAnnotationAnalyzer.hasCached(currentBook, textChapter.chapter, contents)
+        ) {
+            // A prefetched cache arrived after this chapter was laid out;
+            // re-lay out once so the hints attach.
+            loadContent(false)
+            return
+        }
+        launch {
+            WordAnnotationAnalyzer.analyzeAndPublish(currentBook, textChapter.chapter, contents, textChapter)
+        }
+    }
+
+    fun prefetchWordAnnotationForNext() {
+        val currentBook = book ?: return
+        if (!currentBook.getWordAnnotationEnabled() || currentBook.isEpub) return
+        val textChapter = nextTextChapter ?: return
+        val contents = BookContent(
+            sameTitleRemoved = textChapter.sameTitleRemoved,
+            textList = textChapter.sourceParagraphs,
+            effectiveReplaceRules = textChapter.effectiveReplaceRules,
+        )
+        launch {
+            WordAnnotationAnalyzer.analyzeAndPublish(
+                currentBook, textChapter.chapter, contents, textChapter, prefetch = true,
+            )
         }
     }
 
@@ -593,6 +634,7 @@ object ReadBook : CoroutineScope by MainScope() {
             }
             loadContent(durChapterIndex.minus(1), upContent, false)
             saveRead()
+            launchWordAnnotationForCurrent()
             callBack?.upMenuView()
             curPageChanged(restartReadAloud = restartReadAloud)
             return true
@@ -1155,8 +1197,11 @@ object ReadBook : CoroutineScope by MainScope() {
                 val analysisJob = this@ReadBook.launch {
                     WordAnnotationAnalyzer.analyzeAndPublish(book, chapter, contents, textChapter)
                 }
-                coroutineContext[Job]?.invokeOnCompletion {
-                    analysisJob.cancel()
+                coroutineContext[Job]?.invokeOnCompletion { cause ->
+                    // Cancel the detached analysis only when the chapter load
+                    // itself was cancelled; a normal completion must not kill
+                    // the in-flight model call.
+                    if (cause != null) analysisJob.cancel()
                 }
             }
             startup?.mark("native-created")
