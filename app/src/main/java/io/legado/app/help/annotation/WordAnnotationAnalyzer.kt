@@ -20,6 +20,7 @@ import io.legado.app.ui.book.read.page.entities.TextChapter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import splitties.init.appCtx
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -76,6 +77,16 @@ object WordAnnotationAnalyzer {
         textChapter.wordAnnotations = cached
     }
 
+    /** True when this chapter already has a readable cache (including an empty success). */
+    fun hasCached(book: Book, bookChapter: BookChapter, bookContent: BookContent): Boolean {
+        if (!book.getWordAnnotationEnabled() || book.isEpub) return false
+        val paragraphs = canonicalParagraphs(bookContent)
+        if (paragraphs.isEmpty()) return false
+        val hash = WordAnnotationStore.canonicalHash(paragraphs.map { it.text })
+        val identity = WordAnnotationIdentity(book.bookUrl, bookChapter.url, bookChapter.index, hash)
+        return WordAnnotationStore.read(annotationFile(book, bookChapter), identity) != null
+    }
+
     /**
      * Resolves model items against the canonical paragraphs. Returns null when
      * the model body was not valid JSON (never cache that as empty success);
@@ -85,12 +96,24 @@ object WordAnnotationAnalyzer {
         paragraphs: List<CanonicalParagraph>,
         items: List<WordAnnotationItem>?,
         uiLocaleChinese: Boolean,
+        hybridOptions: WordAnnotationHybrid.Options? = null,
+        frequencyIndex: WordFrequencyIndex? = null,
     ): List<WordAnnotation>? {
         if (items == null) return null
-        return WordAnnotationResolver.resolve(paragraphs.map { it.text }, items, uiLocaleChinese)
-            .map { annotation ->
-                annotation.copy(paragraphIndex = paragraphs[annotation.paragraphIndex].sourceIndex)
-            }
+        val resolved = if (hybridOptions != null) {
+            WordAnnotationHybrid.resolve(
+                paragraphs = paragraphs.map { it.text },
+                items = items,
+                uiLocaleChinese = uiLocaleChinese,
+                frequencyIndex = frequencyIndex,
+                options = hybridOptions,
+            ).map { it.annotation }
+        } else {
+            WordAnnotationResolver.resolve(paragraphs.map { it.text }, items, uiLocaleChinese)
+        }
+        return resolved.map { annotation ->
+            annotation.copy(paragraphIndex = paragraphs[annotation.paragraphIndex].sourceIndex)
+        }
     }
 
     suspend fun analyzeAndPublish(
@@ -98,6 +121,7 @@ object WordAnnotationAnalyzer {
         bookChapter: BookChapter,
         bookContent: BookContent,
         textChapter: TextChapter,
+        prefetch: Boolean = false,
     ) {
         if (!book.getWordAnnotationEnabled()) {
             Log.d("WordAnnotation", "skip flag off chapter=${bookChapter.index}")
@@ -170,7 +194,31 @@ object WordAnnotationAnalyzer {
                 )
             }
             val items = WordAnnotationParser.parse(result.content)
-            val resolved = resolveItems(paragraphs, items, uiLocaleChinese)
+            val prototypeOn = WordAnnotationConfig.USE_FUSION_PROTOTYPE
+            val resolved: List<WordAnnotation>?
+            var prototypeStats: String? = null
+            if (items == null) {
+                resolved = null
+            } else if (prototypeOn) {
+                // Generated Gutenberg rank asset; null on a missing/corrupt
+                // asset, in which case every band is UNKNOWN.
+                val frequencyIndex = WordFrequencyAssets.load(appCtx)
+                val hybridResults = WordAnnotationHybrid.resolve(
+                    paragraphs = paragraphs.map { it.text },
+                    items = items,
+                    uiLocaleChinese = uiLocaleChinese,
+                    frequencyIndex = frequencyIndex,
+                    options = WordAnnotationHybrid.Options(frequencyFirst = true),
+                )
+                prototypeStats = hybridStats(hybridResults)
+                resolved = hybridResults.map { result ->
+                    result.annotation.copy(
+                        paragraphIndex = paragraphs[result.annotation.paragraphIndex].sourceIndex,
+                    )
+                }
+            } else {
+                resolved = resolveItems(paragraphs, items, uiLocaleChinese)
+            }
             if (resolved == null) {
                 // Invalid model output must not be cached as an empty success.
                 recordFailure(key)
@@ -180,11 +228,13 @@ object WordAnnotationAnalyzer {
             }
             AppLog.put(
                 "WordAnnotation tokens=${result.promptTokens ?: -1}/${result.completionTokens ?: -1} " +
-                    "items=${items?.size ?: 0} resolved=${resolved.size} chapter=${bookChapter.index}",
+                    "items=${items?.size ?: 0} resolved=${resolved.size} chapter=${bookChapter.index}" +
+                    (prototypeStats?.let { " $it" } ?: ""),
             )
 
             // Publish only when the open book, chapter, flag, and hash still match.
-            if (!isCurrent(book, bookChapter, textChapter, hash)) {
+            // A prefetch call may write when the chapter is the adjacent preload.
+            if (!isPublishable(book, bookChapter, textChapter, hash, prefetch)) {
                 AppLog.put("WordAnnotation publish rejected: not current chapter=${bookChapter.index}")
                 return
             }
@@ -193,9 +243,14 @@ object WordAnnotationAnalyzer {
                 return
             }
 
-            if (resolved.isNotEmpty()) {
+            if (resolved.isNotEmpty() && !prefetch) {
                 // Re-render the in-memory chapter so the freshly written cache is laid out.
                 ReadBook.loadContent(false)
+            }
+            if (!prefetch) {
+                // After the current chapter is cached, warm the preloaded next
+                // chapter in the background so its hints are ready on arrival.
+                ReadBook.prefetchWordAnnotationForNext()
             }
         } catch (e: CancellationException) {
             throw e
@@ -208,6 +263,16 @@ object WordAnnotationAnalyzer {
         }
     }
 
+    private fun hybridStats(results: List<WordAnnotationHybrid.Result>): String {
+        val viaLemma = results.count { it.viaLemmaFallback }
+        val bands = results.groupingBy { it.frequencyBand }.eachCount()
+            .entries.joinToString(",") { "${it.key.name}=${it.value}" }
+        val selected = results.joinToString(",") {
+            "${it.annotation.surface}:${it.frequencyBand.name}"
+        }
+        return "hybrid viaLemma=$viaLemma bands={$bands} selected=[$selected]"
+    }
+
     private fun recordFailure(key: String) {
         lastFailureAt[key] = System.currentTimeMillis()
         if (lastFailureAt.size > MAX_FAILURE_ENTRIES) {
@@ -218,16 +283,25 @@ object WordAnnotationAnalyzer {
         }
     }
 
-    private fun isCurrent(
+    private fun isPublishable(
         book: Book,
         bookChapter: BookChapter,
         textChapter: TextChapter,
         hash: String,
+        prefetch: Boolean,
     ): Boolean {
         val currentBook = ReadBook.book ?: return false
         if (currentBook.bookUrl != book.bookUrl) return false
         if (!currentBook.getWordAnnotationEnabled()) return false
-        if (ReadBook.durChapterIndex != bookChapter.index) return false
+        if (prefetch) {
+            // A prefetch result is only cached while its chapter is the
+            // adjacent preload; never for a chapter the reader has left behind.
+            val adjacent = ReadBook.durChapterIndex - 1 == bookChapter.index ||
+                ReadBook.durChapterIndex + 1 == bookChapter.index
+            if (!adjacent) return false
+        } else if (ReadBook.durChapterIndex != bookChapter.index) {
+            return false
+        }
         // The in-memory chapter must still be the text we analyzed.
         val currentBookContent = BookContent(
             sameTitleRemoved = textChapter.sameTitleRemoved,

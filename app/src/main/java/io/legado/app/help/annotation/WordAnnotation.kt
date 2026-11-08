@@ -23,6 +23,15 @@ object WordAnnotationConfig {
 
     /** Hint length cap when the app UI locale is Chinese, in characters. */
     const val MAX_HINT_CHINESE_CHARS = 16
+
+    /**
+     * Prototype switch for the fusion resolver: after exact matching fails,
+     * expand a returned base form through the English inflection engine, rank
+     * hints by the generated Gutenberg frequency band before the chapter cap,
+     * and load the rank asset. Not a user setting; off keeps the Wave 1
+     * exact-surface contract and reading-order cap.
+     */
+    const val USE_FUSION_PROTOTYPE = false
 }
 
 data class WordAnnotationItem(

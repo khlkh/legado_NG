@@ -65,11 +65,11 @@ object WordAnnotationResolver {
 
     private val WHITESPACE = Regex("\\s+")
 
-    private class ParagraphWindow(val index: Int, val text: String, val globalStart: Int) {
+    internal class ParagraphWindow(val index: Int, val text: String, val globalStart: Int) {
         val globalEnd: Int get() = globalStart + text.length
     }
 
-    private fun paragraphWindows(paragraphs: List<String>): List<ParagraphWindow> {
+    internal fun paragraphWindows(paragraphs: List<String>): List<ParagraphWindow> {
         val windows = ArrayList<ParagraphWindow>(paragraphs.size)
         var globalStart = 0
         for ((index, text) in paragraphs.withIndex()) {
@@ -134,6 +134,15 @@ object WordAnnotationResolver {
     }
 
     private fun dropOverlaps(annotations: List<WordAnnotation>): List<WordAnnotation> {
+        val drop = overlappingIndices(annotations)
+        return annotations.filterIndexed { index, _ -> index !in drop }
+    }
+
+    /**
+     * Indices of the spans that the overlap rule removes: for each overlapping
+     * pair mark the shorter span, or both when the lengths are equal.
+     */
+    internal fun overlappingIndices(annotations: List<WordAnnotation>): Set<Int> {
         val drop = HashSet<Int>()
         for (i in annotations.indices) {
             for (j in i + 1 until annotations.size) {
@@ -153,6 +162,6 @@ object WordAnnotationResolver {
                 }
             }
         }
-        return annotations.filterIndexed { index, _ -> index !in drop }
+        return drop
     }
 }
