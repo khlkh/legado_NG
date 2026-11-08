@@ -60,6 +60,10 @@ data class TextChapter(
     @Transient
     var wordAnnotations: List<WordAnnotation> = emptyList()
 
+    /** True once the book pool was attached to this chapter (even with zero matches). */
+    @Transient
+    var wordAnnotationPoolAttached: Boolean = false
+
     val readAloudText: ReadAloudTextSource get() = NativeReadAloudTextSource(this, layoutReadAloudPages)
 
     private var layout: TextChapterLayout? = null

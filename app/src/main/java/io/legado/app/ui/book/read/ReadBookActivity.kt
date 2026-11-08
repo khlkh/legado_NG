@@ -534,7 +534,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     R.id.menu_re_segment -> item.isChecked = book.getReSegment()
                     R.id.menu_word_annotation -> {
                         item.isChecked = book.getWordAnnotationEnabled()
-                        item.isVisible = !book.isImage
+                        item.isVisible = !book.isImage && book.config.scriptClass != "cjk"
                     }
 //                    R.id.menu_enable_review -> {
 //                        item.isVisible = BuildConfig.DEBUG
