@@ -42,22 +42,20 @@ class WordAnnotationAnalyzerTest {
     }
 
     @Test
-    fun `analysis config keys differ when cap or hint language changes`() {
+    fun `analysis config keys differ when hint language or model changes`() {
         val base = WordAnnotationAnalyzer.AnalysisConfig(
-            level = 4,
-            hintCap = 13,
             hintCharCap = false,
             maxHintWords = 8,
             providerId = "p",
             modelId = "m",
         )
-        val capChanged = base.copy(hintCap = 21)
         val charCap = base.copy(hintCharCap = true)
         val chineseBook = base.copy(hintCharCap = false, maxHintWords = 6)
+        val otherModel = base.copy(modelId = "other")
 
-        assertTrue(base.key != capChanged.key)
         assertTrue(base.key != charCap.key)
         assertTrue(base.key != chineseBook.key)
+        assertTrue(base.key != otherModel.key)
     }
 
     @Test

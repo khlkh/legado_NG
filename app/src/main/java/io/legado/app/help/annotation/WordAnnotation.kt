@@ -13,10 +13,17 @@ package io.legado.app.help.annotation
  */
 object WordAnnotationConfig {
     /** Bump when the prompt or the JSON contract changes; part of the cache key. */
-    const val SCHEMA_VERSION = 7
+    const val SCHEMA_VERSION = 8
 
     /** Wave 1 keeps at most this many resolved hints per chapter, after all other rules. */
     const val MAX_HINTS_PER_CHAPTER = 12
+
+    /**
+     * Superset analysis: the model returns this many candidates spanning all
+     * difficulty levels; the reader's level floor and per-book cap then filter
+     * locally, so changing them never re-calls the model.
+     */
+    const val MAX_SUPERSET_ITEMS = 21
 
     const val MIN_WORD_ANNOTATION_HINT_CAP = 5
     const val MAX_WORD_ANNOTATION_HINT_CAP = 55
@@ -109,6 +116,20 @@ object WordAnnotationLevels {
         }
         return if (uiLocaleChinese) zh else en
     }
+
+    /**
+     * Level-independent selection for the superset cache: the model returns a
+     * broad pool spanning common through rare; the reader filters locally by
+     * level floor and per-book cap, so the prompt must not pre-filter by level.
+     */
+    fun supersetGuidance(uiLocaleChinese: Boolean): String = if (uiLocaleChinese) {
+        "覆盖从常见日常词汇到高级、生僻词汇、习语和短语动词的广泛范围。" +
+            "读者稍后会按难度筛选，因此不要因为一个词太常见就跳过它。"
+    } else {
+        "Cover a broad range from common everyday words through advanced and rare " +
+            "vocabulary, idioms, and phrasal verbs. The reader filters by difficulty " +
+            "later, so do not skip an item only because it is common."
+    }
 }
 
 data class WordAnnotationItem(
@@ -126,4 +147,10 @@ data class WordAnnotation(
     /** Equal to paragraph.substring(start, end); kept for cache/verification. */
     val surface: String,
     val hint: String,
+    /**
+     * Generated-frequency rank of the surface, or null when the asset does not
+     * know it (phrase or out-of-vocabulary word). Used only for the local level
+     * floor and frequency-first ordering; layout ignores it.
+     */
+    val rank: Int? = null,
 )

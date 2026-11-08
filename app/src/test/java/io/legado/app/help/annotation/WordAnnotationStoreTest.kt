@@ -84,10 +84,9 @@ class WordAnnotationStoreTest {
     }
 
     @Test
-    fun `hint cap or model mismatch is a miss`() {
+    fun `hint language or model mismatch is a miss`() {
         val file = cacheFile()
         assertTrue(WordAnnotationStore.write(file, identity, annotations))
-        assertNull(WordAnnotationStore.read(file, identity.copy(hintCap = 21)))
         assertNull(WordAnnotationStore.read(file, identity.copy(modelId = "other-model")))
         assertNull(WordAnnotationStore.read(file, identity.copy(hintCharCap = true)))
     }
@@ -133,7 +132,7 @@ class WordAnnotationStoreTest {
         file.writeText(
             """
             {"bookUrl":"https://book/1","chapterUrl":"https://book/1/chapter/3",
-             "chapterIndex":2,"canonicalHash":"hash-abc","schemaVersion":7,
+             "chapterIndex":2,"canonicalHash":"hash-abc","schemaVersion":8,
              "level":4,"frequencyVersion":"gutenberg-2006-04",
              "hintCap":13,"hintCharCap":false,"providerId":"","modelId":"",
              "annotations":"[]"}
@@ -152,7 +151,7 @@ class WordAnnotationStoreTest {
               "chapterUrl": "https://book/1/chapter/3",
               "chapterIndex": 2,
               "canonicalHash": "hash-abc",
-              "schemaVersion": 7,
+              "schemaVersion": 8,
               "level": 4,
               "frequencyVersion": "gutenberg-2006-04",
               "hintCap": 13,

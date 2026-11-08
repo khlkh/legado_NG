@@ -56,9 +56,7 @@ object WordAnnotationStore {
         if (obj.int("chapterIndex") != identity.chapterIndex) return null
         if (obj.string("canonicalHash") != identity.canonicalHash) return null
         if (obj.int("schemaVersion") != identity.schemaVersion) return null
-        if (obj.int("level") != identity.level) return null
         if (obj.string("frequencyVersion") != identity.frequencyVersion) return null
-        if (obj.int("hintCap") != identity.hintCap) return null
         if (obj.boolean("hintCharCap") != identity.hintCharCap) return null
         if (obj.string("providerId") != identity.providerId) return null
         if (obj.string("modelId") != identity.modelId) return null
@@ -81,6 +79,7 @@ object WordAnnotationStore {
                 end = end,
                 surface = surface,
                 hint = hint,
+                rank = item.intOrNull("rank"),
             )
         }
         return result
@@ -121,9 +120,7 @@ object WordAnnotationStore {
         root.addProperty("chapterIndex", identity.chapterIndex)
         root.addProperty("canonicalHash", identity.canonicalHash)
         root.addProperty("schemaVersion", identity.schemaVersion)
-        root.addProperty("level", identity.level)
         root.addProperty("frequencyVersion", identity.frequencyVersion)
-        root.addProperty("hintCap", identity.hintCap)
         root.addProperty("hintCharCap", identity.hintCharCap)
         root.addProperty("providerId", identity.providerId)
         root.addProperty("modelId", identity.modelId)
@@ -135,6 +132,7 @@ object WordAnnotationStore {
             item.addProperty("end", annotation.end)
             item.addProperty("surface", annotation.surface)
             item.addProperty("hint", annotation.hint)
+            annotation.rank?.let { item.addProperty("rank", it) }
             array.add(item)
         }
         root.add("annotations", array)
@@ -168,9 +166,7 @@ data class WordAnnotationIdentity(
     val chapterIndex: Int,
     val canonicalHash: String,
     val schemaVersion: Int = WordAnnotationConfig.SCHEMA_VERSION,
-    val level: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL,
     val frequencyVersion: String = WordAnnotationConfig.FREQUENCY_VERSION,
-    val hintCap: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP,
     val hintCharCap: Boolean = false,
     val providerId: String = "",
     val modelId: String = "",

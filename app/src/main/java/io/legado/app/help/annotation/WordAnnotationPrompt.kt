@@ -16,6 +16,7 @@ object WordAnnotationPrompt {
         uiLocaleChinese: Boolean,
         level: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL,
         cap: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP,
+        superset: Boolean = false,
     ): String {
         val selectionLine = when (language) {
             WordAnnotationLanguage.ENGLISH ->
@@ -42,10 +43,17 @@ object WordAnnotationPrompt {
         }
         // Level guidance must match the hint language; for Chinese books the
         // guidance stays English so it cannot contradict the English-hint rule.
-        val levelGuidance = WordAnnotationLevels.promptGuidance(
-            level,
-            uiLocaleChinese && language != WordAnnotationLanguage.CHINESE,
-        )
+        // Superset analysis uses a level-independent broad pool instead.
+        val levelGuidance = if (superset) {
+            WordAnnotationLevels.supersetGuidance(
+                uiLocaleChinese && language != WordAnnotationLanguage.CHINESE,
+            )
+        } else {
+            WordAnnotationLevels.promptGuidance(
+                level,
+                uiLocaleChinese && language != WordAnnotationLanguage.CHINESE,
+            )
+        }
         return buildString {
             appendLine("You are a vocabulary assistant for a long-form ebook reader.")
             appendLine()
