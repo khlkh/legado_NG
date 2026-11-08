@@ -581,7 +581,7 @@ object ReadBook : CoroutineScope by MainScope() {
             effectiveReplaceRules = textChapter.effectiveReplaceRules,
         )
         if (textChapter.wordAnnotations.isEmpty() &&
-            WordAnnotationAnalyzer.hasPool(currentBook, textChapter.chapter, contents)
+            WordAnnotationAnalyzer.hasPool(currentBook)
         ) {
             // The pool arrived after this chapter was laid out; re-lay out once
             // so the pool annotations attach.
@@ -589,7 +589,7 @@ object ReadBook : CoroutineScope by MainScope() {
             return
         }
         launch {
-            WordAnnotationAnalyzer.ensureBookPoolAndPublish(currentBook, textChapter.chapter, contents, textChapter)
+            WordAnnotationAnalyzer.analyzeChapterAndAppendPool(currentBook, textChapter.chapter, contents, textChapter)
         }
     }
 
@@ -1179,7 +1179,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 // Detached from the chapter job so completeChapterLoad is not
                 // delayed, but cancelled with it when the reader moves on.
                 val analysisJob = this@ReadBook.launch {
-                    WordAnnotationAnalyzer.ensureBookPoolAndPublish(book, chapter, contents, textChapter)
+                    WordAnnotationAnalyzer.analyzeChapterAndAppendPool(book, chapter, contents, textChapter)
                 }
                 coroutineContext[Job]?.invokeOnCompletion { cause ->
                     // Cancel the detached analysis only when the chapter load

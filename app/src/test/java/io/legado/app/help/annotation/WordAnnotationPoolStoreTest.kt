@@ -15,7 +15,6 @@ class WordAnnotationPoolStoreTest {
 
     private val identity = WordAnnotationPoolIdentity(
         bookUrl = "https://book/1",
-        sampleHash = "sample-abc",
     )
 
     private val items = listOf(
@@ -46,10 +45,10 @@ class WordAnnotationPoolStoreTest {
     }
 
     @Test
-    fun `sample hash mismatch is a miss`() {
+    fun `book url mismatch is a miss`() {
         val file = poolFile()
         assertTrue(WordAnnotationPoolStore.write(file, identity, items))
-        assertNull(WordAnnotationPoolStore.read(file, identity.copy(sampleHash = "other")))
+        assertNull(WordAnnotationPoolStore.read(file, identity.copy(bookUrl = "https://book/2")))
     }
 
     @Test
