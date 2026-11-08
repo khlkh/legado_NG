@@ -18,22 +18,12 @@ object WordAnnotationConfig {
     /** Wave 1 keeps at most this many resolved hints per chapter, after all other rules. */
     const val MAX_HINTS_PER_CHAPTER = 12
 
-    /**
-     * Superset analysis: the model returns this many candidates spanning all
-     * difficulty levels; the reader's level floor and per-book cap then filter
-     * locally, so changing them never re-calls the model.
-     */
-    const val MAX_SUPERSET_ITEMS = 21
-
     const val MIN_WORD_ANNOTATION_HINT_CAP = 5
     const val MAX_WORD_ANNOTATION_HINT_CAP = 55
     const val DEFAULT_WORD_ANNOTATION_HINT_CAP = 13
 
     /** Hint length cap for non-Chinese UI locales, in whitespace-separated words. */
     const val MAX_HINT_WORDS = 8
-
-    /** English-hint length cap when the book text is Chinese, in words. */
-    const val MAX_HINT_WORDS_CHINESE_BOOK = 6
 
     /** Hint length cap when the app UI locale is Chinese, in characters. */
     const val MAX_HINT_CHINESE_CHARS = 16
@@ -44,28 +34,13 @@ object WordAnnotationConfig {
     const val MIN_WORD_ANNOTATION_LEVEL = 1
     const val MAX_WORD_ANNOTATION_LEVEL = 5
     const val DEFAULT_WORD_ANNOTATION_LEVEL = 4
-
-    /**
-     * Prototype switch for the fusion resolver: after exact matching fails,
-     * expand a returned base form through the English inflection engine, rank
-     * hints by the generated Gutenberg frequency band before the chapter cap,
-     * and load the rank asset. Not a user setting; off keeps the Wave 1
-     * exact-surface contract and reading-order cap.
-     */
-    const val USE_FUSION_PROTOTYPE = false
 }
 
 /**
- * Five reader levels for Word Wise. One slider drives three things:
- *
- * - [floorFor]: soft gate. Only single-word hints whose every token rank is
- *   below the floor are dropped; multiword expressions and unknown-rank words
- *   always stay eligible (the model already selected them).
- * - [promptGuidance]: level-specific selection/density instruction appended to
- *   the shared prompt; it overrides the general "stay sparse" rules.
- *
- * The per-chapter hint cap is a separate per-book setting
- * (WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP).
+ * Five reader levels for Word Wise. One slider drives the soft floor: only
+ * single-word hints whose rank is known and below the floor are dropped;
+ * multiword expressions and unknown-rank words always stay eligible. The
+ * per-chapter hint cap is a separate per-book setting.
  */
 object WordAnnotationLevels {
 
@@ -84,41 +59,8 @@ object WordAnnotationLevels {
 
     fun floorFor(level: Int): Int = FLOORS[normalize(level)] ?: FLOORS.getValue(4)
 
-    fun promptGuidance(level: Int, uiLocaleChinese: Boolean): String {
-        val (en, zh) = when (normalize(level)) {
-            1 -> (
-                "Target words and expressions beyond basic everyday vocabulary, " +
-                    "including common content words. Do not skip a word only because it is common. " +
-                    "Explain in very short, simple sentences; do not use idioms in the hint."
-                ) to
-                ("只注释超出基础日常词汇的词和表达，包括常见实词；不要仅仅因为一个词常见就跳过它。" +
-                    "用非常简短、简单的句子解释；提示中不要使用习语。")
-            2 -> (
-                "Target words and expressions beyond everyday vocabulary. " +
-                    "Explain in simple English."
-                ) to
-                ("只注释超出日常词汇的词和表达。用简单的中文解释。")
-            3 -> (
-                "Target intermediate and advanced vocabulary and useful expressions. " +
-                    "Explain in clear, accessible language."
-                ) to
-                ("注释中高级词汇和有价值的表达。用清晰易懂的中文解释。")
-            4 -> (
-                "Target advanced vocabulary, idioms, phrasal verbs, and expressions whose " +
-                    "contextual meanings are not obvious. Explain concisely and precisely."
-                ) to
-                ("注释高级词汇、习语、短语动词和语境含义不明显的表达。用简洁准确的中文解释。")
-            else -> (
-                "Target rare, literary, or specialist vocabulary only. Skip anything a fluent " +
-                    "reader would already know. Explain precisely and sophisticatedly."
-                ) to
-                ("只注释生僻、文学性或专业词汇。跳过流利读者已掌握的词汇。用精准、讲究的中文解释。")
-        }
-        return if (uiLocaleChinese) zh else en
-    }
-
     /**
-     * Level-independent selection for the superset cache: the model returns a
+     * Level-independent selection for the book glossary: the model returns a
      * broad pool spanning common through rare; the reader filters locally by
      * level floor and per-book cap, so the prompt must not pre-filter by level.
      */

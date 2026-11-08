@@ -60,15 +60,15 @@ class WordAnnotationFilterTest {
     }
 
     @Test
-    fun `cjk pool ignores english floor and rank ordering`() {
+    fun `cap one keeps the rarest survivor`() {
+        // Level 4 floor is 3000; "common"(100) is gated, mid(4000) and
+        // rare(20000) survive. Rarest first must keep "rare", not "mid".
         val pool = listOf(
-            ann(paragraphIndex = 0, start = 0, surface = "海纳百川", rank = null),
-            ann(paragraphIndex = 0, start = 10, surface = "serendipity", rank = 20_000),
-            ann(paragraphIndex = 1, start = 0, surface = "common", rank = 100),
+            ann(surface = "common", rank = 100),
+            ann(surface = "mid", rank = 4_000),
+            ann(surface = "rare", rank = 20_000),
         )
-        // Chinese book: no floor gate, no frequency-first ordering; reading
-        // order only, cap applies.
-        val filtered = WordAnnotationFilter.filter(pool, level = 5, cap = 10, rankAware = false)
-        assertEquals(listOf("海纳百川", "serendipity", "common"), filtered.map { it.surface })
+        val filtered = WordAnnotationFilter.filter(pool, level = 4, cap = 1)
+        assertEquals(listOf("rare"), filtered.map { it.surface })
     }
 }

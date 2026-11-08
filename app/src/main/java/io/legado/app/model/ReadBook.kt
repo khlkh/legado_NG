@@ -580,7 +580,7 @@ object ReadBook : CoroutineScope by MainScope() {
             textList = textChapter.sourceParagraphs,
             effectiveReplaceRules = textChapter.effectiveReplaceRules,
         )
-        if (textChapter.wordAnnotations.isEmpty() &&
+        if (!textChapter.wordAnnotationPoolAttached &&
             WordAnnotationAnalyzer.hasPool(currentBook)
         ) {
             // The pool arrived after this chapter was laid out; re-lay out once

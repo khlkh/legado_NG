@@ -1,12 +1,13 @@
 package io.legado.app.help.annotation
 
 /**
- * Resolves a chapter's annotations locally from the book-level pool.
+ * Resolves a chapter's annotations locally from the book pool.
  *
  * Each pool surface is matched at its first exact, case-sensitive occurrence in
  * the chapter's canonical paragraphs, using the same boundary rules as the
- * model path. Cross-paragraph matches are dropped. The resolved list is then
- * filtered by the reader's level floor and per-book cap ([WordAnnotationFilter]).
+ * model path. Cross-paragraph matches are dropped, the longer-wins/equal-drops
+ * overlap rule is applied, and the survivors are then filtered by the reader's
+ * level floor and per-book cap ([WordAnnotationFilter]).
  */
 object WordAnnotationPoolResolver {
 
@@ -15,7 +16,6 @@ object WordAnnotationPoolResolver {
         items: List<WordAnnotationPoolItem>,
         level: Int,
         cap: Int,
-        rankAware: Boolean,
     ): List<WordAnnotation> {
         if (paragraphs.isEmpty() || items.isEmpty()) return emptyList()
         val windows = WordAnnotationResolver.paragraphWindows(paragraphs.map { it.text })
@@ -35,7 +35,11 @@ object WordAnnotationPoolResolver {
                 rank = item.rank,
             )
         }
-        return WordAnnotationFilter.filter(resolved, level, cap, rankAware).map { annotation ->
+        // The model path's overlap rule: keep the longer span, drop both on
+        // equal length, before the cap.
+        val overlapDropped = WordAnnotationResolver.overlappingIndices(resolved)
+        val nonOverlapping = resolved.filterIndexed { index, _ -> index !in overlapDropped }
+        return WordAnnotationFilter.filter(nonOverlapping, level, cap).map { annotation ->
             annotation.copy(paragraphIndex = paragraphs[annotation.paragraphIndex].sourceIndex)
         }
     }

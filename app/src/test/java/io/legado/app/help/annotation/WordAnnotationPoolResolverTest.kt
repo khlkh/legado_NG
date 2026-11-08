@@ -17,7 +17,6 @@ class WordAnnotationPoolResolverTest {
             items = listOf(WordAnnotationPoolItem("untenable", "impossible to defend", 12_000)),
             level = 4,
             cap = 10,
-            rankAware = true,
         )
 
         assertEquals(1, resolved.size)
@@ -32,7 +31,6 @@ class WordAnnotationPoolResolverTest {
             items = listOf(WordAnnotationPoolItem("was untenable", "could not be defended", null)),
             level = 4,
             cap = 10,
-            rankAware = true,
         )
 
         assertEquals(0, resolved.size)
@@ -48,7 +46,6 @@ class WordAnnotationPoolResolverTest {
             ),
             level = 4,
             cap = 1,
-            rankAware = true,
         )
 
         // Floor 3000 drops "common"(100); rarest first keeps "rare" under cap 1.
@@ -62,7 +59,6 @@ class WordAnnotationPoolResolverTest {
             items = listOf(WordAnnotationPoolItem("rare", "uncommon", 20_000)),
             level = 4,
             cap = 10,
-            rankAware = true,
         )
 
         assertEquals(1, resolved.single().paragraphIndex)
