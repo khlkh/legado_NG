@@ -13,13 +13,20 @@ package io.legado.app.help.annotation
  */
 object WordAnnotationConfig {
     /** Bump when the prompt or the JSON contract changes; part of the cache key. */
-    const val SCHEMA_VERSION = 2
+    const val SCHEMA_VERSION = 7
 
     /** Wave 1 keeps at most this many resolved hints per chapter, after all other rules. */
     const val MAX_HINTS_PER_CHAPTER = 12
 
+    const val MIN_WORD_ANNOTATION_HINT_CAP = 5
+    const val MAX_WORD_ANNOTATION_HINT_CAP = 55
+    const val DEFAULT_WORD_ANNOTATION_HINT_CAP = 13
+
     /** Hint length cap for non-Chinese UI locales, in whitespace-separated words. */
     const val MAX_HINT_WORDS = 8
+
+    /** English-hint length cap when the book text is Chinese, in words. */
+    const val MAX_HINT_WORDS_CHINESE_BOOK = 6
 
     /** Hint length cap when the app UI locale is Chinese, in characters. */
     const val MAX_HINT_CHINESE_CHARS = 16
@@ -47,9 +54,11 @@ object WordAnnotationConfig {
  * - [floorFor]: soft gate. Only single-word hints whose every token rank is
  *   below the floor are dropped; multiword expressions and unknown-rank words
  *   always stay eligible (the model already selected them).
- * - [capFor]: maximum hints shown per chapter, after band ordering.
  * - [promptGuidance]: level-specific selection/density instruction appended to
  *   the shared prompt; it overrides the general "stay sparse" rules.
+ *
+ * The per-chapter hint cap is a separate per-book setting
+ * (WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP).
  */
 object WordAnnotationLevels {
 
@@ -61,14 +70,6 @@ object WordAnnotationLevels {
         5 to 8_000,
     )
 
-    private val CAPS = mapOf(
-        1 to 20,
-        2 to 16,
-        3 to 12,
-        4 to 12,
-        5 to 8,
-    )
-
     fun normalize(level: Int): Int = level.coerceIn(
         WordAnnotationConfig.MIN_WORD_ANNOTATION_LEVEL,
         WordAnnotationConfig.MAX_WORD_ANNOTATION_LEVEL,
@@ -76,38 +77,35 @@ object WordAnnotationLevels {
 
     fun floorFor(level: Int): Int = FLOORS[normalize(level)] ?: FLOORS.getValue(4)
 
-    fun capFor(level: Int): Int = CAPS[normalize(level)] ?: CAPS.getValue(4)
-
     fun promptGuidance(level: Int, uiLocaleChinese: Boolean): String {
         val (en, zh) = when (normalize(level)) {
             1 -> (
-                "Target words and expressions beyond basic everyday vocabulary. " +
-                    "Explain in very short, simple sentences; do not use idioms in the hint. " +
-                    "Return up to 20 items."
+                "Target words and expressions beyond basic everyday vocabulary, " +
+                    "including common content words. Do not skip a word only because it is common. " +
+                    "Explain in very short, simple sentences; do not use idioms in the hint."
                 ) to
-                ("只注释超出基础日常词汇的词和表达。用非常简短、简单的句子解释；提示中不要使用习语。最多返回 20 条。")
+                ("只注释超出基础日常词汇的词和表达，包括常见实词；不要仅仅因为一个词常见就跳过它。" +
+                    "用非常简短、简单的句子解释；提示中不要使用习语。")
             2 -> (
                 "Target words and expressions beyond everyday vocabulary. " +
-                    "Explain in simple English. Return up to 16 items."
+                    "Explain in simple English."
                 ) to
-                ("只注释超出日常词汇的词和表达。用简单的中文解释。最多返回 16 条。")
+                ("只注释超出日常词汇的词和表达。用简单的中文解释。")
             3 -> (
                 "Target intermediate and advanced vocabulary and useful expressions. " +
-                    "Explain in clear, accessible language. Return up to 12 items."
+                    "Explain in clear, accessible language."
                 ) to
-                ("注释中高级词汇和有价值的表达。用清晰易懂的中文解释。最多返回 12 条。")
+                ("注释中高级词汇和有价值的表达。用清晰易懂的中文解释。")
             4 -> (
                 "Target advanced vocabulary, idioms, phrasal verbs, and expressions whose " +
-                    "contextual meanings are not obvious. Explain concisely and precisely. " +
-                    "Return up to 12 items."
+                    "contextual meanings are not obvious. Explain concisely and precisely."
                 ) to
-                ("注释高级词汇、习语、短语动词和语境含义不明显的表达。用简洁准确的中文解释。最多返回 12 条。")
+                ("注释高级词汇、习语、短语动词和语境含义不明显的表达。用简洁准确的中文解释。")
             else -> (
                 "Target rare, literary, or specialist vocabulary only. Skip anything a fluent " +
-                    "reader would already know. Explain precisely and sophisticatedly. " +
-                    "Return up to 8 items."
+                    "reader would already know. Explain precisely and sophisticatedly."
                 ) to
-                ("只注释生僻、文学性或专业词汇。跳过流利读者已掌握的词汇。用精准、讲究的中文解释。最多返回 8 条。")
+                ("只注释生僻、文学性或专业词汇。跳过流利读者已掌握的词汇。用精准、讲究的中文解释。")
         }
         return if (uiLocaleChinese) zh else en
     }

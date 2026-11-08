@@ -58,6 +58,10 @@ object WordAnnotationStore {
         if (obj.int("schemaVersion") != identity.schemaVersion) return null
         if (obj.int("level") != identity.level) return null
         if (obj.string("frequencyVersion") != identity.frequencyVersion) return null
+        if (obj.int("hintCap") != identity.hintCap) return null
+        if (obj.boolean("hintCharCap") != identity.hintCharCap) return null
+        if (obj.string("providerId") != identity.providerId) return null
+        if (obj.string("modelId") != identity.modelId) return null
         val annotations = obj.get("annotations") ?: return null
         if (!annotations.isJsonArray) return null
 
@@ -119,6 +123,10 @@ object WordAnnotationStore {
         root.addProperty("schemaVersion", identity.schemaVersion)
         root.addProperty("level", identity.level)
         root.addProperty("frequencyVersion", identity.frequencyVersion)
+        root.addProperty("hintCap", identity.hintCap)
+        root.addProperty("hintCharCap", identity.hintCharCap)
+        root.addProperty("providerId", identity.providerId)
+        root.addProperty("modelId", identity.modelId)
         val array = JsonArray()
         annotations.forEach { annotation ->
             val item = JsonObject()
@@ -145,6 +153,12 @@ object WordAnnotationStore {
         return element.asInt
     }
 
+    private fun JsonObject.boolean(name: String): Boolean? {
+        val element = get(name) ?: return null
+        if (!element.isJsonPrimitive || !element.asJsonPrimitive.isBoolean) return null
+        return element.asBoolean
+    }
+
     private fun JsonObject.intOrNull(name: String): Int? = int(name)
 }
 
@@ -156,4 +170,8 @@ data class WordAnnotationIdentity(
     val schemaVersion: Int = WordAnnotationConfig.SCHEMA_VERSION,
     val level: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL,
     val frequencyVersion: String = WordAnnotationConfig.FREQUENCY_VERSION,
+    val hintCap: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP,
+    val hintCharCap: Boolean = false,
+    val providerId: String = "",
+    val modelId: String = "",
 )

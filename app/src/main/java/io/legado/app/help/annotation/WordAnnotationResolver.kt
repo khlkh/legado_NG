@@ -27,6 +27,7 @@ object WordAnnotationResolver {
         items: List<WordAnnotationItem>,
         uiLocaleChinese: Boolean,
         maxHintsPerChapter: Int = WordAnnotationConfig.MAX_HINTS_PER_CHAPTER,
+        maxHintWords: Int = WordAnnotationConfig.MAX_HINT_WORDS,
     ): List<WordAnnotation> {
         if (paragraphs.isEmpty() || items.isEmpty()) return emptyList()
 
@@ -35,7 +36,7 @@ object WordAnnotationResolver {
 
         val accepted = ArrayList<WordAnnotation>(items.size)
         for (item in items) {
-            if (!hintWithinCap(item.hint, uiLocaleChinese)) continue
+            if (!hintWithinCap(item.hint, uiLocaleChinese, maxHintWords)) continue
             val globalStart = findOccurrence(joined, item.text, item.occurrence) ?: continue
             val window = windows.firstOrNull {
                 globalStart >= it.globalStart && globalStart + item.text.length <= it.globalEnd
@@ -54,12 +55,16 @@ object WordAnnotationResolver {
             .take(maxHintsPerChapter)
     }
 
-    fun hintWithinCap(hint: String, uiLocaleChinese: Boolean): Boolean {
+    fun hintWithinCap(
+        hint: String,
+        uiLocaleChinese: Boolean,
+        maxHintWords: Int = WordAnnotationConfig.MAX_HINT_WORDS,
+    ): Boolean {
         if (hint.isBlank()) return false
         return if (uiLocaleChinese) {
             hint.length <= WordAnnotationConfig.MAX_HINT_CHINESE_CHARS
         } else {
-            hint.trim().split(WHITESPACE).size <= WordAnnotationConfig.MAX_HINT_WORDS
+            hint.trim().split(WHITESPACE).size <= maxHintWords
         }
     }
 

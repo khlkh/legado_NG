@@ -19,15 +19,23 @@ import io.legado.app.ui.design.components.compose.NgSettingsItem
 @Composable
 internal fun WordAnnotationSettingsSheet(
     level: Int,
+    hintCap: Int,
     prefetchChapters: Int,
     modelSummary: String,
+    bookActive: Boolean,
     onSelectModel: () -> Unit,
     onLevelSelected: (Int) -> Unit,
+    onHintCapSelected: (Int) -> Unit,
     onPrefetchSelected: (Int) -> Unit,
 ) {
     var showLevelPicker by rememberSaveable { mutableStateOf(false) }
+    var showHintCapPicker by rememberSaveable { mutableStateOf(false) }
     var showPrefetchPicker by rememberSaveable { mutableStateOf(false) }
     val normalizedLevel = WordAnnotationLevels.normalize(level)
+    val normalizedCap = hintCap.coerceIn(
+        WordAnnotationConfig.MIN_WORD_ANNOTATION_HINT_CAP,
+        WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
+    )
 
     NgSettingsGroup {
         NgSettingsItem(
@@ -40,9 +48,16 @@ internal fun WordAnnotationSettingsSheet(
             summary = stringResource(
                 R.string.ai_word_annotation_level_summary,
                 WordAnnotationLevels.floorFor(normalizedLevel),
-                WordAnnotationLevels.capFor(normalizedLevel),
+                normalizedCap,
             ),
+            enabled = bookActive,
             onClick = { showLevelPicker = true },
+        )
+        NgSettingsItem(
+            title = stringResource(R.string.ai_word_annotation_hint_cap),
+            summary = normalizedCap.toString(),
+            enabled = bookActive,
+            onClick = { showHintCapPicker = true },
         )
         NgSettingsItem(
             title = stringResource(R.string.ai_word_annotation_prefetch_chapters),
@@ -70,6 +85,20 @@ internal fun WordAnnotationSettingsSheet(
             onSelected = { value ->
                 showLevelPicker = false
                 value.toIntOrNull()?.let(onLevelSelected)
+            },
+        )
+    }
+    if (showHintCapPicker) {
+        ConfigChoiceDialog(
+            title = stringResource(R.string.ai_word_annotation_hint_cap),
+            options = listOf(5, 8, 13, 21, 34, 55).map { value ->
+                ConfigChoiceOption(label = value.toString(), value = value.toString())
+            },
+            selectedValue = normalizedCap.toString(),
+            onDismissRequest = { showHintCapPicker = false },
+            onSelected = { value ->
+                showHintCapPicker = false
+                value.toIntOrNull()?.let(onHintCapSelected)
             },
         )
     }

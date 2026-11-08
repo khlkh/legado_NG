@@ -466,6 +466,7 @@
     <string name="ai_word_annotation_level_4">College · ≈C1–C2</string>
     <string name="ai_word_annotation_level_5">Postgraduate · ≈C2+</string>
     <string name="ai_word_annotation_prefetch_chapters">Prefetch chapters</string>
+    <string name="ai_word_annotation_hint_cap">Hints per chapter</string>
     <string name="ai_word_annotation_prefetch_summary">%1$d chapters ahead</string>
     <string name="ai_word_annotation_prefetch_off">Off</string>
     <string name="ai_word_annotation_note">Rank gate applies to English only · Gutenberg 2006/04</string>

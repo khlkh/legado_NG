@@ -241,6 +241,14 @@ data class Book(
         return config.wordAnnotationLevel
     }
 
+    fun setWordAnnotationHintCap(cap: Int) {
+        config.wordAnnotationHintCap = cap
+    }
+
+    fun getWordAnnotationHintCap(): Int {
+        return config.wordAnnotationHintCap
+    }
+
     fun setRemoveSameTitle(removeSameTitle: Boolean) {
         config.removeSameTitle = removeSameTitle
     }
@@ -516,6 +524,8 @@ data class Book(
         var wordAnnotationEnabled: Boolean = false,
         @SerializedName("wordAnnotationLevel")
         var wordAnnotationLevel: Int = 4,
+        @SerializedName("wordAnnotationHintCap")
+        var wordAnnotationHintCap: Int = 13,
     ) : Parcelable
 
     class Converters {

@@ -62,7 +62,10 @@ object WordAnnotationHybrid {
         uiLocaleChinese: Boolean,
         frequencyIndex: WordFrequencyIndex? = null,
         options: Options = Options(),
-    ): List<Result> = resolveDetailed(paragraphs, items, uiLocaleChinese, frequencyIndex, options).results
+        maxHintWords: Int = WordAnnotationConfig.MAX_HINT_WORDS,
+    ): List<Result> = resolveDetailed(
+        paragraphs, items, uiLocaleChinese, frequencyIndex, options, maxHintWords,
+    ).results
 
     fun resolveDetailed(
         paragraphs: List<String>,
@@ -70,6 +73,7 @@ object WordAnnotationHybrid {
         uiLocaleChinese: Boolean,
         frequencyIndex: WordFrequencyIndex? = null,
         options: Options = Options(),
+        maxHintWords: Int = WordAnnotationConfig.MAX_HINT_WORDS,
     ): Resolution {
         if (paragraphs.isEmpty() || items.isEmpty()) return Resolution(emptyList(), 0)
 
@@ -79,7 +83,7 @@ object WordAnnotationHybrid {
         var gatedByFloor = 0
 
         items.forEachIndexed { itemIndex, item ->
-            if (!WordAnnotationResolver.hintWithinCap(item.hint, uiLocaleChinese)) {
+            if (!WordAnnotationResolver.hintWithinCap(item.hint, uiLocaleChinese, maxHintWords)) {
                 return@forEachIndexed
             }
 

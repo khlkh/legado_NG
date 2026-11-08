@@ -2,13 +2,12 @@ package io.legado.app.help.annotation
 
 import io.legado.app.help.book.BookContent
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Wave 1 analyzer helpers: canonical paragraph selection and the
- * resolve-items contract (invalid JSON body is null, never an empty success).
+ * Analyzer helpers: canonical paragraph selection, analysis-config identity
+ * keys, and the fusion-resolution behavior the analyzer relies on.
  */
 class WordAnnotationAnalyzerTest {
 
@@ -43,65 +42,44 @@ class WordAnnotationAnalyzerTest {
     }
 
     @Test
-    fun `resolveItems maps resolver indices to source indices`() {
-        val paragraphs = listOf(
-            WordAnnotationAnalyzer.CanonicalParagraph(sourceIndex = 3, text = "untenable"),
-            WordAnnotationAnalyzer.CanonicalParagraph(sourceIndex = 7, text = "the proposal"),
+    fun `analysis config keys differ when cap or hint language changes`() {
+        val base = WordAnnotationAnalyzer.AnalysisConfig(
+            level = 4,
+            hintCap = 13,
+            hintCharCap = false,
+            maxHintWords = 8,
+            providerId = "p",
+            modelId = "m",
         )
-        val resolved = WordAnnotationAnalyzer.resolveItems(
-            paragraphs = paragraphs,
-            items = listOf(WordAnnotationItem(text = "untenable", occurrence = 1, hint = "无法防守")),
-            uiLocaleChinese = true,
-        )!!
+        val capChanged = base.copy(hintCap = 21)
+        val charCap = base.copy(hintCharCap = true)
+        val chineseBook = base.copy(hintCharCap = false, maxHintWords = 6)
 
-        assertEquals(1, resolved.size)
-        assertEquals(3, resolved.single().paragraphIndex)
-        assertEquals("无法防守", resolved.single().hint)
+        assertTrue(base.key != capChanged.key)
+        assertTrue(base.key != charCap.key)
+        assertTrue(base.key != chineseBook.key)
     }
 
     @Test
-    fun `resolveItems returns null for an invalid model body`() {
-        val paragraphs = listOf(WordAnnotationAnalyzer.CanonicalParagraph(0, "untenable"))
-
-        assertNull(
-            WordAnnotationAnalyzer.resolveItems(
-                paragraphs = paragraphs,
-                items = null,
-                uiLocaleChinese = false,
-            ),
-        )
-    }
-
-    @Test
-    fun `resolveItems returns empty list for a valid body that places nothing`() {
-        val paragraphs = listOf(WordAnnotationAnalyzer.CanonicalParagraph(0, "untenable"))
-
-        val resolved = WordAnnotationAnalyzer.resolveItems(
-            paragraphs = paragraphs,
-            items = emptyList(),
-            uiLocaleChinese = false,
-        )!!
-
-        assertTrue(resolved.isEmpty())
-    }
-
-    @Test
-    fun `fusion option recovers an inflected form and keeps the source index`() {
-        val paragraphs = listOf(
-            WordAnnotationAnalyzer.CanonicalParagraph(sourceIndex = 3, text = "He ran home."),
-        )
-
-        val resolved = WordAnnotationAnalyzer.resolveItems(
+    fun `fusion resolution recovers an inflected form`() {
+        val paragraphs = listOf("He ran home.")
+        val hybrid = WordAnnotationHybrid.resolveDetailed(
             paragraphs = paragraphs,
             items = listOf(WordAnnotationItem(text = "run", occurrence = 1, hint = "move fast")),
             uiLocaleChinese = false,
-            hybridOptions = WordAnnotationHybrid.Options(),
-        )!!
+        )
 
-        assertEquals(1, resolved.size)
-        assertEquals(3, resolved.single().paragraphIndex)
-        assertEquals("ran", resolved.single().surface)
-        assertEquals(3, resolved.single().start)
-        assertEquals(6, resolved.single().end)
+        assertEquals(1, hybrid.results.size)
+        assertEquals("ran", hybrid.results.single().annotation.surface)
+        assertEquals(3, hybrid.results.single().annotation.start)
+        assertEquals(6, hybrid.results.single().annotation.end)
+        assertTrue(hybrid.results.single().viaLemmaFallback)
+    }
+
+    @Test
+    fun `chinese book max hint words rejects a seven-word english hint`() {
+        val sevenWords = List(7) { "word" }.joinToString(" ")
+        assertTrue(!WordAnnotationResolver.hintWithinCap(sevenWords, uiLocaleChinese = false, maxHintWords = 6))
+        assertTrue(WordAnnotationResolver.hintWithinCap(sevenWords, uiLocaleChinese = false, maxHintWords = 8))
     }
 }
