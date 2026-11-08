@@ -45,16 +45,13 @@ class WordAnnotationAnalyzerTest {
     fun `analysis config keys differ when hint language or model changes`() {
         val base = WordAnnotationAnalyzer.AnalysisConfig(
             hintCharCap = false,
-            maxHintWords = 8,
             providerId = "p",
             modelId = "m",
         )
         val charCap = base.copy(hintCharCap = true)
-        val chineseBook = base.copy(hintCharCap = false, maxHintWords = 6)
         val otherModel = base.copy(modelId = "other")
 
         assertTrue(base.key != charCap.key)
-        assertTrue(base.key != chineseBook.key)
         assertTrue(base.key != otherModel.key)
     }
 
@@ -79,5 +76,12 @@ class WordAnnotationAnalyzerTest {
         val sevenWords = List(7) { "word" }.joinToString(" ")
         assertTrue(!WordAnnotationResolver.hintWithinCap(sevenWords, uiLocaleChinese = false, maxHintWords = 6))
         assertTrue(WordAnnotationResolver.hintWithinCap(sevenWords, uiLocaleChinese = false, maxHintWords = 8))
+    }
+
+    @Test
+    fun `pool target respects formula and cost cap`() {
+        assertEquals(120, WordAnnotationAnalyzer.poolTarget(chapterCount = 10, cap = 13))
+        assertEquals(260, WordAnnotationAnalyzer.poolTarget(chapterCount = 100, cap = 13))
+        assertEquals(500, WordAnnotationAnalyzer.poolTarget(chapterCount = 5_000, cap = 55))
     }
 }

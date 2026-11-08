@@ -3,20 +3,26 @@ package io.legado.app.help.annotation
 /**
  * Book-level Word Wise pool.
  *
- * The pool is built once per book from a few sampled chapters and then every
- * chapter resolves its annotations locally from it — no per-chapter model call.
- * The reader's level floor and per-book cap filter the resolved list locally,
- * so changing either re-filters instantly across the whole book.
+ * The pool grows incrementally: each chapter is analyzed with a small
+ * per-chapter call and its items are appended to the book pool. Chapters then
+ * resolve their annotations locally from the pool — no per-chapter cache. The
+ * reader's level floor and per-book cap filter the resolved list locally.
+ *
+ * English/Latin books only; CJK books get no hints in this slice.
  */
 object WordAnnotationPoolConfig {
-    /** Model is asked for at most this many pool items per book. */
-    const val MAX_BOOK_POOL_ITEMS = 120
+    /** The pool target is at least this many items. */
+    const val MIN_POOL_TARGET = 120
 
-    /** At most this many chapters are sampled to build the pool. */
-    const val MAX_POOL_SAMPLE_CHAPTERS = 3
+    /**
+     * Cost guard: the target formula is `max(MIN_POOL_TARGET,
+     * chapterCount * cap * 0.2)`, capped at this value so very long books
+     * cannot balloon the pool (and its token cost).
+     */
+    const val MAX_POOL_TARGET = 500
 
-    /** Sampled passage char budget for the pool prompt. */
-    const val MAX_POOL_SAMPLE_CHARS = 12_000
+    /** chapterCount * cap * this fraction contributes to the target. */
+    const val POOL_TARGET_RATIO = 0.2
 }
 
 data class WordAnnotationPoolItem(
@@ -27,7 +33,6 @@ data class WordAnnotationPoolItem(
 
 data class WordAnnotationPoolIdentity(
     val bookUrl: String,
-    val sampleHash: String,
     val schemaVersion: Int = WordAnnotationConfig.SCHEMA_VERSION,
     val frequencyVersion: String = WordAnnotationConfig.FREQUENCY_VERSION,
     val hintCharCap: Boolean = false,

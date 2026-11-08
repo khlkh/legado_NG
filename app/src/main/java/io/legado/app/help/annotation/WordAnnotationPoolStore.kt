@@ -40,7 +40,6 @@ object WordAnnotationPoolStore {
         if (!root.isJsonObject) return null
         val obj = root.asJsonObject
         if (obj.string("bookUrl") != identity.bookUrl) return null
-        if (obj.string("sampleHash") != identity.sampleHash) return null
         if (obj.int("schemaVersion") != identity.schemaVersion) return null
         if (obj.string("frequencyVersion") != identity.frequencyVersion) return null
         if (obj.boolean("hintCharCap") != identity.hintCharCap) return null
@@ -94,7 +93,6 @@ object WordAnnotationPoolStore {
     private fun toJson(identity: WordAnnotationPoolIdentity, items: List<WordAnnotationPoolItem>): String {
         val root = JsonObject()
         root.addProperty("bookUrl", identity.bookUrl)
-        root.addProperty("sampleHash", identity.sampleHash)
         root.addProperty("schemaVersion", identity.schemaVersion)
         root.addProperty("frequencyVersion", identity.frequencyVersion)
         root.addProperty("hintCharCap", identity.hintCharCap)
