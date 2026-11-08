@@ -58,4 +58,17 @@ class WordAnnotationFilterTest {
         val filtered = WordAnnotationFilter.filter(pool, level = 1, cap = 10)
         assertEquals(1, filtered.size)
     }
+
+    @Test
+    fun `cjk pool ignores english floor and rank ordering`() {
+        val pool = listOf(
+            ann(paragraphIndex = 0, start = 0, surface = "海纳百川", rank = null),
+            ann(paragraphIndex = 0, start = 10, surface = "serendipity", rank = 20_000),
+            ann(paragraphIndex = 1, start = 0, surface = "common", rank = 100),
+        )
+        // Chinese book: no floor gate, no frequency-first ordering; reading
+        // order only, cap applies.
+        val filtered = WordAnnotationFilter.filter(pool, level = 5, cap = 10, rankAware = false)
+        assertEquals(listOf("海纳百川", "serendipity", "common"), filtered.map { it.surface })
+    }
 }
