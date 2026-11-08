@@ -149,10 +149,12 @@ object WordAnnotationAnalyzer {
         ) ?: return
         // The file already stores layout source paragraph indices; the current
         // level/cap filter the superset locally without another model call.
+        // English frequency floor/ordering applies to English books only.
         textChapter.wordAnnotations = WordAnnotationFilter.filter(
             cached,
             book.getWordAnnotationLevel(),
             book.getWordAnnotationHintCap(),
+            rankAware = language != WordAnnotationLanguage.CHINESE,
         )
     }
 
