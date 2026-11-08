@@ -83,6 +83,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         const val PAGE_PURIFY = "purify"
         const val PAGE_READ_ALOUD = "readAloud"
         const val PAGE_ASSISTANT = "assistant"
+        const val PAGE_WORD_ANNOTATION = "wordAnnotation"
         private const val ARG_INITIAL_PAGE = "initialPage"
         private const val ARG_RETURN_TO_MENU = "returnToMenu"
         private const val MENU_EXPORT_SKILL = 0x4E470114
@@ -219,6 +220,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             PAGE_PURIFY -> Page.PURIFY_MODEL_SETTINGS
             PAGE_READ_ALOUD -> Page.READ_ALOUD_MODEL_SETTINGS
             PAGE_ASSISTANT -> Page.ASSISTANT_MODEL_SETTINGS
+            PAGE_WORD_ANNOTATION -> Page.MAIN
             else -> Page.MAIN
         }
         when (entryPage) {
@@ -227,7 +229,12 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             Page.PURIFY_MODEL_SETTINGS -> showPurifyModelSettings()
             Page.READ_ALOUD_MODEL_SETTINGS -> showReadAloudModelSettings()
             Page.ASSISTANT_MODEL_SETTINGS -> showAssistantModelSettings()
-            else -> showMain()
+            else -> {
+                showMain()
+                if (initialPage == PAGE_WORD_ANNOTATION) {
+                    view?.post { showWordAnnotationModelSelectDialog() }
+                }
+            }
         }
         if (arguments?.containsKey(ARG_INITIAL_PAGE) != true && initialPage != null) {
             activity?.intent?.removeExtra(EXTRA_INITIAL_PAGE)
@@ -593,6 +600,10 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                 R.string.ai_model_function_summary,
                 readAloudStoryboardModelSummaryText(providers),
                 readAloudStoryboardReasoningSummaryText(providers),
+            ),
+            wordAnnotationSummary = getString(
+                R.string.ai_word_annotation_model_summary,
+                wordAnnotationModelSummaryText(providers),
             ),
         )
     }
@@ -1101,6 +1112,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             PAGE_PURIFY -> showPurifyModelSettings()
             PAGE_READ_ALOUD -> showReadAloudModelSettings()
             PAGE_ASSISTANT -> showAssistantModelSettings()
+            PAGE_WORD_ANNOTATION -> showWordAnnotationModelSelectDialog()
         }
     }
 
@@ -1920,6 +1932,39 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         }
     }
 
+    private fun wordAnnotationModelSummaryText(
+        providers: List<AiProviderSetting>? = null
+    ): String {
+        val selected = selectedWordAnnotationModel(providers)
+        return when {
+            selected == null && AiConfig.wordAnnotationModelId.isBlank() ->
+                getString(R.string.ai_word_annotation_model_not_selected)
+            selected == null ->
+                getString(R.string.ai_purify_model_unavailable)
+            else ->
+                getString(
+                    R.string.ai_purify_model_selected_summary,
+                    selected.model.displayName(),
+                    selected.provider.name
+                )
+        }
+    }
+
+    private fun selectedWordAnnotationModel(
+        providers: List<AiProviderSetting>? = null
+    ): PurifyModelOption? {
+        val providerId = AiConfig.wordAnnotationProviderId
+        val modelId = AiConfig.wordAnnotationModelId
+        if (providerId.isBlank() || modelId.isBlank()) return null
+        val provider = if (providers == null) {
+            AiProviderStore.provider(providerId)
+        } else {
+            providers.firstOrNull { it.id == providerId }
+        }?.takeIf { it.enabled } ?: return null
+        val model = provider.purifyEligibleModels().firstOrNull { it.safeId() == modelId } ?: return null
+        return PurifyModelOption(provider, model)
+    }
+
     private fun readAloudStoryboardReasoningSummaryText(
         providers: List<AiProviderSetting>? = null
     ): String {
@@ -1991,6 +2036,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         READ_ALOUD,
         ASSISTANT,
         CONTEXT_COMPACTION,
+        WORD_ANNOTATION,
     }
 
     private fun modelSelectionProviders(
@@ -2024,12 +2070,14 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             AiModelSelectionTarget.READ_ALOUD -> AiConfig.readAloudStoryboardProviderId
             AiModelSelectionTarget.ASSISTANT -> AiConfig.assistantProviderId
             AiModelSelectionTarget.CONTEXT_COMPACTION -> AiConfig.contextCompactionProviderId
+            AiModelSelectionTarget.WORD_ANNOTATION -> AiConfig.wordAnnotationProviderId
         }
         val selectedModelId = when (target) {
             AiModelSelectionTarget.PURIFY -> AiConfig.purifyModelId
             AiModelSelectionTarget.READ_ALOUD -> AiConfig.readAloudStoryboardModelId
             AiModelSelectionTarget.ASSISTANT -> AiConfig.assistantModelId
             AiModelSelectionTarget.CONTEXT_COMPACTION -> AiConfig.contextCompactionModelId
+            AiModelSelectionTarget.WORD_ANNOTATION -> AiConfig.wordAnnotationModelId
         }
         val dialog = BottomSheetDialog(requireContext())
         var sheetState by mutableStateOf(AiModelSelectionSheetState(
@@ -2078,6 +2126,9 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                             }
                             AiModelSelectionTarget.CONTEXT_COMPACTION -> {
                                 AiConfig.saveContextCompactionModel(providerId, modelId)
+                            }
+                            AiModelSelectionTarget.WORD_ANNOTATION -> {
+                                AiConfig.saveWordAnnotationModel(providerId, modelId)
                             }
                         }
                         refreshModelSettings()
@@ -2161,6 +2212,10 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
 
     private fun showContextCompactionModelSelectDialog() {
         showComposeModelSelectionSheet(AiModelSelectionTarget.CONTEXT_COMPACTION)
+    }
+
+    private fun showWordAnnotationModelSelectDialog() {
+        showComposeModelSelectionSheet(AiModelSelectionTarget.WORD_ANNOTATION)
     }
 
     private fun showAssistantContextWindowDialog() {

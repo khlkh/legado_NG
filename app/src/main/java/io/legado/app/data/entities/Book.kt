@@ -225,6 +225,14 @@ data class Book(
         return config.reSegment
     }
 
+    fun setWordAnnotationEnabled(enabled: Boolean) {
+        config.wordAnnotationEnabled = enabled
+    }
+
+    fun getWordAnnotationEnabled(): Boolean {
+        return config.wordAnnotationEnabled
+    }
+
     fun setRemoveSameTitle(removeSameTitle: Boolean) {
         config.removeSameTitle = removeSameTitle
     }
@@ -494,6 +502,8 @@ data class Book(
         var mangaReadingStyle: String? = null,
         @SerializedName("independentOverrides")
         var independentOverrides: String? = null,
+        @SerializedName("wordAnnotationEnabled")
+        var wordAnnotationEnabled: Boolean = false,
     ) : Parcelable
 
     class Converters {

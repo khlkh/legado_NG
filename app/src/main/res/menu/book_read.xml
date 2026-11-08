@@ -76,6 +76,13 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_word_annotation"
+        android:checkable="true"
+        android:checked="false"
+        android:title="@string/word_annotation"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_enable_review"
         android:checkable="true"
         android:checked="false"

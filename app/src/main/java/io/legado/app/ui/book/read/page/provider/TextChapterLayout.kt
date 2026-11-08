@@ -14,6 +14,8 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.constant.PageAnim
 import io.legado.app.data.entities.Book
+import io.legado.app.help.annotation.WordAnnotation
+import io.legado.app.help.annotation.WordAnnotationLayout
 import io.legado.app.help.book.isEpub
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.book.BookContent
@@ -465,6 +467,9 @@ class TextChapterLayout(
                     highlightContext = highlightContext?.context,
                     highlightContextOffset = highlightContext?.offset ?: 0,
                     positions = textPositions,
+                    annotations = textChapter.wordAnnotations.filter {
+                        it.paragraphIndex == sourceParagraphIndex
+                    },
                 )
             } else {
                 if (isSingleImageStyle && isSetTypedImage) {
@@ -596,6 +601,9 @@ class TextChapterLayout(
                         highlightContext = highlightContext?.context,
                         highlightContextOffset = highlightContext?.offset ?: 0,
                         positions = textPositions,
+                        annotations = textChapter.wordAnnotations.filter {
+                            it.paragraphIndex == sourceParagraphIndex
+                        },
                     )
                 }
             }
@@ -1039,6 +1047,7 @@ class TextChapterLayout(
         highlightContext: ReadHighlightContext? = null,
         highlightContextOffset: Int = 0,
         positions: HighlightTextPositions,
+        annotations: List<WordAnnotation> = emptyList(),
     ) {
         val charStyles = LatinRunScale.apply(
             text,
@@ -1107,13 +1116,22 @@ class TextChapterLayout(
 
             else -> durY
         }
+        var pendingAnnotations = annotations
         for (lineIndex in 0 until layout.lineCount) {
-            val textLine = TextLine(isTitle = isTitle)
-            prepareNextPageIfNeed(durY + textHeight)
-            // 边框预算需要本行真实高度；先设置几何再定位文字列。
-            textLine.upTopBottom(durY, textHeight, fontMetrics)
             val lineStart = layout.getLineStart(lineIndex)
             val lineEnd = layout.getLineEnd(lineIndex)
+            val lineHints = if (pendingAnnotations.isEmpty()) {
+                emptyList()
+            } else {
+                WordAnnotationLayout.runsForLine(pendingAnnotations, lineStart, lineEnd)
+            }
+            pendingAnnotations = WordAnnotationLayout.pendingAfterLine(pendingAnnotations, lineEnd)
+            val hintBand = WordAnnotationLayout.bandHeight(textHeight, lineHints.isNotEmpty())
+            val textLine = TextLine(isTitle = isTitle)
+            textLine.hintRuns = lineHints
+            prepareNextPageIfNeed(durY + textHeight + hintBand)
+            // 边框预算需要本行真实高度；先设置几何再定位文字列。hint band 在正文上方。
+            textLine.upTopBottom(durY, textHeight + hintBand, fontMetrics)
             val lineText = text.substring(lineStart, lineEnd)
             val (words, widths) = measureTextSplit(lineText, widthsArray, lineStart)
             val desiredWidth = widths.fastSum() + (nineSliceBudget?.width(lineStart, lineEnd) ?: 0f)
@@ -1178,7 +1196,7 @@ class TextChapterLayout(
             recordHighlightText(textLine.chapterPosition, lineText, positions, lineStart)
             val textPage = pendingTextPage
             textPage.addLine(textLine)
-            durY += textHeight * if (isTitle) titleLineSpacingExtra else lineSpacingExtra
+            durY += (textHeight + hintBand) * if (isTitle) titleLineSpacingExtra else lineSpacingExtra
             if (textPage.height < durY) {
                 textPage.height = durY
             }

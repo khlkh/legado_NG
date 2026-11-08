@@ -11,6 +11,8 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.help.annotation.WordAnnotationAnalyzer
+import io.legado.app.help.annotation.WordAnnotationLayout
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -136,6 +138,10 @@ object ChapterProvider {
     @JvmStatic
     var contentPaint: TextPaint = TextPaint()
 
+    /** Word-annotation hint paint; text size is derived from the body paint in [upStyle]. */
+    @JvmStatic
+    var hintPaint: TextPaint = TextPaint()
+
     @JvmStatic
     var reviewPaint: TextPaint = TextPaint()
 
@@ -198,8 +204,9 @@ object ChapterProvider {
             bookContent.effectiveReplaceRules
         ).apply {
             contentPositionMap = bookContent.positionMap
-            createLayout(scope, book, bookContent)
         }
+        WordAnnotationAnalyzer.attachCached(textChapter, book, bookChapter, bookContent)
+        textChapter.createLayout(scope, book, bookContent)
 
         return textChapter
     }
@@ -216,6 +223,9 @@ object ChapterProvider {
         getPaints(typeface).let {
             titlePaint = it.first
             contentPaint = it.second
+            hintPaint = TextPaint(contentPaint).apply {
+                textSize = contentPaint.textSize * WordAnnotationLayout.HINT_TEXT_SIZE_RATIO
+            }
 //            reviewPaint.color = contentPaint.color
 //            reviewPaint.textSize = contentPaint.textSize * 0.45f
 //            reviewPaint.textAlign = Paint.Align.CENTER

@@ -90,6 +90,7 @@ class ReadMenu @JvmOverloads constructor(
     private var floatingBrightnessAutomatic by mutableStateOf(true)
     private var floatingAutoPage by mutableStateOf(false)
     private var floatingThemeMode by mutableStateOf(ReadBookConfig.currentThemeMode())
+    private var floatingWordAnnotationEnabled by mutableStateOf(ReadBook.book?.getWordAnnotationEnabled() == true)
     private var floatingToolDock by mutableStateOf(
         ReadFloatingToolDock.fromStoredRight(AppConfig.brightnessVwPos)
     )
@@ -283,9 +284,14 @@ class ReadMenu @JvmOverloads constructor(
         applyNavigationBarPadding()
     }
 
+    fun updateWordAnnotationState(enabled: Boolean) {
+        floatingWordAnnotationEnabled = enabled
+    }
+
     fun reset() {
         ReadFloatingAppearanceState.refreshFromConfig()
         floatingThemeMode = ReadBookConfig.currentThemeMode()
+        floatingWordAnnotationEnabled = ReadBook.book?.getWordAnnotationEnabled() == true
         readMenuThemeSnapshot = resolveReadMenuThemeSnapshot()
         upColorConfig()
         initGlassSurfaces()
@@ -429,6 +435,15 @@ class ReadMenu @JvmOverloads constructor(
                     onAiSettings = {
                         floatingToolExpansion = null
                         runMenuOut { callBack.onOpenAiPurifySettings() }
+                    },
+                    wordAnnotationEnabled = floatingWordAnnotationEnabled,
+                    onWordAnnotation = {
+                        floatingToolExpansion = null
+                        ReadBook.book?.let {
+                            it.setWordAnnotationEnabled(!it.getWordAnnotationEnabled())
+                            floatingWordAnnotationEnabled = it.getWordAnnotationEnabled()
+                            runMenuOut { ReadBook.loadContent(false) }
+                        }
                     },
                     onToggleDockSide = {
                         floatingToolExpansion = null

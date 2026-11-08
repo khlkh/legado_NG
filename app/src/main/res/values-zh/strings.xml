@@ -453,6 +453,8 @@
     <string name="ai_purify_chapter_section">章节净化</string>
     <string name="ai_purify_model_setting">净化模型</string>
     <string name="ai_model_function_summary">模型：%1$s · 思考：%2$s</string>
+    <string name="ai_word_annotation_model_summary">模型：%1$s</string>
+    <string name="ai_word_annotation_model_not_selected">未选择（使用当前激活模型）</string>
     <string name="ai_purify_model_not_selected">未选择</string>
     <string name="ai_purify_model_unavailable">已选择的模型不可用</string>
     <string name="ai_purify_model_selected_summary">%1$s（%2$s）</string>
@@ -1704,6 +1706,7 @@
     <string name="auto_clear_expired">自动清除过期搜索数据</string>
     <string name="auto_clear_expired_summary">超过一天的搜索数据</string>
     <string name="re_segment">重新分段</string>
+    <string name="word_annotation">AI 单词注释</string>
     <string name="style_name">样式名称：</string>
     <string name="empty_msg_import_book">点击右上角文件夹图标，选择文件夹</string>
     <string name="scan_folder">智能扫描</string>

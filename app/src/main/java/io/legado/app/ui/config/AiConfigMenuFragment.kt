@@ -96,6 +96,10 @@ class AiConfigMenuFragment : BaseFragment(R.layout.fragment_ai_config_menu) {
                 R.string.ai_model_function_summary,
                 readAloudModelSummary(providers),
                 readAloudReasoningSummary(providers)
+            ),
+            wordAnnotationSummary = getString(
+                R.string.ai_word_annotation_model_summary,
+                wordAnnotationModelSummary(providers)
             )
         )
         refreshSkillSummary()
@@ -174,6 +178,16 @@ class AiConfigMenuFragment : BaseFragment(R.layout.fragment_ai_config_menu) {
         }
     }
 
+    private fun wordAnnotationModelSummary(providers: List<AiProviderSetting>): String {
+        val selected = selectedWordAnnotationModel(providers)
+        return when {
+            selected == null && AiConfig.wordAnnotationModelId.isBlank() ->
+                getString(R.string.ai_word_annotation_model_not_selected)
+            selected == null -> getString(R.string.ai_purify_model_unavailable)
+            else -> selected.modelSummary()
+        }
+    }
+
     private fun readAloudReasoningSummary(providers: List<AiProviderSetting>): String {
         val selected = selectedReadAloudModel(providers)
         return when {
@@ -207,6 +221,15 @@ class AiConfigMenuFragment : BaseFragment(R.layout.fragment_ai_config_menu) {
             providers = providers,
             providerId = AiConfig.readAloudStoryboardProviderId,
             modelId = AiConfig.readAloudStoryboardModelId,
+            assistantOnly = false
+        )
+    }
+
+    private fun selectedWordAnnotationModel(providers: List<AiProviderSetting>): ModelSelection? {
+        return selectedChatModel(
+            providers = providers,
+            providerId = AiConfig.wordAnnotationProviderId,
+            modelId = AiConfig.wordAnnotationModelId,
             assistantOnly = false
         )
     }

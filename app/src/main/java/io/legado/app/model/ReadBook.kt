@@ -10,6 +10,7 @@ import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.AppWebDav
+import io.legado.app.help.annotation.WordAnnotationAnalyzer
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isEpub
@@ -1148,6 +1149,16 @@ object ReadBook : CoroutineScope by MainScope() {
             val textChapter = ChapterProvider.getTextChapterAsync(
                 this, book, chapter, displayTitle, contents, simulatedChapterSize
             )
+            if (book.getWordAnnotationEnabled() && chapter.index == durChapterIndex) {
+                // Detached from the chapter job so completeChapterLoad is not
+                // delayed, but cancelled with it when the reader moves on.
+                val analysisJob = this@ReadBook.launch {
+                    WordAnnotationAnalyzer.analyzeAndPublish(book, chapter, contents, textChapter)
+                }
+                coroutineContext[Job]?.invokeOnCompletion {
+                    analysisJob.cancel()
+                }
+            }
             startup?.mark("native-created")
             when (val offset = chapter.index - durChapterIndex) {
                 0 -> curChapterLoadingLock.withLock {
