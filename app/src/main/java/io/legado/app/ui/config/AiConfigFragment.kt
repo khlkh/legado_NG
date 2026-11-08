@@ -29,8 +29,10 @@ import io.legado.app.databinding.FragmentAiConfigBinding
 import io.legado.app.data.appDb
 import io.legado.app.help.ai.AiConfig
 import io.legado.app.help.ai.AiManager
+import io.legado.app.help.annotation.WordAnnotationConfig
 import io.legado.app.help.ai.AiModel
 import io.legado.app.help.ai.AiModelAbility
+import io.legado.app.model.ReadBook
 import io.legado.app.help.ai.AiModelModality
 import io.legado.app.help.ai.AiModelType
 import io.legado.app.help.ai.AiOperationPermissionMode
@@ -232,7 +234,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             else -> {
                 showMain()
                 if (initialPage == PAGE_WORD_ANNOTATION) {
-                    view?.post { showWordAnnotationModelSelectDialog() }
+                    view?.post { showWordAnnotationSettingsSheet() }
                 }
             }
         }
@@ -1112,7 +1114,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             PAGE_PURIFY -> showPurifyModelSettings()
             PAGE_READ_ALOUD -> showReadAloudModelSettings()
             PAGE_ASSISTANT -> showAssistantModelSettings()
-            PAGE_WORD_ANNOTATION -> showWordAnnotationModelSelectDialog()
+            PAGE_WORD_ANNOTATION -> showWordAnnotationSettingsSheet()
         }
     }
 
@@ -2216,6 +2218,52 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
 
     private fun showWordAnnotationModelSelectDialog() {
         showComposeModelSelectionSheet(AiModelSelectionTarget.WORD_ANNOTATION)
+    }
+
+    private fun showWordAnnotationSettingsSheet() {
+        val level = ReadBook.book?.getWordAnnotationLevel()
+            ?: WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL
+        val prefetchChapters = AiConfig.wordAnnotationPrefetchChapters
+        val dialog = BottomSheetDialog(requireContext())
+        dialog.setContentView(
+            requireContext().createNgBottomDrawerComposeHost(
+                fillMaxHeight = false,
+                contentCardStyle = NgDrawerContentCardStyle.ADAPTIVE,
+            ) {
+                WordAnnotationSettingsSheet(
+                    level = level,
+                    prefetchChapters = prefetchChapters,
+                    modelSummary = wordAnnotationModelSummaryText(),
+                    onSelectModel = {
+                        showComposeModelSelectionSheet(AiModelSelectionTarget.WORD_ANNOTATION)
+                    },
+                    onLevelSelected = { newLevel ->
+                        ReadBook.book?.setWordAnnotationLevel(newLevel)
+                        if (ReadBook.book?.getWordAnnotationEnabled() == true) {
+                            ReadBook.loadContent(false)
+                        }
+                        refreshMain()
+                        dialog.dismiss()
+                    },
+                    onPrefetchSelected = { newN ->
+                        AiConfig.wordAnnotationPrefetchChapters = newN
+                        refreshMain()
+                        dialog.dismiss()
+                    },
+                )
+            }
+        )
+        dialog.setOnShowListener {
+            val sheet = dialog.findViewById<View>(
+                com.google.android.material.R.id.design_bottom_sheet
+            ) ?: return@setOnShowListener
+            sheet.setBackgroundColor(Color.TRANSPARENT)
+            BottomSheetBehavior.from(sheet).apply {
+                skipCollapsed = true
+                state = BottomSheetBehavior.STATE_EXPANDED
+            }
+        }
+        dialog.showWithAppNavigationBarVisibility()
     }
 
     private fun showAssistantContextWindowDialog() {

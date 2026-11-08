@@ -80,7 +80,7 @@ class WordAnnotationStoreTest {
     fun `schema version mismatch is a miss`() {
         val file = cacheFile()
         assertTrue(WordAnnotationStore.write(file, identity, annotations))
-        assertNull(WordAnnotationStore.read(file, identity.copy(schemaVersion = 2)))
+        assertNull(WordAnnotationStore.read(file, identity.copy(schemaVersion = 99)))
     }
 
     @Test
@@ -124,7 +124,8 @@ class WordAnnotationStoreTest {
         file.writeText(
             """
             {"bookUrl":"https://book/1","chapterUrl":"https://book/1/chapter/3",
-             "chapterIndex":2,"canonicalHash":"hash-abc","schemaVersion":1,
+             "chapterIndex":2,"canonicalHash":"hash-abc","schemaVersion":2,
+             "level":4,"frequencyVersion":"gutenberg-2006-04",
              "annotations":"[]"}
             """.trimIndent(),
         )
@@ -141,7 +142,9 @@ class WordAnnotationStoreTest {
               "chapterUrl": "https://book/1/chapter/3",
               "chapterIndex": 2,
               "canonicalHash": "hash-abc",
-              "schemaVersion": 1,
+              "schemaVersion": 2,
+              "level": 4,
+              "frequencyVersion": "gutenberg-2006-04",
               "annotations": [
                 {"paragraphIndex":0,"start":17,"end":26,"surface":"untenable","hint":"impossible to defend"},
                 {"paragraphIndex":0,"start":-1,"end":26,"surface":"bad","hint":"bad"},
@@ -189,7 +192,7 @@ class WordAnnotationStoreTest {
         val second = WordAnnotationStore.canonicalHash(paragraphs)
         assertEquals(first, second)
         assertNotEquals(first, WordAnnotationStore.canonicalHash(paragraphs + "extra"))
-        assertNotEquals(first, WordAnnotationStore.canonicalHash(paragraphs, schemaVersion = 2))
+        assertNotEquals(first, WordAnnotationStore.canonicalHash(paragraphs, schemaVersion = 1))
         assertNotEquals(first, WordAnnotationStore.canonicalHash(emptyList()))
     }
 }

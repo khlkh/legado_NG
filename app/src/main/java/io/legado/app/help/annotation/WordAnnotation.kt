@@ -13,7 +13,7 @@ package io.legado.app.help.annotation
  */
 object WordAnnotationConfig {
     /** Bump when the prompt or the JSON contract changes; part of the cache key. */
-    const val SCHEMA_VERSION = 1
+    const val SCHEMA_VERSION = 2
 
     /** Wave 1 keeps at most this many resolved hints per chapter, after all other rules. */
     const val MAX_HINTS_PER_CHAPTER = 12
@@ -24,6 +24,13 @@ object WordAnnotationConfig {
     /** Hint length cap when the app UI locale is Chinese, in characters. */
     const val MAX_HINT_CHINESE_CHARS = 16
 
+    /** Version of the generated frequency rank asset; part of the cache key. */
+    const val FREQUENCY_VERSION = "gutenberg-2006-04"
+
+    const val MIN_WORD_ANNOTATION_LEVEL = 1
+    const val MAX_WORD_ANNOTATION_LEVEL = 5
+    const val DEFAULT_WORD_ANNOTATION_LEVEL = 4
+
     /**
      * Prototype switch for the fusion resolver: after exact matching fails,
      * expand a returned base form through the English inflection engine, rank
@@ -32,6 +39,78 @@ object WordAnnotationConfig {
      * exact-surface contract and reading-order cap.
      */
     const val USE_FUSION_PROTOTYPE = false
+}
+
+/**
+ * Five reader levels for Word Wise. One slider drives three things:
+ *
+ * - [floorFor]: soft gate. Only single-word hints whose every token rank is
+ *   below the floor are dropped; multiword expressions and unknown-rank words
+ *   always stay eligible (the model already selected them).
+ * - [capFor]: maximum hints shown per chapter, after band ordering.
+ * - [promptGuidance]: level-specific selection/density instruction appended to
+ *   the shared prompt; it overrides the general "stay sparse" rules.
+ */
+object WordAnnotationLevels {
+
+    private val FLOORS = mapOf(
+        1 to 100,
+        2 to 300,
+        3 to 1_000,
+        4 to 3_000,
+        5 to 8_000,
+    )
+
+    private val CAPS = mapOf(
+        1 to 20,
+        2 to 16,
+        3 to 12,
+        4 to 12,
+        5 to 8,
+    )
+
+    fun normalize(level: Int): Int = level.coerceIn(
+        WordAnnotationConfig.MIN_WORD_ANNOTATION_LEVEL,
+        WordAnnotationConfig.MAX_WORD_ANNOTATION_LEVEL,
+    )
+
+    fun floorFor(level: Int): Int = FLOORS[normalize(level)] ?: FLOORS.getValue(4)
+
+    fun capFor(level: Int): Int = CAPS[normalize(level)] ?: CAPS.getValue(4)
+
+    fun promptGuidance(level: Int, uiLocaleChinese: Boolean): String {
+        val (en, zh) = when (normalize(level)) {
+            1 -> (
+                "Target words and expressions beyond basic everyday vocabulary. " +
+                    "Explain in very short, simple sentences; do not use idioms in the hint. " +
+                    "Return up to 20 items."
+                ) to
+                ("只注释超出基础日常词汇的词和表达。用非常简短、简单的句子解释；提示中不要使用习语。最多返回 20 条。")
+            2 -> (
+                "Target words and expressions beyond everyday vocabulary. " +
+                    "Explain in simple English. Return up to 16 items."
+                ) to
+                ("只注释超出日常词汇的词和表达。用简单的中文解释。最多返回 16 条。")
+            3 -> (
+                "Target intermediate and advanced vocabulary and useful expressions. " +
+                    "Explain in clear, accessible language. Return up to 12 items."
+                ) to
+                ("注释中高级词汇和有价值的表达。用清晰易懂的中文解释。最多返回 12 条。")
+            4 -> (
+                "Target advanced vocabulary, idioms, phrasal verbs, and expressions whose " +
+                    "contextual meanings are not obvious. Explain concisely and precisely. " +
+                    "Return up to 12 items."
+                ) to
+                ("注释高级词汇、习语、短语动词和语境含义不明显的表达。用简洁准确的中文解释。最多返回 12 条。")
+            else -> (
+                "Target rare, literary, or specialist vocabulary only. Skip anything a fluent " +
+                    "reader would already know. Explain precisely and sophisticatedly. " +
+                    "Return up to 8 items."
+                ) to
+                ("只注释生僻、文学性或专业词汇。跳过流利读者已掌握的词汇。用精准、讲究的中文解释。最多返回 8 条。")
+        }
+        return if (uiLocaleChinese) zh else en
+    }
 }
 
 data class WordAnnotationItem(

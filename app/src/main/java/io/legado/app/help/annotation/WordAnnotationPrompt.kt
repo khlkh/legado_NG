@@ -14,6 +14,7 @@ object WordAnnotationPrompt {
     fun system(
         language: WordAnnotationLanguage,
         uiLocaleChinese: Boolean,
+        level: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL,
     ): String {
         val selectionLine = when (language) {
             WordAnnotationLanguage.ENGLISH ->
@@ -29,6 +30,7 @@ object WordAnnotationPrompt {
         } else {
             "no more than ${WordAnnotationConfig.MAX_HINT_WORDS} words"
         }
+        val levelGuidance = WordAnnotationLevels.promptGuidance(level, uiLocaleChinese)
         return buildString {
             appendLine("You are a vocabulary assistant for a long-form ebook reader.")
             appendLine()
@@ -63,6 +65,9 @@ object WordAnnotationPrompt {
                 "8. Do not annotate the same occurrence more than once. " +
                     "Avoid redundant and overlapping annotations."
             )
+            appendLine()
+            appendLine("Reader level guidance (this overrides rules 3 and 4):")
+            appendLine(levelGuidance)
             appendLine()
             appendLine(selectionLine)
             appendLine(

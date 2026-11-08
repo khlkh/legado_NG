@@ -11,6 +11,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.annotation.WordAnnotationAnalyzer
+import io.legado.app.help.ai.AiConfig
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
@@ -593,19 +594,57 @@ object ReadBook : CoroutineScope by MainScope() {
         }
     }
 
-    fun prefetchWordAnnotationForNext() {
+    fun prefetchWordAnnotationAhead() {
         val currentBook = book ?: return
         if (!currentBook.getWordAnnotationEnabled() || currentBook.isEpub) return
-        val textChapter = nextTextChapter ?: return
-        val contents = BookContent(
-            sameTitleRemoved = textChapter.sameTitleRemoved,
-            textList = textChapter.sourceParagraphs,
-            effectiveReplaceRules = textChapter.effectiveReplaceRules,
-        )
-        launch {
-            WordAnnotationAnalyzer.analyzeAndPublish(
-                currentBook, textChapter.chapter, contents, textChapter, prefetch = true,
+        val prefetchN = AiConfig.wordAnnotationPrefetchChapters
+        if (prefetchN <= 0) return
+        for (offset in 1..prefetchN) {
+            val index = durChapterIndex + offset
+            if (index >= chapterSize) break
+            val chapter = appDb.bookChapterDao.getChapter(currentBook.bookUrl, index) ?: continue
+            if (offset == 1) {
+                val textChapter = nextTextChapter
+                if (textChapter != null) {
+                    val contents = BookContent(
+                        sameTitleRemoved = textChapter.sameTitleRemoved,
+                        textList = textChapter.sourceParagraphs,
+                        effectiveReplaceRules = textChapter.effectiveReplaceRules,
+                    )
+                    launch {
+                        WordAnnotationAnalyzer.analyzeAndPublish(
+                            currentBook, chapter, contents, textChapter, prefetch = true,
+                        )
+                    }
+                    continue
+                }
+            }
+            // Chapters beyond the reader's preload are warmed from cached/local
+            // content only; never download just for Word Wise.
+            val raw = BookHelp.getContent(currentBook, chapter) ?: continue
+            val processor = ContentProcessor.get(currentBook.name, currentBook.origin)
+            val displayTitle = chapter.getDisplayTitle(
+                processor.getTitleReplaceRules(),
+                currentBook.getUseReplaceRule(),
+                replaceBook = currentBook.toReplaceBook(),
             )
+            val contents = processor.getContent(currentBook, chapter, raw, includeTitle = false)
+            val textChapter = TextChapter(
+                chapter = chapter,
+                position = chapter.index,
+                title = displayTitle,
+                chaptersSize = chapterSize,
+                sameTitleRemoved = currentBook.getRemoveSameTitle(),
+                sourceParagraphs = contents.textList,
+                isVip = false,
+                isPay = false,
+                effectiveReplaceRules = contents.effectiveReplaceRules,
+            )
+            launch {
+                WordAnnotationAnalyzer.analyzeAndPublish(
+                    currentBook, chapter, contents, textChapter, prefetch = true,
+                )
+            }
         }
     }
 
