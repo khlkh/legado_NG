@@ -11,7 +11,7 @@ class WordAnnotationPoolResolverTest {
         }
 
     @Test
-    fun `resolves the first occurrence of each pool item`() {
+    fun `resolves every occurrence of each pool item`() {
         val resolved = WordAnnotationPoolResolver.resolveChapter(
             paragraphs = paragraphs("The proposal was untenable. The term untenable repeats."),
             items = listOf(WordAnnotationPoolItem("untenable", "impossible to defend", 12_000)),
@@ -19,9 +19,8 @@ class WordAnnotationPoolResolverTest {
             cap = 10,
         )
 
-        assertEquals(1, resolved.size)
-        assertEquals("untenable", resolved.single().surface)
-        assertEquals(17, resolved.single().start)
+        assertEquals(2, resolved.size)
+        assertEquals(listOf(17, 37), resolved.map { it.start })
     }
 
     @Test

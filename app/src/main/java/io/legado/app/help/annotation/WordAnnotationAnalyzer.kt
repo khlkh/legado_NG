@@ -159,11 +159,17 @@ object WordAnnotationAnalyzer {
         val config = analysisConfig(book, appUiLocaleChinese())
         val items = readPool(book, config) ?: return false
         textChapter.wordAnnotationPoolAttached = true
+        val userCap = book.getWordAnnotationHintCap().coerceIn(
+            WordAnnotationConfig.MIN_WORD_ANNOTATION_HINT_CAP,
+            WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
+        )
+        val words = passage.split(Regex("\\s+")).count { it.isNotBlank() }
+        val cap = maxOf(userCap, words / 1000)
         val resolved = WordAnnotationPoolResolver.resolveChapter(
             paragraphs = paragraphs,
             items = items,
             level = book.getWordAnnotationLevel(),
-            cap = book.getWordAnnotationHintCap(),
+            cap = cap,
         )
         if (book.isEpub) {
             // The EPUB renderer draws hints from native fragments; the native
