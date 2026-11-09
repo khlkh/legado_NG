@@ -479,10 +479,9 @@ internal class EpubLayoutController(
                             next.top + rect.optDouble("bottom").toFloat() * scale)
                         return@interactReady
                     }
-                    val wordWiseId = result.optInt("wordWise", -1)
-                    if (wordWiseId >= 0) {
-                        val hint = textChapter?.epubWordAnnotations?.getOrNull(wordWiseId)?.hint
-                        if (hint != null) host.context.toastOnUi(hint)
+                    val wordWiseHint = result.optString("wordWiseHint")
+                    if (wordWiseHint.isNotEmpty()) {
+                        host.context.toastOnUi(wordWiseHint)
                         return@interactReady
                     }
                     val href = if (result.isNull("href")) "" else result.optString("href")
@@ -1097,24 +1096,16 @@ internal class EpubLayoutController(
                 for (i in 0 until ranges.length()) put(ranges.getJSONObject(i))
             } })
         } }
+        val documentWordWise = documents[documentIndex].wordWise
         val wordWise = JSONArray().apply {
             val prepared = preparedContent ?: return@apply
-            AppLog.put("WordAnnotation epub options annotations=${prepared.chapter.epubWordAnnotations.size} doc=$documentIndex")
-            val annotations = prepared.chapter.epubWordAnnotations
-            if (annotations.isNotEmpty()) {
-                val all = EpubWordWiseFragments.resolve(prepared.chapter.sourceParagraphs, prepared.mapped.documents, annotations)
-                AppLog.put("WordAnnotation epub fragments total=${all.size} doc=$documentIndex dist=${all.groupBy { it.document }.mapValues { it.value.size }}")
-                val currentSpine = documents[documentIndex].spineIndex
-                all
-                    .filter { prepared.mapped.documents.getOrNull(it.document)?.source?.spineOccurrence == currentSpine }
-                    .forEach { fragment ->
-                        put(JSONObject().put("id", fragment.hintId).put("element", fragment.element)
-                            .put("ordinal", fragment.ordinal).put("start", fragment.nativeStart).put("end", fragment.nativeEnd)
-                            .put("hint", annotations.getOrNull(fragment.hintId)?.hint ?: ""))
-                    }
+            documentWordWise.forEach { fragment ->
+                put(JSONObject().put("id", fragment.hintId).put("element", fragment.element)
+                    .put("ordinal", fragment.ordinal).put("start", fragment.nativeStart).put("end", fragment.nativeEnd)
+                    .put("hint", prepared.chapter.epubWordAnnotations.getOrNull(fragment.hintId)?.hint ?: ""))
             }
         }
-        if (wordWise.length() > 0) {
+        if (documentWordWise.isNotEmpty()) {
             // Reserve vertical space above each line for hint labels, exactly like the
             // native hint band. Changing line-height re-paginates only when the feature
             // is toggled or annotations attach, never on ordinary style repaints.

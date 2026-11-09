@@ -142,7 +142,8 @@ internal class EpubLayoutSurface(
             readyContentKey != contentKey || readyDocumentsKey != documentsKey || readyWidth != width || readyHeight != height ||
             readyContentUrl != gateway.contentUrl() || readyReaderFontUrl != gateway.readerFontUrl() ||
             readyTitleFontUrl != gateway.titleFontUrl() ||
-            options.optBoolean("fixed") || (options.optJSONArray("highlights")?.length() ?: 0) != 0) return false
+            options.optBoolean("fixed") || (options.optJSONArray("highlights")?.length() ?: 0) != 0 ||
+            (options.optJSONArray("wordWise")?.length() ?: 0) != 0) return false
         val aloud = options.optJSONObject("aloud")
         return aloud == null || aloud.isNull("range") && (aloud.optJSONArray("ranges")?.length() ?: 0) == 0
     }
@@ -201,10 +202,6 @@ internal class EpubLayoutSurface(
             override fun onConsoleMessage(message: ConsoleMessage): Boolean {
                 if (io.legado.app.BuildConfig.DEBUG && message.message().startsWith("EpubAloudTrace ")) {
                     android.util.Log.d("EpubAloudTrace", message.message().removePrefix("EpubAloudTrace "))
-                    return true
-                }
-                if (io.legado.app.BuildConfig.DEBUG && message.message().startsWith("WordWiseDebug ")) {
-                    android.util.Log.e("WordWiseDebug", message.message().removePrefix("WordWiseDebug "))
                     return true
                 }
                 return super.onConsoleMessage(message)
@@ -834,6 +831,7 @@ internal class EpubLayoutSurface(
             // queried; the controller still rejects book/layout epoch changes.
             val capturedTap = action == "tap" && result != null && result.optString("token") == token &&
                 !result.optBoolean("handled") && !result.optBoolean("dismissed") && result.optString("highlight").isEmpty() &&
+                result.optString("wordWiseHint").isEmpty() &&
                 (result.isNull("href") || result.optString("href").isEmpty())
             if (io.legado.app.BuildConfig.DEBUG && capturedTap && revision.toString() != token)
                 android.util.Log.d("EpubStartup", "tap-result-retained token=$token current=$revision")
@@ -1060,7 +1058,6 @@ internal class EpubLayoutSurface(
             webView.evaluateJavascript("$api && $api.state()") { raw ->
                 if (closed || revision.toString() != token) return@evaluateJavascript
                 val report = runCatching { JSONObject(raw) }.getOrNull()
-                android.util.Log.e("WordWiseDebug", "state poll token=${report?.optString("token")} status=${report?.optString("status")}")
                 when {
                     report?.optString("token") == token && report.optString("status") == "viewport" && onViewportRequired != null ->
                         onViewportRequired?.invoke(report.optBoolean("fullViewport"))
@@ -1068,9 +1065,6 @@ internal class EpubLayoutSurface(
                         fail(report.optString("error"))
                     report?.optString("token") == token && report.optString("status") == "ready" -> {
                         startup?.mark("layout-ready")
-                        webView.evaluateJavascript("(function(){var c=window.__ngEpubContent;return JSON.stringify({count:c?c.wordWiseCount():-1,rects:c?c.wordWiseRects().length:-1});})()") { probe ->
-                            android.util.Log.e("WordWiseDebug", "probe $probe")
-                        }
                         if (report.optBoolean("documentPreloaded")) startup?.mark("document-preloaded")
                         if (report.optBoolean("preloadedLayoutReused")) startup?.mark("prepared-layout-reused")
                         report.optJSONObject("timings")?.let { times ->

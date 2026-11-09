@@ -22,7 +22,6 @@ class EpubWordWiseFragmentsTest {
             starts = IntArray(size) { nativeStart + it },
             ends = IntArray(size) { nativeStart + it + 1 },
             sourceStarts = IntArray(size) { sourceStart + it },
-            sourceEnds = IntArray(size) { sourceStart + it + 1 },
         )
     }
 
