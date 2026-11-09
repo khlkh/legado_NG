@@ -34,8 +34,9 @@ internal class EpubPreparedContent private constructor(
 ) {
     // Include both the payload graph estimate and its retained serialized snapshot.
     fun estimatedBytes(): Long = mapped.text.length * 2L + documents.sumOf {
-        it.html.length * 2L + it.payloadJson.length * 4L + it.styleFonts.values.sumOf { font -> font.size.toLong() }
-    } + mapped.documents.sumOf { document -> document.nodes.sumOf { (it.starts.size + it.ends.size) * 4L } } +
+        it.html.length * 2L + it.payloadJson.length * 4L + it.styleFonts.values.sumOf { font -> font.size.toLong() } +
+            it.wordWise.size * 32L
+    } + mapped.documents.sumOf { document -> document.nodes.sumOf { (it.starts.size + it.ends.size + it.sourceStarts.size) * 4L } } +
         chapter.highlightInputs.asSequence().mapNotNull { it.context }.distinct().sumOf { it.text.length * 2L }
     /** Called only after the owner accepts this chapter; speculative work has no publication side effects. */
     fun publishMapping(book: Book, revision: String?) {
