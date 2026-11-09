@@ -152,19 +152,25 @@ object WordAnnotationAnalyzer {
         bookContent: BookContent,
     ): Boolean {
         if (!book.getWordAnnotationEnabled()) return false
+        val config = analysisConfig(book, appUiLocaleChinese())
+        val items = readPool(book, config) ?: return false
+        // The pool exists for this book: mark the chapter attached even when it
+        // resolves to zero hints, so chapter moves never reload-loop on chapters
+        // without eligible paragraphs.
+        textChapter.wordAnnotationPoolAttached = true
         val paragraphs = canonicalParagraphs(bookContent)
         if (paragraphs.isEmpty()) return false
         val passage = paragraphs.joinToString("\n") { it.text }
         if (bookLanguage(passage, book.config.scriptClass) != WordAnnotationLanguage.ENGLISH) return false
-        val config = analysisConfig(book, appUiLocaleChinese())
-        val items = readPool(book, config) ?: return false
-        textChapter.wordAnnotationPoolAttached = true
         val userCap = book.getWordAnnotationHintCap().coerceIn(
             WordAnnotationConfig.MIN_WORD_ANNOTATION_HINT_CAP,
             WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
         )
         val words = passage.split(Regex("\\s+")).count { it.isNotBlank() }
-        val cap = maxOf(userCap, words / 1000)
+        val cap = minOf(
+            WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
+            maxOf(userCap, words / 1000),
+        )
         val resolved = WordAnnotationPoolResolver.resolveChapter(
             paragraphs = paragraphs,
             items = items,

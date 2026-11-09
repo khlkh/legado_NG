@@ -744,6 +744,7 @@
     }
     function hasTapTargets() {
         return !!selectedRange || noteHitRects.length > 0 || highlightRects.length > 0 ||
+            (window.__ngEpubContent && window.__ngEpubContent.wordWiseCount() > 0) ||
             triggerObservers.size > 0 || document.getElementsByTagNameNS('*', 'a').length > 0;
     }
     function interact(value) {
@@ -793,6 +794,7 @@
                     .filter(function (r) { return value.x >= r.left && value.x <= r.right && value.y >= r.top && value.y <= r.bottom; })
                     .pop();
                 if (wordWise) return { token: state.token, wordWise: wordWise.id,
+                    wordWiseHint: wordWise.hint || '',
                     wordWiseRect: { left: wordWise.left, top: wordWise.top, right: wordWise.right, bottom: wordWise.bottom } };
                 var hit = document.elementFromPoint(value.x, value.y);
                 var observer = hit;
@@ -1543,8 +1545,6 @@
         }
     }
     async function configureLayout(value, mine, retainedLocation) {
-        window.console.log('WordWiseDebug configureLayout hasWordWise=' + !!(value && value.wordWise) +
-            ' n=' + ((value && value.wordWise) || []).length + ' hasContent=' + !!window.__ngEpubContent);
         var frameTiming = { total: 0, max: 0, count: 0 };
         pageStartsCache = null;
 
@@ -1560,7 +1560,6 @@
             indexContentNodes();
         }
         if (window.__ngEpubContent && window.__ngEpubContent.setWordWise(value.wordWise || [], value.wordWiseStyle || null)) {
-            window.console.log('WordWiseDebug configure wordWise=' + (value.wordWise || []).length);
             indexContentNodes();
         }
         if (window.__ngEpubContent) {

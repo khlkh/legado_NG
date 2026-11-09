@@ -33,7 +33,7 @@ object WordAnnotationFilter {
             .sortedWith(compareBy({ it.paragraphIndex }, { it.start }))
     }
 
-    private fun passesFloor(surface: String, rank: Int?, floor: Int): Boolean {
+    fun passesFloor(surface: String, rank: Int?, floor: Int): Boolean {
         if (floor <= 0) return true
         // Phrases pass; only single-word hints with a known rank are gated.
         if (!SINGLE_TOKEN.matches(surface)) return true

@@ -16,7 +16,6 @@
     var lastStylePayload = null, aloud = null, nightMode = false;
     var noteMarkers = [], noteElements = [], noteStyle = null, noteSignature = '[[],null]', noteImage = null;
     var wordWiseFragments = [], wordWiseStyle = null, wordWiseSignature = '[[],null]', wordWiseLayer = null;
-    var wordWiseDebugLog = 0;
     var titleSegments = [], titleStyle = null, titleSignature = '[[],null]';
     function palette(value) { return nightMode && value.nightCharStyles ? value.nightCharStyles : value.charStyles || []; }
     function paintRanges(value) { return nightMode && value.nightStyleRanges ? value.nightStyleRanges : value.styleRanges || []; }
@@ -129,43 +128,24 @@
         var signature = JSON.stringify([values || [], style || null]);
         if (signature === wordWiseSignature) return false;
         wordWiseFragments = (values || []).slice(); wordWiseStyle = style; wordWiseSignature = signature;
-        window.console.log('WordWiseDebug setWordWise fragments=' + wordWiseFragments.length + ' entries=' + entries.length);
         paintWordWise();
         return true;
     }
     function wordWiseRects() {
         if (!wordWiseFragments.length) return [];
-        var transform = bodyTransform();
         var result = [];
-        if (wordWiseDebugLog < 2) {
-            wordWiseDebugLog++;
-            wordWiseFragments.slice(0, 3).forEach(function (fragment) {
-                var entry = null;
-                for (var i = 0; i < entries.length; i++) {
-                    var item = entries[i];
-                    if (item.element === fragment.element && item.ordinal === fragment.ordinal) { entry = item; break; }
-                }
-                var range = entry ? rangeForEntry(entry, fragment.start, fragment.end) : null;
-                window.console.log('WordWiseDebug rectDebug fragment=' + JSON.stringify(fragment) +
-                    ' entryFound=' + !!entry +
-                    (entry ? ' entryElem=' + entry.element + ' entryOrd=' + entry.ordinal + ' runs=' + entry.runs.length : '') +
-                    (entry && entry.runs.length ? ' firstRun=' + JSON.stringify(entry.runs[0]) + ' lastRun=' + JSON.stringify(entry.runs[entry.runs.length-1]) : '') +
-                    (range ? ' range=' + range.startOffset + '-' + range.endOffset : ' range=null'));
-            });
-        }
         wordWiseFragments.forEach(function (fragment) {
-            var entry = null;
-            for (var i = 0; i < entries.length; i++) {
-                var item = entries[i];
-                if (item.element === fragment.element && item.ordinal === fragment.ordinal) { entry = item; break; }
-            }
-            if (!entry) return;
-            var range = rangeForEntry(entry, fragment.start, fragment.end);
-            if (!range) return;
-            Array.from(range.getClientRects()).forEach(function (rect) {
-                if (rect.width <= 0 || rect.height <= 0) return;
-                result.push({ id: fragment.id, hint: fragment.hint, left: rect.left - transform.x, top: rect.top - transform.y,
-                    right: rect.right - transform.x, bottom: rect.bottom - transform.y });
+            // Native positions are unique across the chapter text, so iterate the
+            // runs map directly instead of matching projected element/ordinal ids,
+            // which change after line fragmentation.
+            entries.forEach(function (entry) {
+                var range = rangeForEntry(entry, fragment.start, fragment.end);
+                if (!range) return;
+                Array.from(range.getClientRects()).forEach(function (rect) {
+                    if (rect.width <= 0 || rect.height <= 0) return;
+                    result.push({ id: fragment.id, hint: fragment.hint, left: rect.left, top: rect.top,
+                        right: rect.right, bottom: rect.bottom });
+                });
             });
         });
         return result;
@@ -190,7 +170,6 @@
     }
     function paintWordWise() {
         if (wordWiseLayer) wordWiseLayer.replaceChildren();
-        window.console.log('WordWiseDebug paint fragments=' + wordWiseFragments.length + ' entries=' + entries.length);
         if (!wordWiseFragments.length || !document.body) return;
         if (!wordWiseLayer) {
             wordWiseLayer = document.createElementNS('http://www.w3.org/1999/xhtml', 'ng-word-wise');
@@ -200,36 +179,38 @@
             Object.keys(layerStyle).forEach(function (name) { wordWiseLayer.style.setProperty(name, layerStyle[name], 'important'); });
             document.documentElement.appendChild(wordWiseLayer);
         }
-        var transform = bodyTransform(), color = wordWiseStyle && wordWiseStyle.color ? wordWiseStyle.color : '#00A8FF';
-        var scale = transform.scale || 1, labelSize = (wordWiseStyle && wordWiseStyle.fontSize || 11) * scale;
-        var rects = wordWiseRects();
-        window.console.log('WordWiseDebug rects=' + rects.length);
+        var color = wordWiseStyle && wordWiseStyle.color ? wordWiseStyle.color : '#00A8FF';
+        var labelSize = wordWiseStyle && wordWiseStyle.fontSize ? wordWiseStyle.fontSize : 11;
         var byId = new Map();
-        rects.forEach(function (rect) {
+        wordWiseRects().forEach(function (rect) {
             if (!byId.has(rect.id)) byId.set(rect.id, []);
             byId.get(rect.id).push(rect);
         });
-        var viewport = document.documentElement, width = viewport.clientWidth;
-        byId.forEach(function (rects, id) {
+        var viewport = document.documentElement, width = viewport.clientWidth, height = viewport.clientHeight;
+        byId.forEach(function (rects) {
             rects.forEach(function (rect) {
                 var div = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
                 var properties = { position: 'absolute', 'pointer-events': 'none', 'border-radius': '2px',
-                    left: (rect.left + transform.x) + 'px', top: (rect.top + transform.y) + 'px',
+                    left: rect.left + 'px', top: rect.top + 'px',
                     width: (rect.right - rect.left) + 'px', height: (rect.bottom - rect.top) + 'px',
                     'background-color': color, opacity: '0.18' };
                 Object.keys(properties).forEach(function (name) { div.style.setProperty(name, properties[name], 'important'); });
                 wordWiseLayer.appendChild(div);
             });
-            var first = rects[0];
+            // Label the first rect visible on the current viewport; rects from other
+            // pages are painted by their own page turn.
+            var first = rects.find(function (rect) {
+                return rect.top >= 0 && rect.top < height && rect.bottom > 0;
+            }) || rects[0];
             if (!first || !first.hint) return;
             var label = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
             label.textContent = first.hint;
-            var available = Math.max(40, width - (first.left + transform.x) - 8);
+            var available = Math.max(40, width - first.left - 8);
             var labelStyle = { position: 'absolute', 'pointer-events': 'none', margin: '0', padding: '0', border: '0',
                 'font-size': labelSize + 'px', 'line-height': (labelSize + 2) + 'px', color: color,
                 'white-space': 'nowrap', overflow: 'hidden', 'text-overflow': 'ellipsis',
                 'max-width': available + 'px',
-                left: (first.left + transform.x) + 'px', top: (first.top + transform.y - labelSize - 4) + 'px' };
+                left: first.left + 'px', top: (first.top - labelSize - 4) + 'px' };
             Object.keys(labelStyle).forEach(function (name) { label.style.setProperty(name, labelStyle[name], 'important'); });
             wordWiseLayer.appendChild(label);
         });
@@ -793,6 +774,7 @@
         if (!value || value.version !== 1 || !Array.isArray(value.nodes)) throw new Error('EPUB 正文位置数据无效');
         nightMode = !!isNight;
         if (key === value.key) return updateStyles(value).changed;
+        clearWordWise();
         clearStyleImages(); imagePlans.clear();
         noteMarkers = []; noteElements = []; noteStyle = null; noteSignature = '[[],null]';
         titleSegments = []; titleStyle = null; titleSignature = '[[],null]';

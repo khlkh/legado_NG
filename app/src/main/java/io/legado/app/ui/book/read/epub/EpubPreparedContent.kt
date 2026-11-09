@@ -10,6 +10,8 @@ import io.legado.app.model.epub.EpubSingleDocumentSource
 import io.legado.app.model.epub.EpubSourceChapter
 import io.legado.app.model.epub.EpubResourceLink
 import io.legado.app.model.epub.EpubPageSize
+import io.legado.app.model.epub.EpubWordWiseFragment
+import io.legado.app.model.epub.EpubWordWiseFragments
 import io.legado.app.model.epub.bindNativeContent
 import io.legado.app.model.localBook.EpubFile
 import io.legado.app.ui.book.read.page.entities.TextChapter
@@ -45,7 +47,8 @@ internal class EpubPreparedContent private constructor(
                         val styleFonts: Map<String, ByteArray> = emptyMap(),
                         val nineSlices: Map<String, io.legado.app.model.epub.EpubNineSliceImage> = emptyMap(),
                         val backgrounds: Map<String, io.legado.app.model.epub.EpubBackgroundImage> = emptyMap(),
-                        val titles: List<EpubTitleProjection> = emptyList()) {
+                        val titles: List<EpubTitleProjection> = emptyList(),
+                        val wordWise: List<EpubWordWiseFragment> = emptyList()) {
         // Projection payloads are immutable after preparation. A style copy supplies a
         // new payload and computes its own snapshot before it reaches either surface.
         val payloadJson: String = payload.toString()
@@ -131,6 +134,9 @@ internal class EpubPreparedContent private constructor(
             var last = 0
             var nextOccurrence = 0
             val titleLines = chapter.pages.flatMap { it.lines }.filter { it.isTitle }
+            val wordWiseByDocument = EpubWordWiseFragments.resolve(
+                chapter.sourceParagraphs, mapped.documents, chapter.epubWordAnnotations,
+            ).groupBy { it.document }
             val documents = mapped.documents.mapIndexed { index, document ->
                 checkCancelled()
                 val (first, end) = document.contentBounds(last)
@@ -153,7 +159,8 @@ internal class EpubPreparedContent private constructor(
                     .put("styleRanges", charStyles.ranges).put("nightStyleRanges", charStyles.nightRanges),
                     first, end, if (index == mapped.documents.lastIndex) chapter.chapter.endFragmentId else null,
                     spineIndex, chapter, mapped.text, svgSize, charStyles.fonts, charStyles.nineSlices, charStyles.backgrounds,
-                    EpubTitleProjection.from(document, titleLines))
+                    EpubTitleProjection.from(document, titleLines),
+                    wordWiseByDocument[index].orEmpty())
             }
             check(documents.isNotEmpty()) { "EPUB 章节没有正文文档" }
             startup.mark("payload-ready")

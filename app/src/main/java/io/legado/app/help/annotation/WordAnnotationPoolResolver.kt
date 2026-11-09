@@ -18,10 +18,14 @@ object WordAnnotationPoolResolver {
         cap: Int,
     ): List<WordAnnotation> {
         if (paragraphs.isEmpty() || items.isEmpty()) return emptyList()
+        val floor = WordAnnotationLevels.floorFor(level)
+        val eligible = items.filter { WordAnnotationFilter.passesFloor(it.surface, it.rank, floor) }
+        if (eligible.isEmpty()) return emptyList()
         val windows = WordAnnotationResolver.paragraphWindows(paragraphs.map { it.text })
         val joined = windows.joinToString(separator = "\n") { it.text }
-        val resolved = ArrayList<WordAnnotation>(items.size * 4)
-        for (item in items) {
+        val resolved = ArrayList<WordAnnotation>(eligible.size * 4)
+        val expandLimit = maxOf(cap * 4, 64)
+        outer@ for (item in eligible) {
             var occurrence = 1
             while (true) {
                 val start = WordAnnotationResolver.findOccurrence(joined, item.surface, occurrence) ?: break
@@ -37,6 +41,7 @@ object WordAnnotationPoolResolver {
                     hint = item.hint,
                     rank = item.rank,
                 )
+                if (resolved.size >= expandLimit) break@outer
             }
         }
         // The model path's overlap rule: keep the longer span, drop both on
