@@ -442,6 +442,7 @@ class ReadMenu @JvmOverloads constructor(
                         ReadBook.book?.let {
                             it.setWordAnnotationEnabled(!it.getWordAnnotationEnabled())
                             floatingWordAnnotationEnabled = it.getWordAnnotationEnabled()
+                            ReadBook.saveRead()
                             runMenuOut { ReadBook.loadContent(false) }
                         }
                     },
