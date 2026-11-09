@@ -136,7 +136,7 @@ object WordAnnotationAnalyzer {
 
     /** True when the book has a readable pool (including an empty success). */
     fun hasPool(book: Book): Boolean {
-        if (!book.getWordAnnotationEnabled() || book.isEpub) return false
+        if (!book.getWordAnnotationEnabled()) return false
         val config = analysisConfig(book, appUiLocaleChinese())
         return readPool(book, config) != null
     }
@@ -151,7 +151,7 @@ object WordAnnotationAnalyzer {
         bookChapter: BookChapter,
         bookContent: BookContent,
     ): Boolean {
-        if (!book.getWordAnnotationEnabled() || book.isEpub) return false
+        if (!book.getWordAnnotationEnabled()) return false
         val paragraphs = canonicalParagraphs(bookContent)
         if (paragraphs.isEmpty()) return false
         val passage = paragraphs.joinToString("\n") { it.text }
@@ -159,12 +159,20 @@ object WordAnnotationAnalyzer {
         val config = analysisConfig(book, appUiLocaleChinese())
         val items = readPool(book, config) ?: return false
         textChapter.wordAnnotationPoolAttached = true
-        textChapter.wordAnnotations = WordAnnotationPoolResolver.resolveChapter(
+        val resolved = WordAnnotationPoolResolver.resolveChapter(
             paragraphs = paragraphs,
             items = items,
             level = book.getWordAnnotationLevel(),
             cap = book.getWordAnnotationHintCap(),
         )
+        if (book.isEpub) {
+            // The EPUB renderer draws hints from native fragments; the native
+            // layout must not reserve hint bands for them.
+            textChapter.epubWordAnnotations = resolved
+            textChapter.wordAnnotations = emptyList()
+        } else {
+            textChapter.wordAnnotations = resolved
+        }
         return true
     }
 
@@ -182,10 +190,6 @@ object WordAnnotationAnalyzer {
         if (!book.getWordAnnotationEnabled()) {
             Log.d("WordAnnotation", "skip flag off")
             AppLog.put("WordAnnotation skip: flag off")
-            return
-        }
-        if (book.isEpub) {
-            Log.d("WordAnnotation", "skip epub")
             return
         }
         val paragraphs = canonicalParagraphs(bookContent)

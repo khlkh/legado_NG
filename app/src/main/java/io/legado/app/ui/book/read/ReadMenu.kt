@@ -439,7 +439,7 @@ class ReadMenu @JvmOverloads constructor(
                     },
                     wordAnnotationEnabled = floatingWordAnnotationEnabled,
                     wordAnnotationVisible = ReadBook.book?.let {
-                        !it.isEpub && it.config.scriptClass != "cjk"
+                        it.config.scriptClass != "cjk"
                     } == true,
                     onWordAnnotation = {
                         floatingToolExpansion = null
