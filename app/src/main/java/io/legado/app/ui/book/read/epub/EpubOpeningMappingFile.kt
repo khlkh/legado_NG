@@ -27,7 +27,7 @@ import java.security.MessageDigest
 /** Disposable derived data, explicitly encoded. No native page geometry, styles or live owners. */
 internal object EpubOpeningMappingFile {
     // Bump when source capture, content projection or native coordinate interpretation changes.
-    private const val VERSION = 2
+    private const val VERSION = 3
     private const val MAX_BYTES = 2 * 1024 * 1024
     private const val MAX_ITEMS = 10_000
 
@@ -103,7 +103,9 @@ internal object EpubOpeningMappingFile {
                     val starts = positions(value.length); val ends = positions(value.length)
                     for (index in starts.indices) require(starts[index] in -1..text.length &&
                         ends[index] in starts[index]..text.length && (starts[index] >= 0 || ends[index] == -1))
-                    EpubContentProjection.ProjectedNode(element, ordinal, original, value, starts, ends, nullableString(), readBoolean())
+                    val sourceStarts = positions(value.length); val sourceEnds = positions(value.length)
+                    EpubContentProjection.ProjectedNode(element, ordinal, original, value, starts, ends, nullableString(), readBoolean(),
+                        sourceStarts, sourceEnds)
                 }
                 val media = list(1024) {
                     val element = string(); val visible = readBoolean(); val start = readInt(); val stop = readInt()
@@ -134,6 +136,7 @@ internal object EpubOpeningMappingFile {
                     list(document.nodes) {
                         string(it.element); writeInt(it.ordinal); string(it.original); string(it.text)
                         positions(it.starts); positions(it.ends); nullableString(it.beforeMedia); writeBoolean(it.preserveBreaks)
+                        positions(it.sourceStarts); positions(it.sourceEnds)
                     }
                     list(document.media, 1024) { string(it.element); writeBoolean(it.visible); writeInt(it.start); writeInt(it.end) }
                 }

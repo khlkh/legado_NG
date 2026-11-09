@@ -28,6 +28,9 @@ internal class EpubContentProjection(
         var live = true
         var canonicalStart = Int.MAX_VALUE
         var canonicalEnd = -1
+        /** Source offset in the joined paragraph text (BookContent.toString()). */
+        var sourceStart = Int.MAX_VALUE
+        var sourceEnd = -1
     }
     internal data class Mark(val start: Glyph?, val last: Glyph?, val boundary: Glyph? = null)
     internal data class ProjectedNode(
@@ -35,6 +38,8 @@ internal class EpubContentProjection(
         val text: String, val starts: IntArray, val ends: IntArray,
         val beforeMedia: String? = null,
         val preserveBreaks: Boolean = false,
+        val sourceStarts: IntArray = IntArray(0),
+        val sourceEnds: IntArray = IntArray(0),
     )
     internal data class ProjectedMedia(val element: String, val visible: Boolean, val start: Int, val end: Int)
     internal data class ProjectedDocument(val source: EpubSourceDocument, val nodes: List<ProjectedNode>, val media: List<ProjectedMedia>)
@@ -208,6 +213,8 @@ internal class EpubContentProjection(
         while (glyph !== end && glyph !== tail) {
             glyph.canonicalStart = minOf(glyph.canonicalStart, canonicalPosition)
             glyph.canonicalEnd = maxOf(glyph.canonicalEnd, canonicalPosition + 1)
+            glyph.sourceStart = minOf(glyph.sourceStart, position)
+            glyph.sourceEnd = maxOf(glyph.sourceEnd, position + 1)
             glyph = glyph.next ?: tail
         }
     }
@@ -292,5 +299,7 @@ internal class EpubContentProjection(
         ProjectedNode(element, ordinal, original, glyphs.joinToString("") { it.char.toString() },
             glyphs.map { if (it.canonicalStart == Int.MAX_VALUE) -1 else it.canonicalStart }.toIntArray(),
             glyphs.map { it.canonicalEnd }.toIntArray(), beforeMedia,
-            glyphs.any { it.generated && (it.char == '\n' || it.char == '\r') })
+            glyphs.any { it.generated && (it.char == '\n' || it.char == '\r') },
+            glyphs.map { if (it.sourceStart == Int.MAX_VALUE) -1 else it.sourceStart }.toIntArray(),
+            glyphs.map { it.sourceEnd }.toIntArray())
 }
