@@ -1098,11 +1098,13 @@ internal class EpubLayoutController(
         } }
         val documentWordWise = documents[documentIndex].wordWise
         val wordWise = JSONArray().apply {
-            val prepared = preparedContent ?: return@apply
+            // Hint text must come from the same document's chapter: preloaded
+            // neighbours carry their own fragments and their own annotations.
+            val chapterAnnotations = documents[documentIndex].chapter.epubWordAnnotations
             documentWordWise.forEach { fragment ->
-                put(JSONObject().put("id", fragment.hintId).put("element", fragment.element)
-                    .put("ordinal", fragment.ordinal).put("start", fragment.nativeStart).put("end", fragment.nativeEnd)
-                    .put("hint", prepared.chapter.epubWordAnnotations.getOrNull(fragment.hintId)?.hint ?: ""))
+                put(JSONObject().put("id", fragment.hintId)
+                    .put("start", fragment.nativeStart).put("end", fragment.nativeEnd)
+                    .put("hint", chapterAnnotations.getOrNull(fragment.hintId)?.hint ?: ""))
             }
         }
         if (documentWordWise.isNotEmpty()) {
@@ -1113,7 +1115,9 @@ internal class EpubLayoutController(
         }
         value.put("highlights", highlights).put("noteMarkers", notes).put("titleSegmentsByDocument", titleSegments)
             .put("wordWise", wordWise)
-            .put("wordWiseStyle", if (wordWise.length() > 0) JSONObject().put("color", EpubCharStyles.cssColor(ReadBookConfig.textAccentColor)) else JSONObject.NULL)
+            .put("wordWiseStyle", if (wordWise.length() > 0) JSONObject()
+                .put("color", EpubCharStyles.cssColor(ReadBookConfig.textAccentColor))
+                .put("fontSize", ChapterProvider.hintPaint.textSize / metrics.density) else JSONObject.NULL)
             .put("titleSegments", titleSegments.optJSONArray(documentIndex.toString()))
             .put("noteMarkerStyle", if (notes.length() > 0) noteMarker.style() ?: JSONObject.NULL else JSONObject.NULL)
             .put("selectionTransparent", selectionTransparent)

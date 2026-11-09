@@ -62,4 +62,20 @@ class WordAnnotationPoolResolverTest {
 
         assertEquals(1, resolved.single().paragraphIndex)
     }
+
+    @Test
+    fun `late rare item survives a budget filled by an early common item`() {
+        val text = "the " .repeat(80) + "a rare word"
+        val resolved = WordAnnotationPoolResolver.resolveChapter(
+            paragraphs = paragraphs(text),
+            items = listOf(
+                WordAnnotationPoolItem("the", "definite article", 100),
+                WordAnnotationPoolItem("rare", "uncommon", 20_000),
+            ),
+            level = 1,
+            cap = 1,
+        )
+
+        assertEquals(listOf("rare"), resolved.map { it.surface })
+    }
 }

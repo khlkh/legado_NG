@@ -19,7 +19,11 @@ object WordAnnotationPoolResolver {
     ): List<WordAnnotation> {
         if (paragraphs.isEmpty() || items.isEmpty()) return emptyList()
         val floor = WordAnnotationLevels.floorFor(level)
-        val eligible = items.filter { WordAnnotationFilter.passesFloor(it.surface, it.rank, floor) }
+        // Expand rarest first so the expansion budget cannot be consumed by a
+        // common surface that happens to sit early in pool order.
+        val eligible = items
+            .filter { WordAnnotationFilter.passesFloor(it.surface, it.rank, floor) }
+            .sortedWith(compareByDescending<WordAnnotationPoolItem> { it.rank ?: Int.MIN_VALUE })
         if (eligible.isEmpty()) return emptyList()
         val windows = WordAnnotationResolver.paragraphWindows(paragraphs.map { it.text })
         val joined = windows.joinToString(separator = "\n") { it.text }
