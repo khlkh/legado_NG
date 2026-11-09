@@ -789,6 +789,9 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun upBookView() {
+        // Refresh the rail's Word Wise state from the live book; the View is
+        // constructed before ReadBook.book is installed on a cold start.
+        floatingWordAnnotationEnabled = ReadBook.book?.getWordAnnotationEnabled() == true
         binding.titleBar.title = null
         updateHeaderActionMode()
         binding.tvBookTitle.text = ReadBook.book?.name.orEmpty()
