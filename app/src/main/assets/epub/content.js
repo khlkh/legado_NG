@@ -16,6 +16,7 @@
     var lastStylePayload = null, aloud = null, nightMode = false;
     var noteMarkers = [], noteElements = [], noteStyle = null, noteSignature = '[[],null]', noteImage = null;
     var wordWiseFragments = [], wordWiseStyle = null, wordWiseSignature = '[[],null]', wordWiseLayer = null;
+    var wordWiseRectsCache = null;
     var titleSegments = [], titleStyle = null, titleSignature = '[[],null]';
     function palette(value) { return nightMode && value.nightCharStyles ? value.nightCharStyles : value.charStyles || []; }
     function paintRanges(value) { return nightMode && value.nightStyleRanges ? value.nightStyleRanges : value.styleRanges || []; }
@@ -128,10 +129,11 @@
         var signature = JSON.stringify([values || [], style || null]);
         if (signature === wordWiseSignature) return false;
         wordWiseFragments = (values || []).slice(); wordWiseStyle = style; wordWiseSignature = signature;
+        wordWiseRectsCache = null;
         paintWordWise();
         return true;
     }
-    function wordWiseRects() {
+    function computeWordWiseRects() {
         if (!wordWiseFragments.length) return [];
         var result = [];
         wordWiseFragments.forEach(function (fragment) {
@@ -149,6 +151,10 @@
             });
         });
         return result;
+    }
+    function wordWiseRects() {
+        if (!wordWiseRectsCache) wordWiseRectsCache = computeWordWiseRects();
+        return wordWiseRectsCache;
     }
     function rangeForEntry(entry, nativeStart, nativeEnd) {
         var node = entry.node, runs = entry.runs;
@@ -182,7 +188,8 @@
         var color = wordWiseStyle && wordWiseStyle.color ? wordWiseStyle.color : '#00A8FF';
         var labelSize = wordWiseStyle && wordWiseStyle.fontSize ? wordWiseStyle.fontSize : 11;
         var byId = new Map();
-        wordWiseRects().forEach(function (rect) {
+        wordWiseRectsCache = computeWordWiseRects();
+        wordWiseRectsCache.forEach(function (rect) {
             if (!byId.has(rect.id)) byId.set(rect.id, []);
             byId.get(rect.id).push(rect);
         });
@@ -197,22 +204,38 @@
                 Object.keys(properties).forEach(function (name) { div.style.setProperty(name, properties[name], 'important'); });
                 wordWiseLayer.appendChild(div);
             });
-            // Label the first rect visible on the current viewport; rects from other
-            // pages are painted by their own page turn.
+        });
+        // One label per hint, on the first rect visible in the viewport.
+        var labels = [];
+        byId.forEach(function (rects) {
             var first = rects.find(function (rect) {
                 return rect.top >= 0 && rect.top < height && rect.bottom > 0;
             }) || rects[0];
-            if (!first || !first.hint) return;
+            if (first && first.hint) labels.push(first);
+        });
+        labels.sort(function (a, b) { return a.top - b.top || a.left - b.left; });
+        var labelTop = 0;
+        labels.forEach(function (first) {
+            var top = Math.max(0, first.top - labelSize - 4);
+            // Same line as the previous label: shift right instead of overlapping.
+            var left = first.left;
+            if (Math.abs(top - labelTop) <= labelSize) {
+                var previous = labels[labels.indexOf(first) - 1];
+                if (previous && previous.__labelRight != null) left = previous.__labelRight + 6;
+            }
+            left = Math.min(left, Math.max(0, width - 48));
+            labelTop = top;
             var label = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
             label.textContent = first.hint;
-            var available = Math.max(40, width - first.left - 8);
+            var available = Math.max(40, width - left - 8);
             var labelStyle = { position: 'absolute', 'pointer-events': 'none', margin: '0', padding: '0', border: '0',
                 'font-size': labelSize + 'px', 'line-height': (labelSize + 2) + 'px', color: color,
                 'white-space': 'nowrap', overflow: 'hidden', 'text-overflow': 'ellipsis',
                 'max-width': available + 'px',
-                left: first.left + 'px', top: (first.top - labelSize - 4) + 'px' };
+                left: left + 'px', top: top + 'px' };
             Object.keys(labelStyle).forEach(function (name) { label.style.setProperty(name, labelStyle[name], 'important'); });
             wordWiseLayer.appendChild(label);
+            first.__labelRight = left + Math.min(label.offsetWidth || available, available);
         });
     }
     function clearWordWise() {
@@ -416,6 +439,7 @@
         nodeEntries = new WeakMap(); entries.forEach(function (entry) { nodeEntries.set(entry.node, entry); });
     }
     function clearLineBoxes() {
+        wordWiseRectsCache = null;
         var restored = window.__ngEpubLines && window.__ngEpubLines.clear();
         if (!restored) return false;
         entries = restored; styleElements = lineStyleElements; lineStyleElements = null; indexEntries();
@@ -774,6 +798,7 @@
         if (!value || value.version !== 1 || !Array.isArray(value.nodes)) throw new Error('EPUB 正文位置数据无效');
         nightMode = !!isNight;
         if (key === value.key) return updateStyles(value).changed;
+        wordWiseRectsCache = null;
         clearWordWise();
         clearStyleImages(); imagePlans.clear();
         noteMarkers = []; noteElements = []; noteStyle = null; noteSignature = '[[],null]';
