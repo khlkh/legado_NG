@@ -90,9 +90,9 @@ data class WordAnnotation(
     val surface: String,
     val hint: String,
     /**
-     * Generated-frequency rank of the surface, or null when the asset does not
-     * know it (phrase or out-of-vocabulary word). Used only for the local level
-     * floor and frequency-first ordering; layout ignores it.
+     * Generated-frequency rank of the surface's rarest token, or null when the
+     * asset does not know one of its tokens. Used only for the local level
+     * floor (single words) and rarest-first ordering; layout ignores it.
      */
     val rank: Int? = null,
 )

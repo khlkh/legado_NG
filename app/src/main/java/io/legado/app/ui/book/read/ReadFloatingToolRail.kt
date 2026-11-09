@@ -85,6 +85,7 @@ internal fun ReadFloatingToolRail(
     onAiPurify: () -> Unit,
     onAiSettings: () -> Unit,
     wordAnnotationEnabled: Boolean,
+    wordAnnotationVisible: Boolean = true,
     onWordAnnotation: () -> Unit,
     onToggleDockSide: () -> Unit
 ) {
@@ -152,6 +153,7 @@ private fun ToolRail(
     onReplace: () -> Unit,
     onAutoPage: () -> Unit,
     wordAnnotationEnabled: Boolean,
+    wordAnnotationVisible: Boolean = true,
     onWordAnnotation: () -> Unit,
     onToggleDockSide: () -> Unit
 ) {
@@ -209,13 +211,15 @@ private fun ToolRail(
                 onExpansionChange(expansion.toggle(ReadFloatingToolExpansion.AI))
             }
         )
-        ToolButton(
-            iconRes = R.drawable.ic_translate,
-            labelRes = R.string.word_annotation,
-            iconSize = 20.dp,
-            selected = wordAnnotationEnabled,
-            onClick = onWordAnnotation
-        )
+        if (wordAnnotationVisible) {
+            ToolButton(
+                iconRes = R.drawable.ic_translate,
+                labelRes = R.string.word_annotation,
+                iconSize = 20.dp,
+                selected = wordAnnotationEnabled,
+                onClick = onWordAnnotation
+            )
+        }
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             color = Color(NgTheme.colors.outlineVariant).copy(alpha = 0.45f)

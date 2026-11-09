@@ -283,7 +283,7 @@ object WordAnnotationAnalyzer {
                     next += WordAnnotationPoolItem(
                         surface = item.text,
                         hint = item.hint,
-                        rank = frequencyIndex?.minRankOf(item.text),
+                        rank = frequencyIndex?.maxRankOf(item.text),
                     )
                     added++
                 }

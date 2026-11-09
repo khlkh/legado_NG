@@ -37,6 +37,7 @@ import io.legado.app.databinding.ViewReadMenuBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.book.isEpub
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.source.getSourceType
 import io.legado.app.model.ReadBook
@@ -437,6 +438,9 @@ class ReadMenu @JvmOverloads constructor(
                         runMenuOut { callBack.onOpenAiPurifySettings() }
                     },
                     wordAnnotationEnabled = floatingWordAnnotationEnabled,
+                    wordAnnotationVisible = ReadBook.book?.let {
+                        !it.isEpub && it.config.scriptClass != "cjk"
+                    } == true,
                     onWordAnnotation = {
                         floatingToolExpansion = null
                         ReadBook.book?.let {
