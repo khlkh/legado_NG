@@ -83,6 +83,7 @@ internal class EpubLayoutController(
     private val neighboringChapters: () -> List<TextChapter>,
     private val selectionChanged: (JSONObject?, Boolean) -> Unit,
     private val highlightClick: (Bookmark, Float, Float, Float) -> Unit,
+    private val wordWiseClick: (String, Float, Float, Float) -> Unit = { _, _, _, _ -> },
     private val imageLongPress: (Float, Float, String) -> Unit = { _, _, _ -> },
     private val openingPreparation: () -> EpubOpeningPreparation? = { null },
     private val openingPreview: () -> EpubOpeningPreview? = { null },
@@ -481,7 +482,11 @@ internal class EpubLayoutController(
                     }
                     val wordWiseHint = result.optString("wordWiseHint")
                     if (wordWiseHint.isNotEmpty()) {
-                        host.context.toastOnUi(wordWiseHint)
+                        val wordWiseRect = result.optJSONObject("wordWiseRect")
+                        val scale = host.resources.displayMetrics.density
+                        val top = next.top + (wordWiseRect?.optDouble("top") ?: 0.0).toFloat() * scale
+                        val bottom = next.top + (wordWiseRect?.optDouble("bottom") ?: 0.0).toFloat() * scale
+                        wordWiseClick(wordWiseHint, x + next.left, top, bottom)
                         return@interactReady
                     }
                     val href = if (result.isNull("href")) "" else result.optString("href")
