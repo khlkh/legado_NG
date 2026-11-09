@@ -413,3 +413,15 @@ fun tryParesExportFileName(jsStr: String): Boolean {
         true
     }.getOrDefault(false)
 }
+
+/**
+ * Copies the live instance's readConfig into this (usually a freshly loaded or
+ * to-be-saved copy) when both are the same book. Prevents an in-memory config
+ * change (Word Wise toggle, level, cap) from being overwritten by a Book row
+ * loaded or written before the change.
+ */
+fun Book.carryReadConfigFrom(live: Book?) {
+    if (live != null && live.bookUrl == bookUrl && live.readConfig != null) {
+        readConfig = live.readConfig
+    }
+}

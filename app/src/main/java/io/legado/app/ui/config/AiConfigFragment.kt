@@ -2244,6 +2244,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                     },
                     onLevelSelected = { newLevel ->
                         ReadBook.book?.setWordAnnotationLevel(newLevel)
+                        ReadBook.saveWordAnnotationConfig()
                         if (ReadBook.book?.getWordAnnotationEnabled() == true) {
                             ReadBook.loadContent(false)
                         }
@@ -2252,6 +2253,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                     },
                     onHintCapSelected = { newCap ->
                         ReadBook.book?.setWordAnnotationHintCap(newCap)
+                        ReadBook.saveWordAnnotationConfig()
                         if (ReadBook.book?.getWordAnnotationEnabled() == true) {
                             ReadBook.loadContent(false)
                         }

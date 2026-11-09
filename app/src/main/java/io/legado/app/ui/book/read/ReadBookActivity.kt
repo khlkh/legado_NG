@@ -596,7 +596,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 it.setWordAnnotationEnabled(!it.getWordAnnotationEnabled())
                 item.isChecked = it.getWordAnnotationEnabled()
                 binding.readMenu.updateWordAnnotationState(it.getWordAnnotationEnabled())
-                ReadBook.saveRead()
+                ReadBook.saveWordAnnotationConfig()
                 ReadBook.loadContent(false)
             }
 

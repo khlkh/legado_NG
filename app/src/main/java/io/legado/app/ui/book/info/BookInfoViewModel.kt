@@ -23,6 +23,7 @@ import io.legado.app.data.entities.SearchBook
 import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.carryReadConfigFrom
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isNotShelf
@@ -498,6 +499,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         chapterListData.postValue(appDb.bookChapterDao.getChapterList(latest.bookUrl))
                         return@withChapterCachePublication
                     }
+                    book.carryReadConfigFrom(ReadBook.book)
                     appDb.bookDao.update(book)
                     appDb.bookChapterDao.delByBook(book.bookUrl)
                     appDb.bookChapterDao.insert(*chapters.toTypedArray())
@@ -700,6 +702,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 book.durChapterPos = it.durChapterPos
                 book.durChapterTitle = it.durChapterTitle
             }
+            book.carryReadConfigFrom(ReadBook.book)
             book.save()
             if (ReadBook.book?.isSameNameAuthor(book) == true) {
                 ReadBook.book = book
@@ -733,6 +736,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     book.durChapterPos = it.durChapterPos
                     book.durChapterTitle = it.durChapterTitle
                 }
+                book.carryReadConfigFrom(ReadBook.book)
                 if (ReadBook.book?.isSameNameAuthor(book) == true) {
                     ReadBook.book = book
                 } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {

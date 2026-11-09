@@ -14,6 +14,7 @@ import io.legado.app.help.annotation.WordAnnotationAnalyzer
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.book.carryReadConfigFrom
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
@@ -124,6 +125,7 @@ object ReadBook : CoroutineScope by MainScope() {
     @Synchronized
     fun resetData(book: Book) {
         releaseAndCancel()
+        book.carryReadConfigFrom(ReadBook.book)
         ReadingRecordTracker.bindBook(ReadingRecordKind.TEXT, book.bookUrl, book.name)
         ReadBook.book = book
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
@@ -157,6 +159,7 @@ object ReadBook : CoroutineScope by MainScope() {
     @Synchronized
     fun upData(book: Book) {
         releaseAndCancel()
+        book.carryReadConfigFrom(ReadBook.book)
         ReadingRecordTracker.bindBook(ReadingRecordKind.TEXT, book.bookUrl, book.name)
         ReadBook.book = book
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
@@ -316,6 +319,7 @@ object ReadBook : CoroutineScope by MainScope() {
         tocOrderPausedBookUrl = null
         if (book?.bookUrl != updatedBook.bookUrl) return
         loadEpoch.invalidate()
+        updatedBook.carryReadConfigFrom(book)
         book = updatedBook
         chapterSize = updatedBook.totalChapterNum
         simulatedChapterSize = updatedBook.simulatedTotalChapterNum()
@@ -1418,6 +1422,12 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     @Synchronized
+    /** Persists only the live book's ReadConfig column (Word Wise flag/level/cap). */
+    fun saveWordAnnotationConfig() {
+        val b = book ?: return
+        appDb.bookDao.updateReadStyleConfig(b.bookUrl, b.config)
+    }
+
     fun saveRead(pageChanged: Boolean = false) {
         val book = book ?: return
         if (tocOrderPausedBookUrl == book.bookUrl) return
@@ -1492,6 +1502,7 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun onChapterListUpdated(newBook: Book, loadContent: Boolean = true) {
         if (newBook.isSameNameAuthor(book)) {
+            newBook.carryReadConfigFrom(book)
             book = newBook
             chapterSize = newBook.totalChapterNum
             simulatedChapterSize = newBook.simulatedTotalChapterNum()
