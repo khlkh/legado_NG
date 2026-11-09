@@ -2237,7 +2237,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                     hintCap = hintCap,
                     modelSummary = wordAnnotationModelSummaryText(),
                     bookActive = ReadBook.book?.let {
-                        !it.isEpub && it.config.scriptClass != "cjk"
+                        it.config.scriptClass != "cjk"
                     } == true,
                     onSelectModel = {
                         showComposeModelSelectionSheet(AiModelSelectionTarget.WORD_ANNOTATION)

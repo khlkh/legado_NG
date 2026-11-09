@@ -463,6 +463,14 @@
         highlights = values || [];
         if (JSON.stringify(highlights) !== paintedHighlights) paintHighlights();
     }
+    function setWordWise(values, style) {
+        if (window.__ngEpubContent && window.__ngEpubContent.setWordWise(values || [], style || null)) {
+            indexContentNodes();
+            if (state.status === 'ready') {
+                window.__ngEpubContent.paintWordWise();
+            }
+        }
+    }
     var selectionLayer, selectionHighlightTransparent = false;
     function setSelectionTransparent(value) {
         if (selectionHighlightTransparent === !!value && document.getElementById('ng-epub-selection-style')) return;
@@ -780,6 +788,11 @@
                 var mark = highlightRects.slice().reverse().find(function (h) { var r = h.rect; return value.x >= r.left && value.x <= r.right && value.y >= r.top && value.y <= r.bottom; });
                 if (mark) { var r = mark.rect; return { token: state.token, highlight: mark.value.id,
                     highlightRect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } }; }
+                var wordWise = window.__ngEpubContent && window.__ngEpubContent.wordWiseRects()
+                    .filter(function (r) { return value.x >= r.left && value.x <= r.right && value.y >= r.top && value.y <= r.bottom; })
+                    .pop();
+                if (wordWise) return { token: state.token, wordWise: wordWise.id,
+                    wordWiseRect: { left: wordWise.left, top: wordWise.top, right: wordWise.right, bottom: wordWise.bottom } };
                 var hit = document.elementFromPoint(value.x, value.y);
                 var observer = hit;
                 while (observer && !triggerObservers.has(observer)) observer = observer.parentElement;
@@ -1543,6 +1556,9 @@
         if (window.__ngEpubContent && window.__ngEpubContent.setNotes(value.noteMarkers || [], value.noteMarkerStyle || null)) {
             indexContentNodes();
         }
+        if (window.__ngEpubContent && window.__ngEpubContent.setWordWise(value.wordWise || [], value.wordWiseStyle || null)) {
+            indexContentNodes();
+        }
         if (window.__ngEpubContent) {
             var titleEnabled = !value.fixed && (value.features || {}).title === false;
             var title = (value.readerStyle || value.readerDefaults || {}).title;
@@ -1889,6 +1905,7 @@
                 state.timings = layoutTimings(frameTiming, 0, performance.now() - began);
                   state.status = 'ready';
                   paintHighlights();
+                  if (window.__ngEpubContent) window.__ngEpubContent.paintWordWise();
                 if (trace) {
                     try { window.console.debug('EpubAloudTrace ' + JSON.stringify({ event: 'js-ready', token: value.token,
                         page: state.pageIndex, capturedOffset: sourceLocation().textOffset })); } catch (_) {}
@@ -1902,6 +1919,7 @@
         scrollBy: scrollBy,
         beginScroll: function () { state.scrollOvershoot = 0; },
         setHighlights: setHighlights,
+        setWordWise: setWordWise,
         setSelectionTransparent: setSelectionTransparent,
         mediaOverlay: mediaOverlay,
         revealText: revealText,

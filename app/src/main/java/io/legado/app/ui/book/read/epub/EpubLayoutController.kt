@@ -36,6 +36,8 @@ import io.legado.app.model.epub.EpubSpreadLayout
 import io.legado.app.model.epub.EpubSpreadPage
 import io.legado.app.model.epub.EpubPageProgressionDirection
 import io.legado.app.model.epub.EpubResourceLink
+import io.legado.app.model.epub.EpubWordWiseFragments
+import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -474,6 +476,12 @@ internal class EpubLayoutController(
                         highlightClick(highlight, x + next.left,
                             next.top + rect.optDouble("top").toFloat() * scale,
                             next.top + rect.optDouble("bottom").toFloat() * scale)
+                        return@interactReady
+                    }
+                    val wordWiseId = result.optInt("wordWise", -1)
+                    if (wordWiseId >= 0) {
+                        val hint = textChapter?.epubWordAnnotations?.getOrNull(wordWiseId)?.hint
+                        if (hint != null) host.context.toastOnUi(hint)
                         return@interactReady
                     }
                     val href = if (result.isNull("href")) "" else result.optString("href")
@@ -1088,7 +1096,21 @@ internal class EpubLayoutController(
                 for (i in 0 until ranges.length()) put(ranges.getJSONObject(i))
             } })
         } }
+        val wordWise = JSONArray().apply {
+            val prepared = preparedContent ?: return@apply
+            val annotations = prepared.chapter.epubWordAnnotations
+            if (annotations.isNotEmpty()) {
+                EpubWordWiseFragments.resolve(prepared.chapter.sourceParagraphs, prepared.mapped.documents, annotations)
+                    .filter { it.document == documentIndex }
+                    .forEach { fragment ->
+                        put(JSONObject().put("id", fragment.hintId).put("element", fragment.element)
+                            .put("ordinal", fragment.ordinal).put("start", fragment.nativeStart).put("end", fragment.nativeEnd))
+                    }
+            }
+        }
         value.put("highlights", highlights).put("noteMarkers", notes).put("titleSegmentsByDocument", titleSegments)
+            .put("wordWise", wordWise)
+            .put("wordWiseStyle", if (wordWise.length() > 0) JSONObject().put("color", EpubCharStyles.cssColor(ReadBookConfig.textAccentColor)) else JSONObject.NULL)
             .put("titleSegments", titleSegments.optJSONArray(documentIndex.toString()))
             .put("noteMarkerStyle", if (notes.length() > 0) noteMarker.style() ?: JSONObject.NULL else JSONObject.NULL)
             .put("selectionTransparent", selectionTransparent)

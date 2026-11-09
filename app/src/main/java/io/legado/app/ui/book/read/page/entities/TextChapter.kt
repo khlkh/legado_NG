@@ -64,6 +64,10 @@ data class TextChapter(
     @Transient
     var wordAnnotationPoolAttached: Boolean = false
 
+    /** EPUB-only resolved annotations; native layout must not draw hint bands for them. */
+    @Transient
+    var epubWordAnnotations: List<WordAnnotation> = emptyList()
+
     val readAloudText: ReadAloudTextSource get() = NativeReadAloudTextSource(this, layoutReadAloudPages)
 
     private var layout: TextChapterLayout? = null
