@@ -405,6 +405,7 @@
         paintSelection();
         paintFullLineUnderlines();
         if (window.__ngEpubContent) window.__ngEpubContent.paintUnderlines(visible);
+        if (window.__ngEpubContent) window.__ngEpubContent.paintWordWise();
         if (!highlightLayer) {
             highlightLayer = document.createElement('div');
             highlightLayer.setAttribute('aria-hidden', 'true');
@@ -1542,6 +1543,8 @@
         }
     }
     async function configureLayout(value, mine, retainedLocation) {
+        window.console.log('WordWiseDebug configureLayout hasWordWise=' + !!(value && value.wordWise) +
+            ' n=' + ((value && value.wordWise) || []).length + ' hasContent=' + !!window.__ngEpubContent);
         var frameTiming = { total: 0, max: 0, count: 0 };
         pageStartsCache = null;
 
@@ -1557,6 +1560,7 @@
             indexContentNodes();
         }
         if (window.__ngEpubContent && window.__ngEpubContent.setWordWise(value.wordWise || [], value.wordWiseStyle || null)) {
+            window.console.log('WordWiseDebug configure wordWise=' + (value.wordWise || []).length);
             indexContentNodes();
         }
         if (window.__ngEpubContent) {

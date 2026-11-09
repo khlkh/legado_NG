@@ -10,6 +10,7 @@ import android.widget.FrameLayout
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isEpub
@@ -1098,15 +1099,26 @@ internal class EpubLayoutController(
         } }
         val wordWise = JSONArray().apply {
             val prepared = preparedContent ?: return@apply
+            AppLog.put("WordAnnotation epub options annotations=${prepared.chapter.epubWordAnnotations.size} doc=$documentIndex")
             val annotations = prepared.chapter.epubWordAnnotations
             if (annotations.isNotEmpty()) {
-                EpubWordWiseFragments.resolve(prepared.chapter.sourceParagraphs, prepared.mapped.documents, annotations)
-                    .filter { it.document == documentIndex }
+                val all = EpubWordWiseFragments.resolve(prepared.chapter.sourceParagraphs, prepared.mapped.documents, annotations)
+                AppLog.put("WordAnnotation epub fragments total=${all.size} doc=$documentIndex dist=${all.groupBy { it.document }.mapValues { it.value.size }}")
+                val currentSpine = documents[documentIndex].spineIndex
+                all
+                    .filter { prepared.mapped.documents.getOrNull(it.document)?.source?.spineOccurrence == currentSpine }
                     .forEach { fragment ->
                         put(JSONObject().put("id", fragment.hintId).put("element", fragment.element)
-                            .put("ordinal", fragment.ordinal).put("start", fragment.nativeStart).put("end", fragment.nativeEnd))
+                            .put("ordinal", fragment.ordinal).put("start", fragment.nativeStart).put("end", fragment.nativeEnd)
+                            .put("hint", annotations.getOrNull(fragment.hintId)?.hint ?: ""))
                     }
             }
+        }
+        if (wordWise.length() > 0) {
+            // Reserve vertical space above each line for hint labels, exactly like the
+            // native hint band. Changing line-height re-paginates only when the feature
+            // is toggled or annotations attach, never on ordinary style repaints.
+            reader.put("lineHeight", reader.optDouble("lineHeight") + 16.0)
         }
         value.put("highlights", highlights).put("noteMarkers", notes).put("titleSegmentsByDocument", titleSegments)
             .put("wordWise", wordWise)

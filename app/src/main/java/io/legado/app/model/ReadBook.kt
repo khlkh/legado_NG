@@ -577,7 +577,7 @@ object ReadBook : CoroutineScope by MainScope() {
 
     private fun launchWordAnnotationForCurrent() {
         val currentBook = book ?: return
-        if (!currentBook.getWordAnnotationEnabled() || currentBook.isEpub) return
+        if (!currentBook.getWordAnnotationEnabled()) return
         val textChapter = curTextChapter ?: return
         val contents = BookContent(
             sameTitleRemoved = textChapter.sameTitleRemoved,

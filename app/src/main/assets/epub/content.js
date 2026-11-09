@@ -16,6 +16,7 @@
     var lastStylePayload = null, aloud = null, nightMode = false;
     var noteMarkers = [], noteElements = [], noteStyle = null, noteSignature = '[[],null]', noteImage = null;
     var wordWiseFragments = [], wordWiseStyle = null, wordWiseSignature = '[[],null]', wordWiseLayer = null;
+    var wordWiseDebugLog = 0;
     var titleSegments = [], titleStyle = null, titleSignature = '[[],null]';
     function palette(value) { return nightMode && value.nightCharStyles ? value.nightCharStyles : value.charStyles || []; }
     function paintRanges(value) { return nightMode && value.nightStyleRanges ? value.nightStyleRanges : value.styleRanges || []; }
@@ -128,6 +129,7 @@
         var signature = JSON.stringify([values || [], style || null]);
         if (signature === wordWiseSignature) return false;
         wordWiseFragments = (values || []).slice(); wordWiseStyle = style; wordWiseSignature = signature;
+        window.console.log('WordWiseDebug setWordWise fragments=' + wordWiseFragments.length + ' entries=' + entries.length);
         paintWordWise();
         return true;
     }
@@ -135,6 +137,22 @@
         if (!wordWiseFragments.length) return [];
         var transform = bodyTransform();
         var result = [];
+        if (wordWiseDebugLog < 2) {
+            wordWiseDebugLog++;
+            wordWiseFragments.slice(0, 3).forEach(function (fragment) {
+                var entry = null;
+                for (var i = 0; i < entries.length; i++) {
+                    var item = entries[i];
+                    if (item.element === fragment.element && item.ordinal === fragment.ordinal) { entry = item; break; }
+                }
+                var range = entry ? rangeForEntry(entry, fragment.start, fragment.end) : null;
+                window.console.log('WordWiseDebug rectDebug fragment=' + JSON.stringify(fragment) +
+                    ' entryFound=' + !!entry +
+                    (entry ? ' entryElem=' + entry.element + ' entryOrd=' + entry.ordinal + ' runs=' + entry.runs.length : '') +
+                    (entry && entry.runs.length ? ' firstRun=' + JSON.stringify(entry.runs[0]) + ' lastRun=' + JSON.stringify(entry.runs[entry.runs.length-1]) : '') +
+                    (range ? ' range=' + range.startOffset + '-' + range.endOffset : ' range=null'));
+            });
+        }
         wordWiseFragments.forEach(function (fragment) {
             var entry = null;
             for (var i = 0; i < entries.length; i++) {
@@ -146,7 +164,7 @@
             if (!range) return;
             Array.from(range.getClientRects()).forEach(function (rect) {
                 if (rect.width <= 0 || rect.height <= 0) return;
-                result.push({ id: fragment.id, left: rect.left - transform.x, top: rect.top - transform.y,
+                result.push({ id: fragment.id, hint: fragment.hint, left: rect.left - transform.x, top: rect.top - transform.y,
                     right: rect.right - transform.x, bottom: rect.bottom - transform.y });
             });
         });
@@ -172,6 +190,7 @@
     }
     function paintWordWise() {
         if (wordWiseLayer) wordWiseLayer.replaceChildren();
+        window.console.log('WordWiseDebug paint fragments=' + wordWiseFragments.length + ' entries=' + entries.length);
         if (!wordWiseFragments.length || !document.body) return;
         if (!wordWiseLayer) {
             wordWiseLayer = document.createElementNS('http://www.w3.org/1999/xhtml', 'ng-word-wise');
@@ -182,14 +201,37 @@
             document.documentElement.appendChild(wordWiseLayer);
         }
         var transform = bodyTransform(), color = wordWiseStyle && wordWiseStyle.color ? wordWiseStyle.color : '#00A8FF';
-        wordWiseRects().forEach(function (rect) {
-            var div = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
-            var properties = { position: 'absolute', 'pointer-events': 'none', 'border-radius': '2px',
-                left: (rect.left + transform.x) + 'px', top: (rect.top + transform.y) + 'px',
-                width: (rect.right - rect.left) + 'px', height: (rect.bottom - rect.top) + 'px',
-                'background-color': color, opacity: '0.22' };
-            Object.keys(properties).forEach(function (name) { div.style.setProperty(name, properties[name], 'important'); });
-            wordWiseLayer.appendChild(div);
+        var scale = transform.scale || 1, labelSize = (wordWiseStyle && wordWiseStyle.fontSize || 11) * scale;
+        var rects = wordWiseRects();
+        window.console.log('WordWiseDebug rects=' + rects.length);
+        var byId = new Map();
+        rects.forEach(function (rect) {
+            if (!byId.has(rect.id)) byId.set(rect.id, []);
+            byId.get(rect.id).push(rect);
+        });
+        var viewport = document.documentElement, width = viewport.clientWidth;
+        byId.forEach(function (rects, id) {
+            rects.forEach(function (rect) {
+                var div = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+                var properties = { position: 'absolute', 'pointer-events': 'none', 'border-radius': '2px',
+                    left: (rect.left + transform.x) + 'px', top: (rect.top + transform.y) + 'px',
+                    width: (rect.right - rect.left) + 'px', height: (rect.bottom - rect.top) + 'px',
+                    'background-color': color, opacity: '0.18' };
+                Object.keys(properties).forEach(function (name) { div.style.setProperty(name, properties[name], 'important'); });
+                wordWiseLayer.appendChild(div);
+            });
+            var first = rects[0];
+            if (!first || !first.hint) return;
+            var label = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+            label.textContent = first.hint;
+            var available = Math.max(40, width - (first.left + transform.x) - 8);
+            var labelStyle = { position: 'absolute', 'pointer-events': 'none', margin: '0', padding: '0', border: '0',
+                'font-size': labelSize + 'px', 'line-height': (labelSize + 2) + 'px', color: color,
+                'white-space': 'nowrap', overflow: 'hidden', 'text-overflow': 'ellipsis',
+                'max-width': available + 'px',
+                left: (first.left + transform.x) + 'px', top: (first.top + transform.y - labelSize - 4) + 'px' };
+            Object.keys(labelStyle).forEach(function (name) { label.style.setProperty(name, labelStyle[name], 'important'); });
+            wordWiseLayer.appendChild(label);
         });
     }
     function clearWordWise() {
@@ -884,7 +926,8 @@
     window.__ngEpubContent = Object.freeze({ apply: apply, loadFonts: loadFonts, offset: offset, point: point, selection: selection,
         setAloud: setAloud,
         setNotes: setNotes, noteRects: noteRects,
-        setWordWise: setWordWise, wordWiseRects: wordWiseRects, paintWordWise: paintWordWise, clearWordWise: clearWordWise,
+        setWordWise: setWordWise, wordWiseRects: wordWiseRects, wordWiseCount: function () { return wordWiseFragments.length; },
+        paintWordWise: paintWordWise, clearWordWise: clearWordWise,
         setTitleSegments: setTitleSegments, titleHeadings: titleHeadings,
         ruleUnderlineRects: ruleUnderlineRects,
         justifyLines: justifyLines, clearLineBoxes: clearLineBoxes,
