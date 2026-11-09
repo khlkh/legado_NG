@@ -3,6 +3,8 @@ package io.legado.app.help.annotation
 import java.util.Locale
 
 /**
+ * Future work / prototype, not used by the production analyzer.
+ *
  * Fusion prototype: a small English inflection engine used only as a fallback
  * when exact-surface resolution fails.
  *

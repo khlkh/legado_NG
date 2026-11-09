@@ -78,6 +78,24 @@ class WordFrequencyIndex private constructor(
     }
 
     /**
+     * Maximum (rarest) token rank of a surface, or null when any token is
+     * unknown. Used for pool ordering so a phrase ranks by its hardest token
+     * instead of its most common one.
+     */
+    fun maxRankOf(surface: String): Int? {
+        val tokens = TOKEN.findAll(surface)
+            .mapNotNull { normalizeToken(it.value) }
+            .toList()
+        if (tokens.isEmpty()) return null
+        var max = Int.MIN_VALUE
+        for (token in tokens) {
+            val rank = rankByWord[token] ?: return null
+            if (rank > max) max = rank
+        }
+        return max
+    }
+
+    /**
      * Band for a word or multiword surface. A phrase is only banded when every
      * token is known; one unknown token makes the whole phrase [FrequencyBand.UNKNOWN],
      * which is the conservative choice for a hint candidate.

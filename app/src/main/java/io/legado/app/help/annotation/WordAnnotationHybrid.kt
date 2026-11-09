@@ -1,6 +1,8 @@
 package io.legado.app.help.annotation
 
 /**
+ * Future work / prototype, not used by the production analyzer.
+ *
  * Fusion prototype: exact LLM anchoring, a rule-based lemma fallback, and an
  * optional frequency-band prior.
  *
