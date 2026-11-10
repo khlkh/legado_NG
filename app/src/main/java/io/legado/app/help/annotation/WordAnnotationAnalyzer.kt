@@ -1,6 +1,7 @@
 package io.legado.app.help.annotation
 
 import android.util.Log
+import io.legado.app.BuildConfig
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.constant.PreferKey
@@ -278,6 +279,23 @@ object WordAnnotationAnalyzer {
                 AppLog.put("WordAnnotation invalid chapter json chapter=${bookChapter.index}")
                 return
             }
+            // Debug-only measurement for the deferred inflection decision. It
+            // never changes the pool or the resolved hints. Measure only items
+            // that pass the same hint-length gate as the merge loop.
+            val inflectionProbe = if (BuildConfig.DEBUG) {
+                val measured = items.filter {
+                    WordAnnotationResolver.hintWithinCap(
+                        it.hint,
+                        config.hintCharCap,
+                        WordAnnotationConfig.MAX_HINT_WORDS,
+                    )
+                }
+                WordAnnotationInflectionProbe.probe(passage, measured)
+            } else null
+            if (inflectionProbe != null && inflectionProbe.exactMisses > 0) {
+                Log.i("WordAnnotation", "inflection samples: ${inflectionProbe.detail()}")
+            }
+            var poolVariantProbe: WordAnnotationInflectionProbe.PoolReport? = null
             // Merge and write under one lock so a concurrent chapter append
             // cannot be overwritten.
             synchronized(lock) {
@@ -305,6 +323,9 @@ object WordAnnotationAnalyzer {
                 }
                 val merged = next.take(target).toList()
                 mergedSize = merged.size
+                if (BuildConfig.DEBUG) {
+                    poolVariantProbe = WordAnnotationInflectionProbe.poolVariants(merged)
+                }
                 if (merged != current && !WordAnnotationPoolStore.write(file, identity, merged)) {
                     AppLog.put("WordAnnotation pool write failed")
                     return
@@ -313,8 +334,13 @@ object WordAnnotationAnalyzer {
             }
             AppLog.put(
                 "WordAnnotation chapter tokens=${result.promptTokens ?: -1}/${result.completionTokens ?: -1} " +
-                    "items=${items.size} added=$added pool=$mergedSize/$target chapter=${bookChapter.index}",
+                    "items=${items.size} added=$added pool=$mergedSize/$target chapter=${bookChapter.index}" +
+                    (inflectionProbe?.let { " ${it.summary()}" } ?: ""),
             )
+            poolVariantProbe?.takeIf { it.groups > 0 }?.let { report ->
+                AppLog.put("WordAnnotation inflection pool ${report.summary()}")
+                Log.i("WordAnnotation", "inflection pool samples: ${report.detail()}")
+            }
             val currentBook = ReadBook.book ?: return
             if (currentBook.bookUrl != book.bookUrl || !currentBook.getWordAnnotationEnabled()) {
                 AppLog.put("WordAnnotation pool append rejected: book changed")

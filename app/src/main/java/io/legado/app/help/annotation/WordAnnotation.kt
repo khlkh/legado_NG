@@ -15,9 +15,6 @@ object WordAnnotationConfig {
     /** Bump when the prompt or the JSON contract changes; part of the cache key. */
     const val SCHEMA_VERSION = 8
 
-    /** Wave 1 keeps at most this many resolved hints per chapter, after all other rules. */
-    const val MAX_HINTS_PER_CHAPTER = 12
-
     const val MIN_WORD_ANNOTATION_HINT_CAP = 5
     const val MAX_WORD_ANNOTATION_HINT_CAP = 89
     const val DEFAULT_WORD_ANNOTATION_HINT_CAP = 21

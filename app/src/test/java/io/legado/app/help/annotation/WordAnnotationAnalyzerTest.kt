@@ -1,5 +1,6 @@
 package io.legado.app.help.annotation
 
+import io.legado.app.data.entities.Book
 import io.legado.app.help.book.BookContent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -7,7 +8,7 @@ import org.junit.Test
 
 /**
  * Analyzer helpers: canonical paragraph selection, analysis-config identity
- * keys, and the fusion-resolution behavior the analyzer relies on.
+ * keys, pool sizing, and the current per-book cap default.
  */
 class WordAnnotationAnalyzerTest {
 
@@ -56,22 +57,6 @@ class WordAnnotationAnalyzerTest {
     }
 
     @Test
-    fun `fusion resolution recovers an inflected form`() {
-        val paragraphs = listOf("He ran home.")
-        val hybrid = WordAnnotationHybrid.resolveDetailed(
-            paragraphs = paragraphs,
-            items = listOf(WordAnnotationItem(text = "run", occurrence = 1, hint = "move fast")),
-            uiLocaleChinese = false,
-        )
-
-        assertEquals(1, hybrid.results.size)
-        assertEquals("ran", hybrid.results.single().annotation.surface)
-        assertEquals(3, hybrid.results.single().annotation.start)
-        assertEquals(6, hybrid.results.single().annotation.end)
-        assertTrue(hybrid.results.single().viaLemmaFallback)
-    }
-
-    @Test
     fun `chinese book max hint words rejects a seven-word english hint`() {
         val sevenWords = List(7) { "word" }.joinToString(" ")
         assertTrue(!WordAnnotationResolver.hintWithinCap(sevenWords, uiLocaleChinese = false, maxHintWords = 6))
@@ -83,5 +68,13 @@ class WordAnnotationAnalyzerTest {
         assertEquals(120, WordAnnotationAnalyzer.poolTarget(chapterCount = 10, cap = 13))
         assertEquals(260, WordAnnotationAnalyzer.poolTarget(chapterCount = 100, cap = 13))
         assertEquals(500, WordAnnotationAnalyzer.poolTarget(chapterCount = 5_000, cap = 55))
+    }
+
+    @Test
+    fun `new book defaults to the current hint cap`() {
+        assertEquals(
+            WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP,
+            Book().getWordAnnotationHintCap(),
+        )
     }
 }
