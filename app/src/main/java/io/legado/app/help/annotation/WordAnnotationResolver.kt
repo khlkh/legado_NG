@@ -18,7 +18,7 @@ package io.legado.app.help.annotation
  * 4. Take the occurrence-th surviving match; drop the item if it does not exist.
  * 5. In one round, drop every overlapping span pair's shorter span, or both
  *    spans when lengths are equal. Independent of model order.
- * 6. Sort by paragraph index and start; keep at most MAX_HINTS_PER_CHAPTER.
+ * 6. Sort by paragraph index and start; keep at most the supplied chapter cap.
  */
 object WordAnnotationResolver {
 
@@ -26,7 +26,7 @@ object WordAnnotationResolver {
         paragraphs: List<String>,
         items: List<WordAnnotationItem>,
         uiLocaleChinese: Boolean,
-        maxHintsPerChapter: Int = WordAnnotationConfig.MAX_HINTS_PER_CHAPTER,
+        maxHintsPerChapter: Int = WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP,
         maxHintWords: Int = WordAnnotationConfig.MAX_HINT_WORDS,
     ): List<WordAnnotation> {
         if (paragraphs.isEmpty() || items.isEmpty()) return emptyList()

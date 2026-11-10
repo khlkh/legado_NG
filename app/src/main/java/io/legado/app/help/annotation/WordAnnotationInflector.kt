@@ -3,15 +3,17 @@ package io.legado.app.help.annotation
 import java.util.Locale
 
 /**
- * Future work / prototype, not used by the production analyzer.
+ * Debug-only measurement helper, not used by the production analyzer.
  *
- * Fusion prototype: a small English inflection engine used only as a fallback
- * when exact-surface resolution fails.
+ * Used by [WordAnnotationInflectionProbe] to test whether a model item that
+ * failed exact matching could be recovered by a conservative forward
+ * inflection. Production Word Wise is exact-surface only; do not call this
+ * from the analyzer, the pool resolver, or the renderer.
  *
- * The model is still told to return the exact surface string. This engine is a
- * safety net for the common case where it returns a base form (`run`) while the
- * chapter contains an inflected form (`ran`, `running`, `runs`). It is our own
- * rule engine: no third-party lemma, frequency, or inflection data is embedded.
+ * The model is still told to return the exact surface string. This engine
+ * expands a known base form (`run`) into candidate forms (`ran`, `running`,
+ * `runs`) for measurement. It is our own rule engine: no third-party lemma,
+ * frequency, or inflection data is embedded.
  *
  * Deliberately conservative:
  * - English letters only; Chinese and other scripts return an empty list.
