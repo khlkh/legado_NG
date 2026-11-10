@@ -68,4 +68,120 @@ class WordAnnotationLayoutTest {
         )
         assertEquals(emptyList<TextHintRun>(), WordAnnotationLayout.runsForLine(annotations, 0, 20))
     }
+
+    @Test
+    fun `pending keeps a wrap only when the next line is a new page`() {
+        val annotations = listOf(
+            WordAnnotation(paragraphIndex = 0, start = 4, end = 22, surface = "came to terms with", hint = "accepted"),
+            WordAnnotation(paragraphIndex = 0, start = 40, end = 48, surface = "later", hint = "later"),
+        )
+        assertEquals(listOf(annotations[1]), WordAnnotationLayout.pendingAfterLine(annotations, lineEnd = 10))
+        assertEquals(annotations, WordAnnotationLayout.pendingAfterLine(annotations, lineEnd = 10, keepWraps = true))
+    }
+
+    @Test
+    fun `end of line label slides left to keep full width`() {
+        val (x, maxWidth) = WordAnnotationLayout.placeHintX(
+            spanStart = 300f, spanEnd = 340f, measuredWidth = 80f,
+            lineStart = 0f, lineEnd = 360f, cursor = 0f,
+        )
+        assertEquals(280f, x, 0.01f)
+        assertEquals(80f, maxWidth, 0.01f)
+    }
+
+    @Test
+    fun `start of line label stays at the word`() {
+        val (x, maxWidth) = WordAnnotationLayout.placeHintX(
+            spanStart = 20f, spanEnd = 60f, measuredWidth = 80f,
+            lineStart = 0f, lineEnd = 360f, cursor = 0f,
+        )
+        assertEquals(20f, x, 0.01f)
+        assertEquals(340f, maxWidth, 0.01f)
+    }
+
+    @Test
+    fun `cursor blocks a label from sliding through the previous one`() {
+        val (x, maxWidth) = WordAnnotationLayout.placeHintX(
+            spanStart = 200f, spanEnd = 240f, measuredWidth = 80f,
+            lineStart = 0f, lineEnd = 360f, cursor = 120f,
+        )
+        assertEquals(200f, x, 0.01f)
+        assertEquals(160f, maxWidth, 0.01f)
+    }
+
+    @Test
+    fun `on-page uses the rect center so a next-column sliver is excluded`() {
+        assertEquals(true, WordAnnotationLayout.onPage(10f, 10f, 40f, 30f, 360f, 640f))
+        // Previous CSS column: same Y, negative X. Center is < 0.
+        assertEquals(false, WordAnnotationLayout.onPage(-80f, 400f, 2f, 420f, 360f, 640f))
+        // Next CSS column: center is past the viewport width.
+        assertEquals(false, WordAnnotationLayout.onPage(358f, 400f, 440f, 420f, 360f, 640f))
+        // First-line word clipped at y=0 still has its center on the page.
+        assertEquals(true, WordAnnotationLayout.onPage(20f, -4f, 80f, 16f, 360f, 640f))
+    }
+
+    @Test
+    fun `inline splits on one line merge into a single segment`() {
+        val merged = WordAnnotationLayout.mergeLineSegments(
+            listOf(
+                WordAnnotationLayout.HintSegment(1, "accepted", 200f, 240f, 40f, 60f),
+                WordAnnotationLayout.HintSegment(1, "accepted", 240f, 310f, 41f, 59f),
+                WordAnnotationLayout.HintSegment(1, "accepted", 20f, 90f, 64f, 84f),
+            ),
+        )
+        assertEquals(2, merged.size)
+        assertEquals(200f, merged[0].left, 0f)
+        assertEquals(310f, merged[0].right, 0f)
+        assertEquals(20f, merged[1].left, 0f)
+    }
+
+    @Test
+    fun `wrapped phrase picks the first segment when it can slide to fit`() {
+        val first = WordAnnotationLayout.HintSegment(1, "accepted", 300f, 340f, 40f, 60f)
+        val second = WordAnnotationLayout.HintSegment(1, "accepted", 20f, 180f, 64f, 84f)
+        val chosen = WordAnnotationLayout.chooseAnchor(listOf(first, second), measuredWidth = 80f, columnLeft = 0f, columnRight = 360f)
+        assertEquals(first, chosen)
+    }
+
+    @Test
+    fun `wrapped phrase picks the roomier segment when the first cannot fit`() {
+        val sliver = WordAnnotationLayout.HintSegment(1, "accepted", 358f, 360f, 40f, 60f)
+        val rest = WordAnnotationLayout.HintSegment(1, "accepted", 20f, 180f, 64f, 84f)
+        val chosen = WordAnnotationLayout.chooseAnchor(
+            listOf(sliver, rest),
+            measuredWidth = 400f,
+            columnLeft = 0f,
+            columnRight = 360f,
+        )
+        assertEquals(rest, chosen)
+    }
+
+    @Test
+    fun `pack slides an end of line label left instead of ellipsizing`() {
+        val segment = WordAnnotationLayout.HintSegment(1, "impossible", 300f, 340f, 40f, 60f)
+        val placed = WordAnnotationLayout.packHintLabels(
+            listOf(segment to 80f),
+            columnLeft = 0f,
+            columnRight = 360f,
+        )
+        assertEquals(1, placed.size)
+        assertEquals(280f, placed[0].left, 0.01f)
+        assertEquals(80f, placed[0].maxWidth, 0.01f)
+    }
+
+    @Test
+    fun `pack slides the earlier label left before shortening the later one`() {
+        val first = WordAnnotationLayout.HintSegment(1, "a", 80f, 100f, 40f, 60f)
+        val second = WordAnnotationLayout.HintSegment(2, "b", 80f, 100f, 40f, 60f)
+        val placed = WordAnnotationLayout.packHintLabels(
+            listOf(first to 40f, second to 40f),
+            columnLeft = 0f,
+            columnRight = 100f,
+        )
+        assertEquals(2, placed.size)
+        assertEquals(40f, placed[0].left, 0.01f)
+        assertEquals(40f, placed[0].maxWidth, 0.01f)
+        assertEquals(86f, placed[1].left, 0.01f)
+        assertEquals(14f, placed[1].maxWidth, 0.01f)
+    }
 }

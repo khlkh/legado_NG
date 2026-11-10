@@ -37,6 +37,7 @@ import io.legado.app.model.epub.EpubSpreadLayout
 import io.legado.app.model.epub.EpubSpreadPage
 import io.legado.app.model.epub.EpubPageProgressionDirection
 import io.legado.app.model.epub.EpubResourceLink
+import io.legado.app.help.annotation.WordAnnotationLayout
 import io.legado.app.model.epub.EpubWordWiseFragments
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
@@ -480,14 +481,20 @@ internal class EpubLayoutController(
                             next.top + rect.optDouble("bottom").toFloat() * scale)
                         return@interactReady
                     }
-                    val wordWiseHint = result.optString("wordWiseHint")
-                    if (wordWiseHint.isNotEmpty()) {
-                        val wordWiseRect = result.optJSONObject("wordWiseRect")
-                        val scale = host.resources.displayMetrics.density
-                        val top = next.top + (wordWiseRect?.optDouble("top") ?: 0.0).toFloat() * scale
-                        val bottom = next.top + (wordWiseRect?.optDouble("bottom") ?: 0.0).toFloat() * scale
-                        wordWiseClick(wordWiseHint, x + next.left, top, bottom)
-                        return@interactReady
+                    if (result.has("wordWise")) {
+                        val wordWiseId = result.optInt("wordWise")
+                        val wordWiseHint = documents.getOrNull(documentIndex)
+                            ?.chapter?.epubWordAnnotations?.getOrNull(wordWiseId)?.hint
+                            .orEmpty()
+                            .ifEmpty { result.optString("wordWiseHint") }
+                        if (wordWiseHint.isNotEmpty()) {
+                            val wordWiseRect = result.optJSONObject("wordWiseRect")
+                            val scale = host.resources.displayMetrics.density
+                            val top = next.top + (wordWiseRect?.optDouble("top") ?: 0.0).toFloat() * scale
+                            val bottom = next.top + (wordWiseRect?.optDouble("bottom") ?: 0.0).toFloat() * scale
+                            wordWiseClick(wordWiseHint, x + next.left, top, bottom)
+                            return@interactReady
+                        }
                     }
                     val href = if (result.isNull("href")) "" else result.optString("href")
                     if (href.isEmpty()) {
@@ -1122,7 +1129,9 @@ internal class EpubLayoutController(
             .put("wordWise", wordWise)
             .put("wordWiseStyle", if (wordWise.length() > 0) JSONObject()
                 .put("color", EpubCharStyles.cssColor(ReadBookConfig.textAccentColor))
-                .put("fontSize", ChapterProvider.hintPaint.textSize / metrics.density) else JSONObject.NULL)
+                .put("fontSize", ChapterProvider.hintPaint.textSize / metrics.density)
+                .put("band", ChapterProvider.hintPaint.textSize / metrics.density +
+                    WordAnnotationLayout.LABEL_ABOVE) else JSONObject.NULL)
             .put("titleSegments", titleSegments.optJSONArray(documentIndex.toString()))
             .put("noteMarkerStyle", if (notes.length() > 0) noteMarker.style() ?: JSONObject.NULL else JSONObject.NULL)
             .put("selectionTransparent", selectionTransparent)

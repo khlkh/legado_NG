@@ -16,7 +16,7 @@
     var lastStylePayload = null, aloud = null, nightMode = false;
     var noteMarkers = [], noteElements = [], noteStyle = null, noteSignature = '[[],null]', noteImage = null;
     var wordWiseFragments = [], wordWiseStyle = null, wordWiseSignature = '[[],null]', wordWiseLayer = null;
-    var wordWiseRectsCache = null;
+    var wordWiseRectsCache = null, wordWiseMeasure = null;
     var titleSegments = [], titleStyle = null, titleSignature = '[[],null]';
     function palette(value) { return nightMode && value.nightCharStyles ? value.nightCharStyles : value.charStyles || []; }
     function paintRanges(value) { return nightMode && value.nightStyleRanges ? value.nightStyleRanges : value.styleRanges || []; }
@@ -174,8 +174,131 @@
         range.setEnd(node, charEnd);
         return range;
     }
+    var wordWiseRafPending = false;
+    var LABEL_GAP = 6, LABEL_MIN_WIDTH = 4, LABEL_ABOVE = 4, LABEL_COLUMN_INSET = 8;
+    function sameLine(a, b) {
+        var overlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        var shorter = Math.min(a.bottom - a.top, b.bottom - b.top);
+        return shorter > 0 && overlap > shorter / 2;
+    }
+    function onPage(rect, width, height) {
+        var cx = (rect.left + rect.right) / 2, cy = (rect.top + rect.bottom) / 2;
+        return cx >= 0 && cx < width && cy >= 0 && cy < height;
+    }
+    function mergeLineSegments(rects) {
+        var lines = [];
+        rects.forEach(function (rect) {
+            var group = null;
+            for (var i = 0; i < lines.length; i++) {
+                if (sameLine(lines[i], rect)) { group = lines[i]; break; }
+            }
+            if (!group) { lines.push({ id: rect.id, hint: rect.hint, left: rect.left, right: rect.right,
+                top: rect.top, bottom: rect.bottom }); return; }
+            group.left = Math.min(group.left, rect.left);
+            group.right = Math.max(group.right, rect.right);
+            group.top = Math.min(group.top, rect.top);
+            group.bottom = Math.max(group.bottom, rect.bottom);
+        });
+        return lines;
+    }
+    function placeHintX(spanStart, spanEnd, measuredWidth, lineStart, lineEnd, cursor) {
+        var colLeft = Math.max(lineStart, cursor), colRight = lineEnd;
+        if (colRight - colLeft < LABEL_MIN_WIDTH || colLeft >= spanEnd) return { x: colLeft, maxWidth: 0 };
+        var x = Math.min(spanStart, colRight - measuredWidth);
+        x = Math.max(x, colLeft);
+        x = Math.min(x, spanEnd - 1);
+        x = Math.max(x, colLeft);
+        return { x: x, maxWidth: Math.max(0, colRight - x) };
+    }
+    function chooseAnchor(segments, measuredWidth, columnLeft, columnRight) {
+        if (!segments.length) return null;
+        var ordered = segments.slice().sort(function (a, b) { return a.top - b.top || a.left - b.left; });
+        function fits(segment) {
+            return placeHintX(segment.left, segment.right, measuredWidth, columnLeft, columnRight, columnLeft).maxWidth >= measuredWidth - 0.5;
+        }
+        function visibleWidth(segment) {
+            return Math.max(0, Math.min(segment.right, columnRight) - Math.max(segment.left, columnLeft));
+        }
+        var full = ordered.find(fits);
+        if (full) return full;
+        return ordered.reduce(function (best, segment) {
+            var a = visibleWidth(segment), b = visibleWidth(best);
+            if (a !== b) return a > b ? segment : best;
+            return segment.top < best.top || (segment.top === best.top && segment.left < best.left) ? segment : best;
+        });
+    }
+    function packHintLabels(anchors, columnLeft, columnRight) {
+        var groups = [];
+        anchors.slice().sort(function (a, b) { return a.top - b.top || a.left - b.left; }).forEach(function (anchor) {
+            var group = null;
+            for (var i = 0; i < groups.length; i++) {
+                if (sameLine(groups[i][0], anchor)) { group = groups[i]; break; }
+            }
+            if (!group) groups.push([anchor]); else group.push(anchor);
+        });
+        var placed = [];
+        groups.forEach(function (group) {
+            var slots = [];
+            group.slice().sort(function (a, b) { return a.left - b.left; }).forEach(function (segment) {
+                var measured = segment.measured;
+                var preferred = Math.max(Math.max(columnLeft, segment.left - measured),
+                    Math.min(segment.left, columnRight - measured));
+                var cursor = slots.length ? slots[slots.length - 1].x + slots[slots.length - 1].width + LABEL_GAP : columnLeft;
+                if (preferred < cursor && slots.length) {
+                    var need = cursor - preferred, j;
+                    for (j = slots.length - 1; j >= 0 && need > 0; j--) {
+                        var can = slots[j].x - Math.max(columnLeft, slots[j].left - slots[j].measured);
+                        if (can <= 0) continue;
+                        var take = Math.min(can, need), k;
+                        for (k = j; k < slots.length; k++) slots[k].x -= take;
+                        need -= take;
+                    }
+                    cursor = slots[slots.length - 1].x + slots[slots.length - 1].width + LABEL_GAP;
+                }
+                var x = Math.max(preferred, cursor);
+                x = Math.min(x, segment.right - 1);
+                x = Math.max(x, cursor);
+                var width = Math.min(measured, Math.max(0, columnRight - x));
+                if (width < LABEL_MIN_WIDTH) return;
+                slots.push({ id: segment.id, hint: segment.hint, left: segment.left, right: segment.right,
+                    top: segment.top, bottom: segment.bottom, measured: measured, x: x, width: width });
+            });
+            slots.forEach(function (slot) {
+                placed.push({ id: slot.id, hint: slot.hint, left: slot.x, maxWidth: slot.width,
+                    segment: { id: slot.id, hint: slot.hint, left: slot.left, right: slot.right,
+                        top: slot.top, bottom: slot.bottom } });
+            });
+        });
+        return placed;
+    }
+    function hintWidth(text, fontSize) {
+        if (!wordWiseMeasure) {
+            wordWiseMeasure = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+            wordWiseMeasure.setAttribute('aria-hidden', 'true');
+            var measureStyle = { position: 'absolute', visibility: 'hidden', 'white-space': 'nowrap',
+                margin: '0', padding: '0', border: '0', left: '0', top: '0', 'pointer-events': 'none' };
+            Object.keys(measureStyle).forEach(function (name) { wordWiseMeasure.style.setProperty(name, measureStyle[name], 'important'); });
+            document.documentElement.appendChild(wordWiseMeasure);
+        }
+        wordWiseMeasure.style.setProperty('font-size', fontSize + 'px', 'important');
+        wordWiseMeasure.style.setProperty('line-height', (fontSize + 2) + 'px', 'important');
+        wordWiseMeasure.textContent = text;
+        return wordWiseMeasure.offsetWidth;
+    }
     function paintWordWise() {
-        if (wordWiseLayer) wordWiseLayer.replaceChildren();
+        paintWordWiseCore();
+        // The page move transform may settle one frame after ready; repaint once
+        // so labels track the final viewport position instead of freezing.
+        if (!wordWiseRafPending) {
+            wordWiseRafPending = true;
+            window.requestAnimationFrame(function () {
+                wordWiseRafPending = false;
+                paintWordWiseCore();
+            });
+        }
+    }
+    function paintWordWiseCore() {
+        if (wordWiseLayer) { wordWiseLayer.replaceChildren(); wordWiseLayer.__ngHits = []; }
         if (!wordWiseFragments.length || !document.body) return;
         if (!wordWiseLayer) {
             wordWiseLayer = document.createElementNS('http://www.w3.org/1999/xhtml', 'ng-word-wise');
@@ -194,8 +317,11 @@
             byId.get(rect.id).push(rect);
         });
         var viewport = document.documentElement, width = viewport.clientWidth, height = viewport.clientHeight;
+        var columnLeft = 0, columnRight = Math.max(columnLeft + LABEL_MIN_WIDTH, width - LABEL_COLUMN_INSET);
+        function visible(rect) { return rect.top < height && rect.bottom > 0 && rect.left < width && rect.right > 0; }
         byId.forEach(function (rects) {
             rects.forEach(function (rect) {
+                if (!visible(rect)) return;
                 var div = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
                 var properties = { position: 'absolute', 'pointer-events': 'none', 'border-radius': '2px',
                     left: rect.left + 'px', top: rect.top + 'px',
@@ -205,41 +331,60 @@
                 wordWiseLayer.appendChild(div);
             });
         });
-        // One label per hint, on the first rect visible in the viewport.
-        var labels = [];
+        // One label per hint id on this page. Wrapped fragments share that id;
+        // extra line boxes keep the tint only.
+        var anchors = [];
         byId.forEach(function (rects) {
-            var first = rects.find(function (rect) {
-                return rect.top >= 0 && rect.top < height && rect.bottom > 0;
-            }) || rects[0];
-            if (first && first.hint) labels.push(first);
-        });
-        labels.sort(function (a, b) { return a.top - b.top || a.left - b.left; });
-        var labelTop = 0;
-        labels.forEach(function (first) {
-            var top = Math.max(0, first.top - labelSize - 4);
-            // Same line as the previous label: shift right instead of overlapping.
-            var left = first.left;
-            if (Math.abs(top - labelTop) <= labelSize) {
-                var previous = labels[labels.indexOf(first) - 1];
-                if (previous && previous.__labelRight != null) left = previous.__labelRight + 6;
+            var pageRects = rects.filter(function (rect) { return onPage(rect, width, height); });
+            if (!pageRects.length) return;
+            var segments = mergeLineSegments(pageRects);
+            var measured = hintWidth(pageRects[0].hint || '', labelSize);
+            var anchor = chooseAnchor(segments, measured, columnLeft, columnRight);
+            if (anchor && anchor.hint) {
+                anchor.measured = measured;
+                anchors.push(anchor);
             }
-            left = Math.min(left, Math.max(0, width - 48));
-            labelTop = top;
+        });
+        var hits = [];
+        packHintLabels(anchors, columnLeft, columnRight).forEach(function (item) {
+            var top = Math.max(0, item.segment.top - labelSize - LABEL_ABOVE);
+            if (top + labelSize + 2 > height) top = Math.max(0, height - labelSize - 2);
             var label = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
-            label.textContent = first.hint;
-            var available = Math.max(40, width - left - 8);
+            label.textContent = item.hint;
             var labelStyle = { position: 'absolute', 'pointer-events': 'none', margin: '0', padding: '0', border: '0',
                 'font-size': labelSize + 'px', 'line-height': (labelSize + 2) + 'px', color: color,
                 'white-space': 'nowrap', overflow: 'hidden', 'text-overflow': 'ellipsis',
-                'max-width': available + 'px',
-                left: left + 'px', top: top + 'px' };
+                'max-width': item.maxWidth + 'px',
+                left: item.left + 'px', top: top + 'px' };
             Object.keys(labelStyle).forEach(function (name) { label.style.setProperty(name, labelStyle[name], 'important'); });
             wordWiseLayer.appendChild(label);
-            first.__labelRight = left + Math.min(label.offsetWidth || available, available);
+            var drawn = Math.min(label.offsetWidth || item.maxWidth, item.maxWidth);
+            hits.push({ id: item.id, hint: item.hint, left: item.left, top: top,
+                right: item.left + drawn, bottom: top + labelSize + 2,
+                segLeft: item.segment.left, segTop: item.segment.top,
+                segRight: item.segment.right, segBottom: item.segment.bottom });
         });
+        wordWiseLayer.__ngHits = hits;
+    }
+    function hitWordWise(x, y) {
+        var hits = wordWiseLayer && wordWiseLayer.__ngHits || [];
+        var i, hit = null;
+        for (i = 0; i < hits.length; i++) {
+            var label = hits[i];
+            if (x >= label.left && x <= label.right && y >= label.top && y <= label.bottom) hit = label;
+        }
+        if (hit) return { id: hit.id, hint: hit.hint, left: hit.segLeft, top: hit.segTop,
+            right: hit.segRight, bottom: hit.segBottom };
+        var rects = wordWiseRects();
+        for (i = 0; i < rects.length; i++) {
+            var box = rects[i];
+            if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) hit = box;
+        }
+        return hit ? { id: hit.id, hint: hit.hint, left: hit.left, top: hit.top, right: hit.right, bottom: hit.bottom } : null;
     }
     function clearWordWise() {
-        if (wordWiseLayer) { wordWiseLayer.replaceChildren(); }
+        wordWiseRectsCache = null;
+        if (wordWiseLayer) { wordWiseLayer.replaceChildren(); wordWiseLayer.__ngHits = []; }
     }
     function applyStyles(value) {
         lastStylePayload = value;
@@ -934,7 +1079,7 @@
         setAloud: setAloud,
         setNotes: setNotes, noteRects: noteRects,
         setWordWise: setWordWise, wordWiseRects: wordWiseRects, wordWiseCount: function () { return wordWiseFragments.length; },
-        paintWordWise: paintWordWise, clearWordWise: clearWordWise,
+        paintWordWise: paintWordWise, clearWordWise: clearWordWise, hitWordWise: hitWordWise,
         setTitleSegments: setTitleSegments, titleHeadings: titleHeadings,
         ruleUnderlineRects: ruleUnderlineRects,
         justifyLines: justifyLines, clearLineBoxes: clearLineBoxes,

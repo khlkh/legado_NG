@@ -1120,12 +1120,12 @@ class TextChapterLayout(
         for (lineIndex in 0 until layout.lineCount) {
             val lineStart = layout.getLineStart(lineIndex)
             val lineEnd = layout.getLineEnd(lineIndex)
-            val lineHints = if (pendingAnnotations.isEmpty()) {
+            val remaining = pendingAnnotations
+            val lineHints = if (remaining.isEmpty()) {
                 emptyList()
             } else {
-                WordAnnotationLayout.runsForLine(pendingAnnotations, lineStart, lineEnd)
+                WordAnnotationLayout.runsForLine(remaining, lineStart, lineEnd)
             }
-            pendingAnnotations = WordAnnotationLayout.pendingAfterLine(pendingAnnotations, lineEnd)
             val hintBand = WordAnnotationLayout.bandHeight(textHeight, lineHints.isNotEmpty())
             val textLine = TextLine(isTitle = isTitle)
             textLine.hintRuns = lineHints
@@ -1200,6 +1200,13 @@ class TextChapterLayout(
             if (textPage.height < durY) {
                 textPage.height = durY
             }
+            val wrapping = remaining.any { it.start < lineEnd && it.end > lineEnd }
+            val nextBand = WordAnnotationLayout.bandHeight(textHeight, wrapping)
+            pendingAnnotations = WordAnnotationLayout.pendingAfterLine(
+                remaining,
+                lineEnd,
+                keepWraps = wrapping && durY + textHeight + nextBand > visibleHeight,
+            )
         }
         durY += textHeight * paragraphSpacing / 10f
     }

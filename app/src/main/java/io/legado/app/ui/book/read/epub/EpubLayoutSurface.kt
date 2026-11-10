@@ -831,6 +831,7 @@ internal class EpubLayoutSurface(
             // queried; the controller still rejects book/layout epoch changes.
             val capturedTap = action == "tap" && result != null && result.optString("token") == token &&
                 !result.optBoolean("handled") && !result.optBoolean("dismissed") && result.optString("highlight").isEmpty() &&
+                !result.has("wordWise") &&
                 result.optString("wordWiseHint").isEmpty() &&
                 (result.isNull("href") || result.optString("href").isEmpty())
             if (io.legado.app.BuildConfig.DEBUG && capturedTap && revision.toString() != token)
