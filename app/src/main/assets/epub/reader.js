@@ -400,12 +400,12 @@
         });
     }
     function paintHighlights() {
+        if (window.__ngEpubContent) window.__ngEpubContent.paintWordWise();
         if (body === root) return;
         paintedHighlights = JSON.stringify(highlights);
         paintSelection();
         paintFullLineUnderlines();
         if (window.__ngEpubContent) window.__ngEpubContent.paintUnderlines(visible);
-        if (window.__ngEpubContent) window.__ngEpubContent.paintWordWise();
         if (!highlightLayer) {
             highlightLayer = document.createElement('div');
             highlightLayer.setAttribute('aria-hidden', 'true');
@@ -790,9 +790,7 @@
                 var mark = highlightRects.slice().reverse().find(function (h) { var r = h.rect; return value.x >= r.left && value.x <= r.right && value.y >= r.top && value.y <= r.bottom; });
                 if (mark) { var r = mark.rect; return { token: state.token, highlight: mark.value.id,
                     highlightRect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } }; }
-                var wordWise = window.__ngEpubContent && window.__ngEpubContent.wordWiseRects()
-                    .filter(function (r) { return value.x >= r.left && value.x <= r.right && value.y >= r.top && value.y <= r.bottom; })
-                    .pop();
+                var wordWise = window.__ngEpubContent && window.__ngEpubContent.hitWordWise(value.x, value.y);
                 if (wordWise) return { token: state.token, wordWise: wordWise.id,
                     wordWiseHint: wordWise.hint || '',
                     wordWiseRect: { left: wordWise.left, top: wordWise.top, right: wordWise.right, bottom: wordWise.bottom } };
@@ -1768,6 +1766,13 @@
                     'column-fill': 'auto', overflow: 'visible', position: 'absolute', left: '0', top: topInset + 'px',
                     'transform-origin': '0 0', transform: 'none' });
                 style(body, { 'overflow-wrap': 'anywhere' });
+                var wordWiseBand = value.wordWiseStyle && Number.isFinite(value.wordWiseStyle.band) ? value.wordWiseStyle.band : 0;
+                if (wordWiseBand > 0) {
+                    // Extra line-height is split above and below the glyphs, so the
+                    // first line of every column still needs this padding for the
+                    // label that sits above the word.
+                    style(body, { 'padding-top': ((parseFloat(window.getComputedStyle(body).paddingTop) || 0) + wordWiseBand) + 'px' });
+                }
                 if (state.scrolled) {
                     style(body, { 'column-width': 'auto', 'column-count': 'auto', 'column-gap': 'normal' });
                     if (axis === 'y') style(body, { height: 'auto' });
@@ -1908,7 +1913,6 @@
                 state.timings = layoutTimings(frameTiming, 0, performance.now() - began);
                   state.status = 'ready';
                   paintHighlights();
-                  if (window.__ngEpubContent) window.__ngEpubContent.paintWordWise();
                 if (trace) {
                     try { window.console.debug('EpubAloudTrace ' + JSON.stringify({ event: 'js-ready', token: value.token,
                         page: state.pageIndex, capturedOffset: sourceLocation().textOffset })); } catch (_) {}

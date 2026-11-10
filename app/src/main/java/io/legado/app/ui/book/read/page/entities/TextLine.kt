@@ -244,24 +244,28 @@ data class TextLine(
         paint.color = ReadBookConfig.textAccentColor
         val band = WordAnnotationLayout.bandHeight(ChapterProvider.contentPaintTextHeight, hasHints = true)
         val baseline = band - paint.fontMetrics.descent - 1.dpToPx()
-        val runs = hintRuns.sortedBy { it.start }
-        runs.forEachIndexed { index, run ->
-            val span = hintRunXSpan(run) ?: return@forEachIndexed
-            // The hint may use the rest of the line, but never into the next
-            // hint's span, so two hints on one line cannot overlap.
-            val nextSpan = runs.getOrNull(index + 1)?.let { hintRunXSpan(it) }
-            val clipEnd = nextSpan?.first ?: lineEnd
-            val availableWidth = maxOf(span.second - span.first, clipEnd - span.first)
-            if (availableWidth <= 0f) return@forEachIndexed
+        val anchors = hintRuns.sortedBy { it.start }.mapNotNull { run ->
+            val span = hintRunXSpan(run) ?: return@mapNotNull null
+            WordAnnotationLayout.HintSegment(
+                id = 0,
+                hint = run.hint,
+                left = span.first,
+                right = span.second,
+                top = 0f,
+                bottom = band,
+            ) to paint.measureText(run.hint)
+        }
+        val placed = WordAnnotationLayout.packHintLabels(anchors, lineStart, lineEnd)
+        placed.forEach { label ->
             val hintText = TextUtils.ellipsize(
-                run.hint,
+                label.hint,
                 TextPaint(paint),
-                availableWidth,
+                label.maxWidth,
                 TextUtils.TruncateAt.END,
-            )?.toString() ?: return@forEachIndexed
+            )?.toString() ?: return@forEach
             canvas.withSave {
-                clipRect(span.first, 0f, clipEnd, band)
-                canvas.drawText(hintText, span.first, baseline, paint)
+                clipRect(label.left, 0f, label.left + label.maxWidth, band)
+                canvas.drawText(hintText, label.left, baseline, paint)
             }
         }
         PaintPool.recycle(paint)
