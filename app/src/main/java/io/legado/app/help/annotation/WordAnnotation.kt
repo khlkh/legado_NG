@@ -19,8 +19,8 @@ object WordAnnotationConfig {
     const val MAX_HINTS_PER_CHAPTER = 12
 
     const val MIN_WORD_ANNOTATION_HINT_CAP = 5
-    const val MAX_WORD_ANNOTATION_HINT_CAP = 55
-    const val DEFAULT_WORD_ANNOTATION_HINT_CAP = 13
+    const val MAX_WORD_ANNOTATION_HINT_CAP = 89
+    const val DEFAULT_WORD_ANNOTATION_HINT_CAP = 21
 
     /** Hint length cap for non-Chinese UI locales, in whitespace-separated words. */
     const val MAX_HINT_WORDS = 8
