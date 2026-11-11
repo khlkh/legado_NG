@@ -93,18 +93,19 @@ object WordAnnotationResolver {
         var index = 0
         var seen = 0
         while (index + text.length <= passage.length) {
-            if (passage.regionMatches(index, text, 0, text.length)) {
-                if (boundaryOk(passage, index, text)) {
-                    seen++
-                    if (seen == occurrence) return index
-                    // A counted match consumes its span; matches are non-overlapping.
-                    index += text.length
-                } else {
-                    // Not a word-boundary match; step one char to find the next start.
-                    index++
-                }
+            // Let the JVM's string search skip non-matching prefixes instead of
+            // calling regionMatches at every character. A match rejected by the
+            // boundary rule resumes one character later, so overlapping
+            // candidates are still considered.
+            val found = passage.indexOf(text, index)
+            if (found < 0) return null
+            if (boundaryOk(passage, found, text)) {
+                seen++
+                if (seen == occurrence) return found
+                // A counted match consumes its span; matches are non-overlapping.
+                index = found + text.length
             } else {
-                index++
+                index = found + 1
             }
         }
         return null
