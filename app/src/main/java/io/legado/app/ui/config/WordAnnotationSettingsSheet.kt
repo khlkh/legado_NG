@@ -13,7 +13,7 @@ import io.legado.app.ui.design.components.compose.NgSettingsGroup
 import io.legado.app.ui.design.components.compose.NgSettingsItem
 
 /**
- * Word Wise settings sheet: model, five-level vocabulary slider, and the
+ * Word Gloss settings sheet: model, five-level vocabulary slider, and the
  * per-book chapter cap. The per-book on/off switch stays in the reader.
  */
 @Composable

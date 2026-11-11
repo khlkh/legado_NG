@@ -1703,7 +1703,7 @@
     <string name="auto_clear_expired">"Clear expired search histories automatically "</string>
     <string name="auto_clear_expired_summary">Search histories more than one day</string>
     <string name="re_segment">Re-segment</string>
-    <string name="word_annotation">AI Word Wise</string>
+    <string name="word_annotation">AI Word Gloss</string>
     <string name="style_name">Style name:</string>
     <string name="empty_msg_import_book">Click the folder icon in the upper right corner and select the folder</string>
     <string name="scan_folder">Intelligent scanning</string>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Word Wise fusion prototype's frequency-rank asset.
+"""Generate the Word Gloss fusion prototype's frequency-rank asset.
 
 Source
 ------
@@ -139,7 +139,7 @@ def write_asset(
     digest = hashlib.sha256(payload).hexdigest()
 
     header = [
-        "# Word frequency rank asset - Word Wise fusion prototype.",
+        "# Word frequency rank asset - Word Gloss fusion prototype.",
         f"# Source: Wiktionary:Frequency_lists/English/Project_Gutenberg, {snapshot} snapshot",
         f"#   {source}",
         "# Underlying texts: Project Gutenberg (~24,197 files, ~1.7B words; mostly pre-1923).",

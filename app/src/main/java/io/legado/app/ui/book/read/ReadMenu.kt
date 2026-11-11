@@ -34,6 +34,7 @@ import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.databinding.ViewReadMenuBinding
+import io.legado.app.help.annotation.WordAnnotationEligibility
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
@@ -439,7 +440,7 @@ class ReadMenu @JvmOverloads constructor(
                     },
                     wordAnnotationEnabled = floatingWordAnnotationEnabled,
                     wordAnnotationVisible = ReadBook.book?.let {
-                        it.config.scriptClass != "cjk"
+                        WordAnnotationEligibility.supports(it)
                     } == true,
                     onWordAnnotation = {
                         floatingToolExpansion = null
@@ -793,7 +794,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun upBookView() {
-        // Refresh the rail's Word Wise state from the live book; the View is
+        // Refresh the rail's Word Gloss state from the live book; the View is
         // constructed before ReadBook.book is installed on a cold start.
         floatingWordAnnotationEnabled = ReadBook.book?.getWordAnnotationEnabled() == true
         binding.titleBar.title = null

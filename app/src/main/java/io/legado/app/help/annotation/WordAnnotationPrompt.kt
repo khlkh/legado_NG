@@ -1,15 +1,14 @@
 package io.legado.app.help.annotation
 
 /**
- * Prompt construction for the book glossary (English/Latin books only).
+ * Prompt construction for the Word Gloss book glossary (Latin-script books
+ * only).
  *
  * The hint language follows the app UI locale: Simplified Chinese on a
  * Chinese-UI device, English otherwise. The prompt asks for a broad pool
  * spanning common through rare; the reader filters locally by level floor and
  * per-book cap.
  */
-enum class WordAnnotationLanguage { ENGLISH, CHINESE }
-
 object WordAnnotationPrompt {
 
     fun system(

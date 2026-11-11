@@ -1,4 +1,4 @@
-# Word frequency rank asset - Word Wise fusion prototype.
+# Word frequency rank asset - Word Gloss fusion prototype.
 # Source: Wiktionary:Frequency_lists/English/Project_Gutenberg, 2006-04-16 snapshot
 #   https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/English/Project_Gutenberg
 # Underlying texts: Project Gutenberg (~24,197 files, ~1.7B words; mostly pre-1923).

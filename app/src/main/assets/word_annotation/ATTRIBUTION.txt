@@ -1,4 +1,4 @@
-Word frequency rank asset used by the Word Wise fusion prototype.
+Word frequency rank asset used by the Word Gloss fusion prototype.
 
 Source: Wiktionary:Frequency_lists/English/Project_Gutenberg
 16 April 2006 snapshot

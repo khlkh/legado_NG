@@ -46,6 +46,7 @@ import io.legado.app.help.ai.AiPurifyHelper
 import io.legado.app.help.ai.AiPurifyResult
 import io.legado.app.help.ai.AiPurifyRuleCandidate as AiPurifyGeneratedRule
 import io.legado.app.help.ai.AiPurifyRuleGenerateResult
+import io.legado.app.help.annotation.WordAnnotationEligibility
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isAudio
@@ -534,7 +535,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     R.id.menu_re_segment -> item.isChecked = book.getReSegment()
                     R.id.menu_word_annotation -> {
                         item.isChecked = book.getWordAnnotationEnabled()
-                        item.isVisible = !book.isImage && book.config.scriptClass != "cjk"
+                        item.isVisible = WordAnnotationEligibility.supports(book)
                     }
 //                    R.id.menu_enable_review -> {
 //                        item.isVisible = BuildConfig.DEBUG
