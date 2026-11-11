@@ -45,15 +45,6 @@ object WordAnnotationAnalyzer {
     const val FAILURE_COOLDOWN_MILLIS = 60_000L
     private const val MAX_FAILURE_ENTRIES = 64
 
-    /** Candidate generation is deliberately larger than the display cap. */
-    private const val MIN_GENERATION_CAP = 60
-    private const val MAX_GENERATION_CAP = 180
-
-    /** Chapter size thresholds; pages are a layout concern and are not used here. */
-    private const val ONE_WINDOW_CHARS = 12_000
-    private const val TWO_WINDOW_CHARS = 30_000
-    private const val THREE_WINDOW_CHARS = 50_000
-    private const val MAX_WINDOWS = 4
 
     private val inFlight = ConcurrentHashMap.newKeySet<String>()
     private val lastFailureAt = ConcurrentHashMap<String, Long>()
@@ -116,32 +107,20 @@ object WordAnnotationAnalyzer {
         )
     }
 
-    /**
-     * The model should discover more candidates than the reader displays.
-     * The display selector later applies the reader's unique-surface cap.
-     */
-    fun generationCap(displayCap: Int): Int =
-        displayCap.coerceIn(MIN_GENERATION_CAP, MAX_GENERATION_CAP)
-
-    fun perWindowCap(generationCap: Int, windowCount: Int): Int =
-        ceil(generationCap.toDouble() / windowCount.coerceAtLeast(1)).toInt().coerceAtLeast(1)
+    fun perWindowCap(discoveryTarget: Int, windowCount: Int): Int =
+        ceil(discoveryTarget.toDouble() / windowCount.coerceAtLeast(1)).toInt().coerceAtLeast(1)
 
     /**
      * Split canonical paragraphs into paragraph-aligned, overlapping windows.
-     * This keeps exact-surface matching stable and prevents a phrase from
-     * being cut by an arbitrary character offset.
+     * Windows are word-based, so a very long chapter gets more independent
+     * discovery budgets without cutting a phrase at an arbitrary character.
      */
     fun discoveryWindows(paragraphs: List<CanonicalParagraph>): List<DiscoveryWindow> {
         if (paragraphs.isEmpty()) return emptyList()
-        val totalChars = paragraphs.sumOf { it.text.length + 1 }
-        val desiredCount = when {
-            totalChars <= ONE_WINDOW_CHARS -> 1
-            totalChars <= TWO_WINDOW_CHARS -> 2
-            totalChars <= THREE_WINDOW_CHARS -> 3
-            else -> MAX_WINDOWS
-        }
-        val count = desiredCount.coerceAtMost(paragraphs.size).coerceAtLeast(1)
-        if (count == 1) {
+        val paragraphWords = paragraphs.map { WordAnnotationTargets.countWords(it.text).coerceAtLeast(1) }
+        val totalWords = paragraphWords.sum()
+        val count = WordAnnotationTargets.windowCount(totalWords)
+        if (count <= 1) {
             return listOf(
                 DiscoveryWindow(
                     index = 0,
@@ -151,13 +130,22 @@ object WordAnnotationAnalyzer {
                 ),
             )
         }
-        val base = (paragraphs.size + count - 1) / count
-        val overlap = (base / 20).coerceAtLeast(1)
+        val targetWords = ceil(totalWords.toDouble() / count).toInt().coerceAtLeast(1)
+        val overlap = (targetWords / 20).coerceAtLeast(1)
+        val ends = IntArray(paragraphs.size)
+        var accumulated = 0
+        paragraphWords.forEachIndexed { index, words ->
+            accumulated += words
+            ends[index] = accumulated
+        }
         val result = ArrayList<DiscoveryWindow>(count)
         for (i in 0 until count) {
-            val start = (i * base - overlap).coerceAtLeast(0)
+            val startWord = (i * targetWords - overlap).coerceAtLeast(0)
+            val endWord = if (i == count - 1) totalWords
+            else ((i + 1) * targetWords + overlap).coerceAtMost(totalWords)
+            val start = ends.indexOfFirst { it > startWord }.takeIf { it >= 0 } ?: (paragraphs.size - 1)
             val end = if (i == count - 1) paragraphs.size
-            else ((i + 1) * base + overlap).coerceAtMost(paragraphs.size)
+            else ends.indexOfFirst { it >= endWord }.let { if (it < 0) paragraphs.size else it + 1 }
             if (end <= start) continue
             result += DiscoveryWindow(
                 index = i,
@@ -166,9 +154,6 @@ object WordAnnotationAnalyzer {
                 endParagraph = end,
             )
         }
-        // A chapter made of very few huge paragraphs can produce duplicate
-        // windows when the overlap reaches both ends. Never call the model
-        // twice for the same paragraph range.
         return result
             .distinctBy { it.startParagraph to it.endParagraph }
             .mapIndexed { index, window -> window.copy(index = index) }
@@ -213,20 +198,19 @@ object WordAnnotationAnalyzer {
             textChapter.wordAnnotations = emptyList()
             return true
         }
-        val userCap = book.getWordAnnotationHintCap().coerceIn(
-            WordAnnotationConfig.MIN_WORD_ANNOTATION_HINT_CAP,
-            WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
-        )
-        val words = passage.split(Regex("\\s+")).count { it.isNotBlank() }
-        val cap = minOf(
-            WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
-            maxOf(userCap, words / 1000),
+        val words = WordAnnotationTargets.wordCount(paragraphs.map { it.text })
+        val density = WordAnnotationDensity.fromStorage(book.getWordAnnotationDensity())
+        val target = WordAnnotationTargets.displayTarget(
+            words = words,
+            level = book.getWordAnnotationLevel(),
+            density = density,
         )
         val resolved = WordAnnotationPoolResolver.resolveChapter(
             paragraphs = paragraphs,
             items = chapter.items,
             level = book.getWordAnnotationLevel(),
-            cap = cap,
+            cap = target,
+            coverageBuckets = WordAnnotationTargets.coverageBuckets(target),
         )
         if (book.isEpub) {
             // The EPUB renderer draws hints from native fragments; the native
@@ -271,14 +255,13 @@ object WordAnnotationAnalyzer {
         }
         val uiLocaleChinese = appUiLocaleChinese()
         val config = analysisConfig(book, uiLocaleChinese)
-        val userCap = book.getWordAnnotationHintCap().coerceIn(
-            WordAnnotationConfig.MIN_WORD_ANNOTATION_HINT_CAP,
-            WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
-        )
         val windows = discoveryWindows(paragraphs)
         if (windows.isEmpty()) return
-        val generationCap = generationCap(userCap)
-        val perWindowCap = perWindowCap(generationCap, windows.size)
+        val discoveryTarget = WordAnnotationTargets.discoveryTarget(
+            WordAnnotationTargets.wordCount(paragraphs.map { it.text }),
+        )
+        if (discoveryTarget <= 0) return
+        val perWindowCap = perWindowCap(discoveryTarget, windows.size)
         val file = poolFile(book)
         val identity = identityFor(book, config)
         val hash = WordAnnotationPoolStore.canonicalHash(paragraphs.map { it.text })
@@ -303,7 +286,7 @@ object WordAnnotationAnalyzer {
         try {
             AppLog.put(
                 "WordAnnotation discover chapter=${bookChapter.index} windows=${windows.size} " +
-                    "pending=${pending.size} generation=$generationCap perWindow=$perWindowCap",
+                    "pending=${pending.size} discovery=$discoveryTarget perWindow=$perWindowCap",
             )
             for (window in pending) {
                 val windowKey = "$chapterKey|window=${window.index}"

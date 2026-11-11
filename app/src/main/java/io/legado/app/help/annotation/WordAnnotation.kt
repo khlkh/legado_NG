@@ -15,9 +15,10 @@ object WordAnnotationConfig {
     /**
      * Bump when the prompt, JSON contract, or candidate organization changes;
      * part of the cache key. 9 introduced per-chapter windowed discovery;
-     * 10 added model difficulty/contextual metadata for level-aware selection.
+     * 10 added model difficulty/contextual metadata; 11 moved to word-based
+     * density targets and windows.
      */
-    const val SCHEMA_VERSION = 10
+    const val SCHEMA_VERSION = 11
 
     const val MIN_WORD_ANNOTATION_HINT_CAP = 8
     const val MAX_WORD_ANNOTATION_HINT_CAP = 144

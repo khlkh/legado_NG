@@ -19,6 +19,7 @@ object WordAnnotationPoolResolver {
         items: List<WordAnnotationPoolItem>,
         level: Int,
         cap: Int,
+        coverageBuckets: Int = COVERAGE_BUCKETS,
     ): List<WordAnnotation> {
         if (paragraphs.isEmpty() || items.isEmpty()) return emptyList()
         val floor = WordAnnotationLevels.floorFor(level)
@@ -68,7 +69,7 @@ object WordAnnotationPoolResolver {
             annotations = nonOverlapping,
             level = level,
             cap = cap,
-            coverageBuckets = COVERAGE_BUCKETS,
+            coverageBuckets = coverageBuckets,
         ).map { annotation ->
             annotation.copy(paragraphIndex = paragraphs[annotation.paragraphIndex].sourceIndex)
         }
