@@ -14,6 +14,8 @@ object WordAnnotationPrompt {
     fun system(
         uiLocaleChinese: Boolean,
         cap: Int,
+        windowIndex: Int = 0,
+        windowCount: Int = 1,
     ): String {
         val hintLanguage = if (uiLocaleChinese) "Simplified Chinese" else "English"
         val hintCap = if (uiLocaleChinese) {
@@ -49,6 +51,14 @@ object WordAnnotationPrompt {
             )
             appendLine()
             appendLine(selectionLine)
+            if (windowCount > 1) {
+                appendLine()
+                appendLine(
+                    "This passage is section ${windowIndex + 1} of $windowCount of the chapter. " +
+                        "Select candidates throughout this section, including its middle and end. " +
+                        "Do not spend the entire budget on its opening paragraphs.",
+                )
+            }
             appendLine("Return up to $cap items.")
             appendLine("For each item, set \"occurrence\" to 1.")
             appendLine("Write each hint in $hintLanguage, using $hintCap.")

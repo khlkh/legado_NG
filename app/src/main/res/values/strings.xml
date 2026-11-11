@@ -459,13 +459,13 @@
     <string name="ai_word_annotation_model_summary">Model: %1$s</string>
     <string name="ai_word_annotation_model_not_selected">Not selected (uses active provider)</string>
     <string name="ai_word_annotation_level">Vocabulary level</string>
-    <string name="ai_word_annotation_level_summary">Floor %1$d+ · up to %2$d hints</string>
+    <string name="ai_word_annotation_level_summary">Floor %1$d+ · up to %2$d expressions</string>
     <string name="ai_word_annotation_level_1">Primary · ≈A2</string>
     <string name="ai_word_annotation_level_2">Middle · ≈B1–B2</string>
     <string name="ai_word_annotation_level_3">High school · ≈B2–C1</string>
     <string name="ai_word_annotation_level_4">College · ≈C1–C2</string>
     <string name="ai_word_annotation_level_5">Postgraduate · ≈C2+</string>
-    <string name="ai_word_annotation_hint_cap">Hints per chapter</string>
+    <string name="ai_word_annotation_hint_cap">Expressions per chapter</string>
     <string name="ai_word_annotation_note">Rank gate applies to English only · Gutenberg 2006/04</string>
     <string name="ai_purify_model_not_selected">Not selected</string>
     <string name="ai_purify_model_unavailable">Selected model is unavailable</string>
