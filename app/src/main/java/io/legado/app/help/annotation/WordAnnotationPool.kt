@@ -14,6 +14,10 @@ data class WordAnnotationPoolItem(
     val surface: String,
     val hint: String,
     val rank: Int? = null,
+    /** Model estimate, 1 (everyday) .. 5 (exceptional/archaic). */
+    val difficulty: Int? = null,
+    /** Common surface with an unusual contextual/idiomatic meaning. */
+    val contextual: Boolean = false,
 )
 
 data class WordAnnotationChapterPool(

@@ -376,7 +376,9 @@ object WordAnnotationAnalyzer {
                     val frequencyIndex = WordFrequencyAssets.load(appCtx)
                     val known = chapter.items.mapTo(HashSet()) { it.surface }
                     val nextItems = ArrayList(chapter.items)
+                    var acceptedForWindow = 0
                     for (item in items) {
+                        if (acceptedForWindow >= perWindowCap) break
                         if (!WordAnnotationResolver.hintWithinCap(
                                 item.hint,
                                 config.hintCharCap,
@@ -392,7 +394,10 @@ object WordAnnotationAnalyzer {
                             surface = item.text,
                             hint = item.hint,
                             rank = frequencyIndex?.maxRankOf(item.text),
+                            difficulty = item.difficulty?.coerceIn(1, 5),
+                            contextual = item.contextual,
                         )
+                        acceptedForWindow++
                         windowAdded++
                     }
                     val nextChapter = chapter.copy(
@@ -409,7 +414,8 @@ object WordAnnotationAnalyzer {
                     added += windowAdded
                     AppLog.put(
                         "WordAnnotation window chapter=${bookChapter.index} window=${window.index} " +
-                            "items=${items.size} added=$windowAdded chapterPool=${nextItems.size}",
+                            "items=${items.size} accepted=$acceptedForWindow added=$windowAdded " +
+                            "chapterPool=${nextItems.size}",
                     )
                 }
             }

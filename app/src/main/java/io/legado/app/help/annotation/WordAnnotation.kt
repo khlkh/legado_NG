@@ -14,13 +14,14 @@ package io.legado.app.help.annotation
 object WordAnnotationConfig {
     /**
      * Bump when the prompt, JSON contract, or candidate organization changes;
-     * part of the cache key. 9 introduced per-chapter windowed discovery.
+     * part of the cache key. 9 introduced per-chapter windowed discovery;
+     * 10 added model difficulty/contextual metadata for level-aware selection.
      */
-    const val SCHEMA_VERSION = 9
+    const val SCHEMA_VERSION = 10
 
-    const val MIN_WORD_ANNOTATION_HINT_CAP = 5
-    const val MAX_WORD_ANNOTATION_HINT_CAP = 89
-    const val DEFAULT_WORD_ANNOTATION_HINT_CAP = 21
+    const val MIN_WORD_ANNOTATION_HINT_CAP = 8
+    const val MAX_WORD_ANNOTATION_HINT_CAP = 144
+    const val DEFAULT_WORD_ANNOTATION_HINT_CAP = 34
 
     /** Hint length cap for non-Chinese UI locales, in whitespace-separated words. */
     const val MAX_HINT_WORDS = 8
@@ -37,10 +38,10 @@ object WordAnnotationConfig {
 }
 
 /**
- * Five reader levels for Word Gloss. One slider drives the soft floor: only
- * single-word hints whose rank is known and below the floor are dropped;
- * multiword expressions and unknown-rank words always stay eligible. The
- * per-chapter hint cap is a separate per-book setting.
+ * Five reader levels for Word Gloss. The Gutenberg floor is a safety filter;
+ * model difficulty (when present) is the primary level signal. Multiword
+ * expressions and unknown-rank words stay eligible. The per-book display cap
+ * is separate.
  */
 object WordAnnotationLevels {
 
@@ -78,6 +79,10 @@ data class WordAnnotationItem(
     val text: String,
     val occurrence: Int,
     val hint: String,
+    /** Model estimate, 1 (everyday) .. 5 (exceptional/archaic). */
+    val difficulty: Int? = null,
+    /** True when a common surface has an unusual contextual/idiomatic meaning. */
+    val contextual: Boolean = false,
 )
 
 data class WordAnnotation(
@@ -95,4 +100,12 @@ data class WordAnnotation(
      * floor (single words) and rarest-first ordering; layout ignores it.
      */
     val rank: Int? = null,
+    /**
+     * Display-only coverage bucket (0..3 quartiles of the canonical passage).
+     * Layout ignores it; [WordAnnotationFilter] uses it to keep a chapter's
+     * annotations spread across its sections.
+     */
+    val coverageBucket: Int = 0,
+    val difficulty: Int? = null,
+    val contextual: Boolean = false,
 )

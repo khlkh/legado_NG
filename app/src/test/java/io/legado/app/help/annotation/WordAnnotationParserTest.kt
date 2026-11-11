@@ -90,4 +90,20 @@ class WordAnnotationParserTest {
         assertEquals(listOf(WordAnnotationItem("a", 1, longHint)), parsed)
         assertTrue(WordAnnotationResolver.resolve(listOf("a"), parsed!!, uiLocaleChinese = false).isEmpty())
     }
+
+    @Test
+    fun `parses optional difficulty and contextual metadata`() {
+        val parsed = WordAnnotationParser.parse(
+            """{"annotations":[{"text":"a","occurrence":1,"hint":"x","difficulty":4,"contextual":true}]}"""
+        )
+        assertEquals(listOf(WordAnnotationItem("a", 1, "x", 4, true)), parsed)
+    }
+
+    @Test
+    fun `invalid difficulty is ignored but the item survives`() {
+        val parsed = WordAnnotationParser.parse(
+            """{"annotations":[{"text":"a","occurrence":1,"hint":"x","difficulty":9,"contextual":"yes"}]}"""
+        )
+        assertEquals(listOf(WordAnnotationItem("a", 1, "x")), parsed)
+    }
 }

@@ -92,6 +92,8 @@ object WordAnnotationPoolStore {
                         surface = surface,
                         hint = hint,
                         rank = item.intOrNull("rank"),
+                        difficulty = item.intOrNull("difficulty")?.coerceIn(1, 5),
+                        contextual = item.boolean("contextual") == true,
                     )
                 }
             }
@@ -153,6 +155,8 @@ object WordAnnotationPoolStore {
                 itemElement.addProperty("surface", item.surface)
                 itemElement.addProperty("hint", item.hint)
                 item.rank?.let { itemElement.addProperty("rank", it) }
+                item.difficulty?.let { itemElement.addProperty("difficulty", it) }
+                if (item.contextual) itemElement.addProperty("contextual", true)
                 items.add(itemElement)
             }
             element.add("items", items)
