@@ -17,9 +17,26 @@ class WordAnnotationPoolStoreTest {
         bookUrl = "https://book/1",
     )
 
-    private val items = listOf(
-        WordAnnotationPoolItem("untenable", "impossible to defend", 12_000),
-        WordAnnotationPoolItem("came to terms with", "accepted", null),
+    private val chapterOne = WordAnnotationChapterPool(
+        chapterIndex = 1,
+        contentHash = "hash-one",
+        completedWindows = setOf(0, 1, 2, 3),
+        items = listOf(
+            WordAnnotationPoolItem("untenable", "impossible to defend", 12_000),
+            WordAnnotationPoolItem("came to terms with", "accepted", null),
+        ),
+    )
+
+    private val state = WordAnnotationPoolState(
+        chapters = mapOf(
+            1 to chapterOne,
+            2 to WordAnnotationChapterPool(
+                chapterIndex = 2,
+                contentHash = "hash-two",
+                completedWindows = setOf(0),
+                items = listOf(WordAnnotationPoolItem("stagnant", "not moving", 11_889)),
+            ),
+        ),
     )
 
     @Before
@@ -38,32 +55,31 @@ class WordAnnotationPoolStoreTest {
     private fun poolFile() = File(dir, WordAnnotationPoolStore.POOL_FILE_NAME)
 
     @Test
-    fun `write then read is a hit with the same items`() {
+    fun `write then read preserves chapters, windows, and items`() {
         val file = poolFile()
-        assertTrue(WordAnnotationPoolStore.write(file, identity, items))
-        assertEquals(items, WordAnnotationPoolStore.read(file, identity))
+        assertTrue(WordAnnotationPoolStore.write(file, identity, state))
+        assertEquals(state, WordAnnotationPoolStore.read(file, identity))
     }
 
     @Test
     fun `book url mismatch is a miss`() {
         val file = poolFile()
-        assertTrue(WordAnnotationPoolStore.write(file, identity, items))
+        assertTrue(WordAnnotationPoolStore.write(file, identity, state))
         assertNull(WordAnnotationPoolStore.read(file, identity.copy(bookUrl = "https://book/2")))
     }
 
     @Test
     fun `model mismatch is a miss`() {
         val file = poolFile()
-        assertTrue(WordAnnotationPoolStore.write(file, identity, items))
+        assertTrue(WordAnnotationPoolStore.write(file, identity, state))
         assertNull(WordAnnotationPoolStore.read(file, identity.copy(modelId = "other-model")))
     }
 
     @Test
-    fun `empty pool is stored and returned as empty not null`() {
+    fun `empty state is stored and returned`() {
         val file = poolFile()
-        assertTrue(WordAnnotationPoolStore.write(file, identity, emptyList()))
-        val read = WordAnnotationPoolStore.read(file, identity)
-        assertTrue(read != null && read.isEmpty())
+        assertTrue(WordAnnotationPoolStore.write(file, identity, WordAnnotationPoolState()))
+        assertEquals(WordAnnotationPoolState(), WordAnnotationPoolStore.read(file, identity))
     }
 
     @Test
@@ -78,7 +94,7 @@ class WordAnnotationPoolStoreTest {
         val file = File(dir, "occupied")
         file.mkdirs()
         File(file, "child").writeText("x")
-        assertFalse(WordAnnotationPoolStore.write(file, identity, items))
+        assertFalse(WordAnnotationPoolStore.write(file, identity, state))
         assertTrue(file.isDirectory)
     }
 }

@@ -12,8 +12,11 @@ package io.legado.app.help.annotation
  * screen coordinates, fonts, or pagination.
  */
 object WordAnnotationConfig {
-    /** Bump when the prompt or the JSON contract changes; part of the cache key. */
-    const val SCHEMA_VERSION = 8
+    /**
+     * Bump when the prompt, JSON contract, or candidate organization changes;
+     * part of the cache key. 9 introduced per-chapter windowed discovery.
+     */
+    const val SCHEMA_VERSION = 9
 
     const val MIN_WORD_ANNOTATION_HINT_CAP = 5
     const val MAX_WORD_ANNOTATION_HINT_CAP = 89

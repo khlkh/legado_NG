@@ -71,4 +71,29 @@ class WordAnnotationFilterTest {
         val filtered = WordAnnotationFilter.filter(pool, level = 4, cap = 1)
         assertEquals(listOf("rare"), filtered.map { it.surface })
     }
+
+    @Test
+    fun `unique cap does not count repeated occurrences`() {
+        val pool = listOf(
+            ann(paragraphIndex = 0, start = 0, surface = "repeat", rank = 20_000),
+            ann(paragraphIndex = 0, start = 10, surface = "repeat", rank = 20_000),
+            ann(paragraphIndex = 0, start = 20, surface = "repeat", rank = 20_000),
+            ann(paragraphIndex = 1, start = 0, surface = "rare", rank = 30_000),
+        )
+        val filtered = WordAnnotationFilter.filter(pool, level = 4, cap = 2)
+        assertEquals(2, filtered.map { it.surface }.distinct().size)
+        assertEquals(3, filtered.size)
+        assertEquals(listOf("repeat", "repeat", "rare"), filtered.map { it.surface })
+    }
+
+    @Test
+    fun `occurrence cap keeps first and last occurrence of one surface`() {
+        val pool = listOf(
+            ann(paragraphIndex = 0, start = 0, surface = "repeat", rank = 20_000),
+            ann(paragraphIndex = 0, start = 10, surface = "repeat", rank = 20_000),
+            ann(paragraphIndex = 0, start = 20, surface = "repeat", rank = 20_000),
+        )
+        val filtered = WordAnnotationFilter.filter(pool, level = 4, cap = 1)
+        assertEquals(listOf(0, 20), filtered.map { it.start })
+    }
 }

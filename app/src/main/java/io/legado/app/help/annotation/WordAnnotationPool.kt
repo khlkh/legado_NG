@@ -1,34 +1,31 @@
 package io.legado.app.help.annotation
 
 /**
- * Book-level Word Gloss pool.
+ * Candidate inventory for the book-level Word Gloss glossary.
  *
- * The pool grows incrementally: each chapter is analyzed with a small
- * per-chapter call and its items are appended to the book pool. Chapters then
- * resolve their annotations locally from the pool — no per-chapter cache. The
- * reader's level floor and per-book cap filter the resolved list locally.
+ * Candidates are stored per chapter and per discovery window. A chapter entry
+ * is keyed by its canonical content hash; changing the chapter text invalidates
+ * only that chapter. The reader resolves hints for a chapter from that
+ * chapter's candidates, not by scanning every candidate in the book.
  *
  * Latin-script books only; CJK and other non-Latin books get no hints.
  */
-object WordAnnotationPoolConfig {
-    /** The pool target is at least this many items. */
-    const val MIN_POOL_TARGET = 120
-
-    /**
-     * Cost guard: the target formula is `max(MIN_POOL_TARGET,
-     * chapterCount * cap * 0.2)`, capped at this value so very long books
-     * cannot balloon the pool (and its token cost).
-     */
-    const val MAX_POOL_TARGET = 500
-
-    /** chapterCount * cap * this fraction contributes to the target. */
-    const val POOL_TARGET_RATIO = 0.2
-}
-
 data class WordAnnotationPoolItem(
     val surface: String,
     val hint: String,
     val rank: Int? = null,
+)
+
+data class WordAnnotationChapterPool(
+    val chapterIndex: Int,
+    val contentHash: String,
+    /** Discovery window indexes that returned a valid result. */
+    val completedWindows: Set<Int> = emptySet(),
+    val items: List<WordAnnotationPoolItem> = emptyList(),
+)
+
+data class WordAnnotationPoolState(
+    val chapters: Map<Int, WordAnnotationChapterPool> = emptyMap(),
 )
 
 data class WordAnnotationPoolIdentity(

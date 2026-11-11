@@ -584,14 +584,8 @@ object ReadBook : CoroutineScope by MainScope() {
             textList = textChapter.sourceParagraphs,
             effectiveReplaceRules = textChapter.effectiveReplaceRules,
         )
-        if (!textChapter.wordAnnotationPoolAttached &&
-            WordAnnotationAnalyzer.hasPool(currentBook)
-        ) {
-            // The pool arrived after this chapter was laid out; re-lay out once
-            // so the pool annotations attach.
-            loadContent(false)
-            return
-        }
+        // Discovery is idempotent per chapter window. If this chapter has no
+        // completed candidates yet, the analyzer fills them and reloads once.
         launch {
             WordAnnotationAnalyzer.analyzeChapterAndAppendPool(currentBook, textChapter.chapter, contents, textChapter)
         }

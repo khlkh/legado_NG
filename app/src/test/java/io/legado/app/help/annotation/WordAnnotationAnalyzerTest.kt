@@ -8,8 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Analyzer helpers: canonical paragraph selection, analysis-config identity
- * keys, pool sizing, and the current per-book cap default.
+ * Analyzer helpers: canonical paragraph selection, windowed discovery,
+ * analysis-config identity keys, and the current per-book cap default.
  */
 class WordAnnotationAnalyzerTest {
 
@@ -65,10 +65,40 @@ class WordAnnotationAnalyzerTest {
     }
 
     @Test
-    fun `pool target respects formula and cost cap`() {
-        assertEquals(120, WordAnnotationAnalyzer.poolTarget(chapterCount = 10, cap = 13))
-        assertEquals(260, WordAnnotationAnalyzer.poolTarget(chapterCount = 100, cap = 13))
-        assertEquals(500, WordAnnotationAnalyzer.poolTarget(chapterCount = 5_000, cap = 55))
+    fun `generation cap is independent from the display cap`() {
+        assertEquals(60, WordAnnotationAnalyzer.generationCap(displayCap = 21))
+        assertEquals(89, WordAnnotationAnalyzer.generationCap(displayCap = 89))
+        assertEquals(15, WordAnnotationAnalyzer.perWindowCap(generationCap = 60, windowCount = 4))
+        assertEquals(23, WordAnnotationAnalyzer.perWindowCap(generationCap = 89, windowCount = 4))
+    }
+
+    @Test
+    fun `discovery windows cover the chapter and overlap at boundaries`() {
+        val paragraphs = (0 until 100).map {
+            WordAnnotationAnalyzer.CanonicalParagraph(it, "paragraph $it " + "x".repeat(1_000))
+        }
+        val windows = WordAnnotationAnalyzer.discoveryWindows(paragraphs)
+
+        assertEquals(4, windows.size)
+        assertEquals(0, windows.first().startParagraph)
+        assertEquals(100, windows.last().endParagraph)
+        assertEquals(0, windows.first().index)
+        assertEquals(3, windows.last().index)
+        windows.zipWithNext().forEach { (left, right) ->
+            assertTrue(right.startParagraph < left.endParagraph)
+        }
+    }
+
+    @Test
+    fun `short chapter uses one discovery window`() {
+        val paragraphs = (0 until 20).map {
+            WordAnnotationAnalyzer.CanonicalParagraph(it, "paragraph $it " + "x".repeat(100))
+        }
+        val windows = WordAnnotationAnalyzer.discoveryWindows(paragraphs)
+
+        assertEquals(1, windows.size)
+        assertEquals(0, windows.single().startParagraph)
+        assertEquals(20, windows.single().endParagraph)
     }
 
     @Test

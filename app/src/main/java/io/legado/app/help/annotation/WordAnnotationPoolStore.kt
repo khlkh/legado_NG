@@ -7,13 +7,29 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * File cache for the book-level Word Gloss pool.
+ * File cache for the book-level Word Gloss candidate inventory.
  *
- * One file per book (`book_cache/<bookFolder>/wordwise-pool.json`). The JSON
- * stores the book identity, the sampled-passage hash, the prompt/schema and
- * generation config, and the pool items. A read is a hit only when every
- * identity field matches and the body parses; an empty pool is a valid empty
- * success. Writes go to a sibling temp file and are renamed into place.
+ * One file per book (`book_cache/<bookFolder>/wordwise-pool.json`). The file
+ * stores the book identity and one entry per analyzed chapter:
+ *
+ * ```
+ * {
+ *   "bookUrl": "...", "schemaVersion": 9, ...,
+ *   "chapters": [
+ *     {
+ *       "chapterIndex": 1,
+ *       "contentHash": "...",
+ *       "completedWindows": [0, 1, 2, 3],
+ *       "items": [{"surface": "...", "hint": "...", "rank": 123}]
+ *     }
+ *   ]
+ * }
+ * ```
+ *
+ * A chapter's window list is the idempotency record: a completed window is
+ * never sent to the model again while the chapter hash and identity match.
+ * Readers resolve hints from the current chapter's items only, so a large book
+ * does not make every chapter scan the whole book inventory.
  */
 object WordAnnotationPoolStore {
 
@@ -34,7 +50,7 @@ object WordAnnotationPoolStore {
         return digest.joinToString("") { "%02x".format(it) }
     }
 
-    fun read(file: File, identity: WordAnnotationPoolIdentity): List<WordAnnotationPoolItem>? {
+    fun read(file: File, identity: WordAnnotationPoolIdentity): WordAnnotationPoolState? {
         if (!file.exists() || !file.isFile) return null
         val json = runCatching { file.readText() }.getOrNull() ?: return null
         if (json.isBlank()) return null
@@ -47,36 +63,59 @@ object WordAnnotationPoolStore {
         if (obj.boolean("hintCharCap") != identity.hintCharCap) return null
         if (obj.string("providerId") != identity.providerId) return null
         if (obj.string("modelId") != identity.modelId) return null
-        val items = obj.get("items") ?: return null
-        if (!items.isJsonArray) return null
 
-        val result = ArrayList<WordAnnotationPoolItem>(items.asJsonArray.size())
-        for (element in items.asJsonArray) {
+        val chapters = obj.get("chapters") ?: return null
+        if (!chapters.isJsonArray) return null
+        val result = LinkedHashMap<Int, WordAnnotationChapterPool>()
+        for (element in chapters.asJsonArray) {
             if (!element.isJsonObject) continue
-            val item = element.asJsonObject
-            val surface = item.string("surface") ?: continue
-            val hint = item.string("hint") ?: continue
-            if (surface.isBlank() || hint.isBlank()) continue
-            result += WordAnnotationPoolItem(
-                surface = surface,
-                hint = hint,
-                rank = item.intOrNull("rank"),
+            val chapter = element.asJsonObject
+            val chapterIndex = chapter.int("chapterIndex") ?: continue
+            val contentHash = chapter.string("contentHash") ?: continue
+            if (contentHash.isBlank()) continue
+            val completed = chapter.get("completedWindows")
+                ?.takeIf { it.isJsonArray }
+                ?.asJsonArray
+                ?.mapNotNull { it.takeIf { value -> value.isJsonPrimitive && value.asJsonPrimitive.isNumber }?.asInt }
+                ?.toSet()
+                ?: emptySet()
+            val items = ArrayList<WordAnnotationPoolItem>()
+            val itemArray = chapter.get("items")
+            if (itemArray != null && itemArray.isJsonArray) {
+                for (itemElement in itemArray.asJsonArray) {
+                    if (!itemElement.isJsonObject) continue
+                    val item = itemElement.asJsonObject
+                    val surface = item.string("surface") ?: continue
+                    val hint = item.string("hint") ?: continue
+                    if (surface.isBlank() || hint.isBlank()) continue
+                    items += WordAnnotationPoolItem(
+                        surface = surface,
+                        hint = hint,
+                        rank = item.intOrNull("rank"),
+                    )
+                }
+            }
+            result[chapterIndex] = WordAnnotationChapterPool(
+                chapterIndex = chapterIndex,
+                contentHash = contentHash,
+                completedWindows = completed,
+                items = items,
             )
         }
-        return result
+        return WordAnnotationPoolState(result)
     }
 
     /** Returns true when the final file is complete; failures leave no final file. */
     fun write(
         file: File,
         identity: WordAnnotationPoolIdentity,
-        items: List<WordAnnotationPoolItem>,
+        state: WordAnnotationPoolState,
     ): Boolean {
         val parent = file.parentFile ?: return false
         if (!parent.exists() && !parent.mkdirs()) return false
         val temp = File(parent, file.name + TEMP_SUFFIX)
         return try {
-            temp.writeText(toJson(identity, items))
+            temp.writeText(toJson(identity, state))
             renameIntoPlace(temp, file)
         } catch (_: Exception) {
             runCatching { temp.delete() }
@@ -92,7 +131,7 @@ object WordAnnotationPoolStore {
         return false
     }
 
-    private fun toJson(identity: WordAnnotationPoolIdentity, items: List<WordAnnotationPoolItem>): String {
+    private fun toJson(identity: WordAnnotationPoolIdentity, state: WordAnnotationPoolState): String {
         val root = JsonObject()
         root.addProperty("bookUrl", identity.bookUrl)
         root.addProperty("schemaVersion", identity.schemaVersion)
@@ -100,15 +139,26 @@ object WordAnnotationPoolStore {
         root.addProperty("hintCharCap", identity.hintCharCap)
         root.addProperty("providerId", identity.providerId)
         root.addProperty("modelId", identity.modelId)
-        val array = JsonArray()
-        items.forEach { item ->
+        val chapters = JsonArray()
+        state.chapters.values.sortedBy { it.chapterIndex }.forEach { chapter ->
             val element = JsonObject()
-            element.addProperty("surface", item.surface)
-            element.addProperty("hint", item.hint)
-            item.rank?.let { element.addProperty("rank", it) }
-            array.add(element)
+            element.addProperty("chapterIndex", chapter.chapterIndex)
+            element.addProperty("contentHash", chapter.contentHash)
+            val completed = JsonArray()
+            chapter.completedWindows.sorted().forEach { completed.add(it) }
+            element.add("completedWindows", completed)
+            val items = JsonArray()
+            chapter.items.forEach { item ->
+                val itemElement = JsonObject()
+                itemElement.addProperty("surface", item.surface)
+                itemElement.addProperty("hint", item.hint)
+                item.rank?.let { itemElement.addProperty("rank", it) }
+                items.add(itemElement)
+            }
+            element.add("items", items)
+            chapters.add(element)
         }
-        root.add("items", array)
+        root.add("chapters", chapters)
         return root.toString()
     }
 

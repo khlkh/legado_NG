@@ -1,13 +1,13 @@
 package io.legado.app.help.annotation
 
 /**
- * Resolves a chapter's annotations locally from the book pool.
+ * Resolves a chapter's annotations locally from that chapter's candidate pool.
  *
  * Every exact, case-sensitive occurrence of each pool surface is matched in the
  * chapter's canonical paragraphs, using the same boundary rules as the model
  * path. Cross-paragraph matches are dropped, the longer-wins/equal-drops
  * overlap rule is applied, and the survivors are then filtered by the reader's
- * level floor and per-book cap ([WordAnnotationFilter]).
+ * level floor, unique-surface cap, and occurrence cap ([WordAnnotationFilter]).
  */
 object WordAnnotationPoolResolver {
 
@@ -28,7 +28,11 @@ object WordAnnotationPoolResolver {
         val windows = WordAnnotationResolver.paragraphWindows(paragraphs.map { it.text })
         val joined = windows.joinToString(separator = "\n") { it.text }
         val resolved = ArrayList<WordAnnotation>(eligible.size * 4)
-        val expandLimit = maxOf(cap * 4, 64)
+        // Per-chapter candidates are bounded, but a single common candidate
+        // can still have many occurrences. Keep enough slots for the unique
+        // surface cap and its occurrence cap without letting one surface
+        // consume the whole expansion.
+        val expandLimit = maxOf(cap * 8, 256)
         outer@ for (item in eligible) {
             var occurrence = 1
             while (true) {
