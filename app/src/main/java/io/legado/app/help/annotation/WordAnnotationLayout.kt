@@ -217,12 +217,9 @@ object WordAnnotationLayout {
 
     private class Slot(
         val segment: HintSegment,
-        val measured: Float,
         var x: Float,
         var width: Float,
-    ) {
-        fun minX(columnLeft: Float) = maxOf(columnLeft, segment.left - measured)
-    }
+    )
 
     private fun packLine(
         ordered: List<Pair<HintSegment, Float>>,
@@ -232,14 +229,16 @@ object WordAnnotationLayout {
     ): List<HintLabelPlacement> {
         val slots = ArrayList<Slot>()
         for ((segment, measured) in ordered) {
-            val minX = maxOf(columnLeft, segment.left - measured)
-            val preferred = maxOf(minX, minOf(segment.left, columnRight - measured))
+            // Match placeHintX: slide left until the full label fits, even if
+            // that takes it left of the word's start. An empty prefix of the
+            // line is better than an unnecessary ellipsis.
+            val preferred = maxOf(columnLeft, minOf(segment.left, columnRight - measured))
             var cursor = if (slots.isEmpty()) columnLeft else slots.last().x + slots.last().width + gap
             if (preferred < cursor && slots.isNotEmpty()) {
                 var need = cursor - preferred
                 for (j in slots.indices.reversed()) {
                     if (need <= 0f) break
-                    val can = slots[j].x - slots[j].minX(columnLeft)
+                    val can = slots[j].x - columnLeft
                     if (can <= 0f) continue
                     val take = minOf(can, need)
                     for (k in j until slots.size) slots[k].x -= take
@@ -252,7 +251,7 @@ object WordAnnotationLayout {
             x = maxOf(x, cursor)
             val width = minOf(measured, (columnRight - x).coerceAtLeast(0f))
             if (width < LABEL_MIN_WIDTH) continue
-            slots += Slot(segment, measured, x, width)
+            slots += Slot(segment, x, width)
         }
         return slots.map {
             HintLabelPlacement(it.segment.id, it.segment.hint, it.x, it.width, it.segment)

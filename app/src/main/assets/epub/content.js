@@ -253,13 +253,15 @@
             var slots = [];
             group.slice().sort(function (a, b) { return a.left - b.left; }).forEach(function (segment) {
                 var measured = segment.measured;
-                var preferred = Math.max(Math.max(columnLeft, segment.left - measured),
-                    Math.min(segment.left, columnRight - measured));
+                // Match placeHintX: slide left until the full label fits, even
+                // if that takes it left of the word's start. An empty prefix of
+                // the line is better than an unnecessary ellipsis.
+                var preferred = Math.max(columnLeft, Math.min(segment.left, columnRight - measured));
                 var cursor = slots.length ? slots[slots.length - 1].x + slots[slots.length - 1].width + LABEL_GAP : columnLeft;
                 if (preferred < cursor && slots.length) {
                     var need = cursor - preferred, j;
                     for (j = slots.length - 1; j >= 0 && need > 0; j--) {
-                        var can = slots[j].x - Math.max(columnLeft, slots[j].left - slots[j].measured);
+                        var can = slots[j].x - columnLeft;
                         if (can <= 0) continue;
                         var take = Math.min(can, need), k;
                         for (k = j; k < slots.length; k++) slots[k].x -= take;
@@ -273,7 +275,7 @@
                 var width = Math.min(measured, Math.max(0, columnRight - x));
                 if (width < LABEL_MIN_WIDTH) return;
                 slots.push({ id: segment.id, hint: segment.hint, left: segment.left, right: segment.right,
-                    top: segment.top, bottom: segment.bottom, measured: measured, x: x, width: width });
+                    top: segment.top, bottom: segment.bottom, x: x, width: width });
             });
             slots.forEach(function (slot) {
                 placed.push({ id: slot.id, hint: slot.hint, left: slot.x, maxWidth: slot.width,
@@ -367,7 +369,9 @@
             var labelStyle = { position: 'absolute', 'pointer-events': 'none', margin: '0', padding: '0', border: '0',
                 'font-size': labelSize + 'px', 'line-height': (labelSize + 2) + 'px', color: color,
                 'white-space': 'nowrap', overflow: 'hidden', 'text-overflow': 'ellipsis',
-                'max-width': item.maxWidth + 'px',
+                // Explicit width keeps shrink-to-fit from making the label
+                // narrower than the width the packer actually reserved.
+                width: item.maxWidth + 'px', 'max-width': item.maxWidth + 'px',
                 left: item.left + 'px', top: top + 'px' };
             Object.keys(labelStyle).forEach(function (name) { label.style.setProperty(name, labelStyle[name], 'important'); });
             wordWiseLayer.appendChild(label);

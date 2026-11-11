@@ -170,7 +170,7 @@ class WordAnnotationLayoutTest {
     }
 
     @Test
-    fun `pack slides the earlier label left before shortening the later one`() {
+    fun `pack slides the earlier label left to keep both labels full width`() {
         val first = WordAnnotationLayout.HintSegment(1, "a", 80f, 100f, 40f, 60f)
         val second = WordAnnotationLayout.HintSegment(2, "b", 80f, 100f, 40f, 60f)
         val placed = WordAnnotationLayout.packHintLabels(
@@ -179,9 +179,22 @@ class WordAnnotationLayoutTest {
             columnRight = 100f,
         )
         assertEquals(2, placed.size)
-        assertEquals(40f, placed[0].left, 0.01f)
+        assertEquals(14f, placed[0].left, 0.01f)
         assertEquals(40f, placed[0].maxWidth, 0.01f)
-        assertEquals(86f, placed[1].left, 0.01f)
-        assertEquals(14f, placed[1].maxWidth, 0.01f)
+        assertEquals(60f, placed[1].left, 0.01f)
+        assertEquals(40f, placed[1].maxWidth, 0.01f)
+    }
+
+    @Test
+    fun `pack slides a right edge label left instead of ellipsizing`() {
+        val segment = WordAnnotationLayout.HintSegment(1, "极其恶劣的", 330f, 360f, 40f, 60f)
+        val placed = WordAnnotationLayout.packHintLabels(
+            listOf(segment to 80f),
+            columnLeft = 0f,
+            columnRight = 325f,
+        )
+        assertEquals(1, placed.size)
+        assertEquals(245f, placed[0].left, 0.01f)
+        assertEquals(80f, placed[0].maxWidth, 0.01f)
     }
 }
