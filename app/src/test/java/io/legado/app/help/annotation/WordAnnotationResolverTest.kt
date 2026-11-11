@@ -59,6 +59,20 @@ class WordAnnotationResolverTest {
     }
 
     @Test
+    fun `overlapping candidates are still considered after a boundary miss`() {
+        // "aba" at 0 is inside "ababa" as a token, so it is not a match; the
+        // next start is checked without skipping a valid overlapping span.
+        val passage = "x ababa aba"
+        val result = resolve(
+            listOf(passage),
+            WordAnnotationItem("aba", 1, "a sequence"),
+        )
+        assertEquals(1, result.size)
+        assertEquals(8, result[0].start)
+        assertEquals(11, result[0].end)
+    }
+
+    @Test
     fun `digits inside a longer number do not count`() {
         val result = resolve(
             listOf("1234 123"),
