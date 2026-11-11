@@ -59,6 +59,12 @@ object WordAnnotationPrompt {
                         "Do not spend the entire budget on its opening paragraphs.",
                 )
             }
+            appendLine("For each item set \"difficulty\" to 1-5:")
+            appendLine("1 = everyday; 2 = intermediate; 3 = advanced; 4 = rare/literary; 5 = exceptional/archaic.")
+            appendLine(
+                "Set \"contextual\" to true when a common word has an unusual, idiomatic, " +
+                    "figurative, or otherwise context-dependent meaning.",
+            )
             appendLine("Return up to $cap items.")
             appendLine("For each item, set \"occurrence\" to 1.")
             appendLine("Write each hint in $hintLanguage, using $hintCap.")
@@ -75,6 +81,6 @@ object WordAnnotationPrompt {
         appendLine(passage)
         appendLine()
         appendLine("Return a JSON object of this shape:")
-        append("""{"annotations":[{"text":"<exact text>","occurrence":1,"hint":"<short explanation>"}]}""")
+        append("""{"annotations":[{"text":"<exact text>","occurrence":1,"hint":"<short explanation>","difficulty":3,"contextual":false}]}""")
     }
 }

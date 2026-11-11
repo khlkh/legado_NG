@@ -31,7 +31,13 @@ object WordAnnotationParser {
             val hint = obj.stringField("hint") ?: continue
             val occurrence = obj.positiveIntField("occurrence") ?: continue
             if (text.isBlank() || hint.isBlank()) continue
-            items += WordAnnotationItem(text = text, occurrence = occurrence, hint = hint)
+            items += WordAnnotationItem(
+                text = text,
+                occurrence = occurrence,
+                hint = hint,
+                difficulty = obj.intField("difficulty")?.takeIf { it in 1..5 },
+                contextual = obj.booleanField("contextual") == true,
+            )
         }
         return items
     }
@@ -40,6 +46,18 @@ object WordAnnotationParser {
         val element = get(name) ?: return null
         if (!element.isJsonPrimitive || !element.asJsonPrimitive.isString) return null
         return element.asString
+    }
+
+    private fun com.google.gson.JsonObject.intField(name: String): Int? {
+        val element = get(name) ?: return null
+        if (!element.isJsonPrimitive || !element.asJsonPrimitive.isNumber) return null
+        return element.asInt
+    }
+
+    private fun com.google.gson.JsonObject.booleanField(name: String): Boolean? {
+        val element = get(name) ?: return null
+        if (!element.isJsonPrimitive || !element.asJsonPrimitive.isBoolean) return null
+        return element.asBoolean
     }
 
     private fun com.google.gson.JsonObject.positiveIntField(name: String): Int? {

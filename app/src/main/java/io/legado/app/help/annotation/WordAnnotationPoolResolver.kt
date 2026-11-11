@@ -11,6 +11,9 @@ package io.legado.app.help.annotation
  */
 object WordAnnotationPoolResolver {
 
+    /** Canonical chapter quartiles used only for display coverage. */
+    const val COVERAGE_BUCKETS = 4
+
     fun resolveChapter(
         paragraphs: List<WordAnnotationAnalyzer.CanonicalParagraph>,
         items: List<WordAnnotationPoolItem>,
@@ -48,6 +51,11 @@ object WordAnnotationPoolResolver {
                     surface = item.surface,
                     hint = item.hint,
                     rank = item.rank,
+                    coverageBucket = ((start.toLong() * COVERAGE_BUCKETS) / joined.length.coerceAtLeast(1))
+                        .toInt()
+                        .coerceIn(0, COVERAGE_BUCKETS - 1),
+                    difficulty = item.difficulty,
+                    contextual = item.contextual,
                 )
                 if (resolved.size >= expandLimit) break@outer
             }
@@ -56,7 +64,12 @@ object WordAnnotationPoolResolver {
         // equal length, before the cap.
         val overlapDropped = WordAnnotationResolver.overlappingIndices(resolved)
         val nonOverlapping = resolved.filterIndexed { index, _ -> index !in overlapDropped }
-        return WordAnnotationFilter.filter(nonOverlapping, level, cap).map { annotation ->
+        return WordAnnotationFilter.filter(
+            annotations = nonOverlapping,
+            level = level,
+            cap = cap,
+            coverageBuckets = COVERAGE_BUCKETS,
+        ).map { annotation ->
             annotation.copy(paragraphIndex = paragraphs[annotation.paragraphIndex].sourceIndex)
         }
     }

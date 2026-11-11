@@ -179,19 +179,14 @@ class WordAnnotationResolverTest {
     }
 
     @Test
-    fun `chapter cap keeps the default twenty-one after sorting`() {
-        val numbers = listOf(
-            "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-            "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
-            "eighteen", "nineteen", "twenty", "twenty-one", "twenty-two", "twenty-three",
-            "twenty-four", "twenty-five",
-        )
-        val paragraph = numbers.joinToString(" ")
-        val items = numbers.map { WordAnnotationItem(it, 1, "meaning of $it") }
+    fun `chapter cap keeps the default thirty-four after sorting`() {
+        val words = (1..40).map { "word$it" }
+        val paragraph = words.joinToString(" ")
+        val items = words.map { WordAnnotationItem(it, 1, "meaning of $it") }
         val result = resolve(listOf(paragraph), *items.toTypedArray())
-        assertEquals(21, result.size)
-        assertEquals("one", result.first().surface)
-        assertEquals("twenty-one", result.last().surface)
+        assertEquals(34, result.size)
+        assertEquals("word1", result.first().surface)
+        assertEquals("word34", result.last().surface)
     }
 
     @Test

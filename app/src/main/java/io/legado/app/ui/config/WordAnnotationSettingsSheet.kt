@@ -79,7 +79,7 @@ internal fun WordAnnotationSettingsSheet(
     if (showHintCapPicker) {
         ConfigChoiceDialog(
             title = stringResource(R.string.ai_word_annotation_hint_cap),
-            options = listOf(5, 8, 13, 21, 34, 55, 89).map { value ->
+            options = listOf(8, 13, 21, 34, 55, 89, 144).map { value ->
                 ConfigChoiceOption(label = value.toString(), value = value.toString())
             },
             selectedValue = normalizedCap.toString(),

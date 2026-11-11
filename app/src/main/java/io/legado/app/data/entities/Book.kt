@@ -524,7 +524,7 @@ data class Book(
         var wordAnnotationLevel: Int = 4,
         @SerializedName("wordAnnotationHintCap")
         // Keep in sync with WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP.
-        var wordAnnotationHintCap: Int = 21,
+        var wordAnnotationHintCap: Int = 34,
     ) : Parcelable
 
     class Converters {

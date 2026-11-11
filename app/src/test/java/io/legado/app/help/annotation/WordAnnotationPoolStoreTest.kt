@@ -22,8 +22,8 @@ class WordAnnotationPoolStoreTest {
         contentHash = "hash-one",
         completedWindows = setOf(0, 1, 2, 3),
         items = listOf(
-            WordAnnotationPoolItem("untenable", "impossible to defend", 12_000),
-            WordAnnotationPoolItem("came to terms with", "accepted", null),
+            WordAnnotationPoolItem("untenable", "impossible to defend", 12_000, difficulty = 4, contextual = true),
+            WordAnnotationPoolItem("came to terms with", "accepted", null, difficulty = 2),
         ),
     )
 
