@@ -21,6 +21,7 @@ import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.annotation.WordAnnotationDensity
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.utils.GSON
@@ -247,6 +248,14 @@ data class Book(
 
     fun getWordAnnotationHintCap(): Int {
         return config.wordAnnotationHintCap
+    }
+
+    fun setWordAnnotationDensity(density: Int) {
+        config.wordAnnotationDensity = density
+    }
+
+    fun getWordAnnotationDensity(): Int {
+        return WordAnnotationDensity.fromStorage(config.wordAnnotationDensity).storageValue
     }
 
     fun setRemoveSameTitle(removeSameTitle: Boolean) {
@@ -523,8 +532,11 @@ data class Book(
         @SerializedName("wordAnnotationLevel")
         var wordAnnotationLevel: Int = 4,
         @SerializedName("wordAnnotationHintCap")
-        // Keep in sync with WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP.
+        // Legacy fixed cap. Display density is now word-count based; the
+        // field is kept only so old ReadConfig JSON stays readable.
         var wordAnnotationHintCap: Int = 34,
+        @SerializedName("wordAnnotationDensity")
+        var wordAnnotationDensity: Int = WordAnnotationDensity.STANDARD.storageValue,
     ) : Parcelable
 
     class Converters {

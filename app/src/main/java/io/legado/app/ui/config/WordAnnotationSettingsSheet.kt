@@ -8,31 +8,30 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import io.legado.app.R
 import io.legado.app.help.annotation.WordAnnotationConfig
+import io.legado.app.help.annotation.WordAnnotationDensity
 import io.legado.app.help.annotation.WordAnnotationLevels
 import io.legado.app.ui.design.components.compose.NgSettingsGroup
 import io.legado.app.ui.design.components.compose.NgSettingsItem
 
 /**
- * Word Gloss settings sheet: model, five-level vocabulary slider, and the
- * per-book chapter cap. The per-book on/off switch stays in the reader.
+ * Word Gloss settings sheet: model, five-level vocabulary level, and density.
+ * Display density is word-count based; the per-book on/off switch stays in the
+ * reader.
  */
 @Composable
 internal fun WordAnnotationSettingsSheet(
     level: Int,
-    hintCap: Int,
+    density: Int,
     modelSummary: String,
     bookActive: Boolean,
     onSelectModel: () -> Unit,
     onLevelSelected: (Int) -> Unit,
-    onHintCapSelected: (Int) -> Unit,
+    onDensitySelected: (Int) -> Unit,
 ) {
     var showLevelPicker by rememberSaveable { mutableStateOf(false) }
-    var showHintCapPicker by rememberSaveable { mutableStateOf(false) }
+    var showDensityPicker by rememberSaveable { mutableStateOf(false) }
     val normalizedLevel = WordAnnotationLevels.normalize(level)
-    val normalizedCap = hintCap.coerceIn(
-        WordAnnotationConfig.MIN_WORD_ANNOTATION_HINT_CAP,
-        WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
-    )
+    val normalizedDensity = WordAnnotationDensity.fromStorage(density)
 
     NgSettingsGroup {
         NgSettingsItem(
@@ -45,16 +44,18 @@ internal fun WordAnnotationSettingsSheet(
             summary = stringResource(
                 R.string.ai_word_annotation_level_summary,
                 WordAnnotationLevels.floorFor(normalizedLevel),
-                normalizedCap,
             ),
             enabled = bookActive,
             onClick = { showLevelPicker = true },
         )
         NgSettingsItem(
-            title = stringResource(R.string.ai_word_annotation_hint_cap),
-            summary = normalizedCap.toString(),
+            title = stringResource(R.string.ai_word_annotation_density),
+            summary = stringResource(
+                R.string.ai_word_annotation_density_summary,
+                stringResource(densityLabelRes(normalizedDensity)),
+            ),
             enabled = bookActive,
-            onClick = { showHintCapPicker = true },
+            onClick = { showDensityPicker = true },
         )
     }
 
@@ -76,17 +77,20 @@ internal fun WordAnnotationSettingsSheet(
             },
         )
     }
-    if (showHintCapPicker) {
+    if (showDensityPicker) {
         ConfigChoiceDialog(
-            title = stringResource(R.string.ai_word_annotation_hint_cap),
-            options = listOf(8, 13, 21, 34, 55, 89, 144).map { value ->
-                ConfigChoiceOption(label = value.toString(), value = value.toString())
+            title = stringResource(R.string.ai_word_annotation_density),
+            options = WordAnnotationDensity.entries.map { value ->
+                ConfigChoiceOption(
+                    label = stringResource(densityLabelRes(value)),
+                    value = value.storageValue.toString(),
+                )
             },
-            selectedValue = normalizedCap.toString(),
-            onDismissRequest = { showHintCapPicker = false },
+            selectedValue = normalizedDensity.storageValue.toString(),
+            onDismissRequest = { showDensityPicker = false },
             onSelected = { value ->
-                showHintCapPicker = false
-                value.toIntOrNull()?.let(onHintCapSelected)
+                showDensityPicker = false
+                value.toIntOrNull()?.let(onDensitySelected)
             },
         )
     }
@@ -98,4 +102,10 @@ private fun levelLabelRes(level: Int): Int = when (level) {
     3 -> R.string.ai_word_annotation_level_3
     4 -> R.string.ai_word_annotation_level_4
     else -> R.string.ai_word_annotation_level_5
+}
+
+private fun densityLabelRes(density: WordAnnotationDensity): Int = when (density) {
+    WordAnnotationDensity.SPARSE -> R.string.ai_word_annotation_density_sparse
+    WordAnnotationDensity.STANDARD -> R.string.ai_word_annotation_density_standard
+    WordAnnotationDensity.DENSE -> R.string.ai_word_annotation_density_dense
 }

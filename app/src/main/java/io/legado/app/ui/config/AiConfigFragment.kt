@@ -30,6 +30,7 @@ import io.legado.app.data.appDb
 import io.legado.app.help.ai.AiConfig
 import io.legado.app.help.ai.AiManager
 import io.legado.app.help.annotation.WordAnnotationConfig
+import io.legado.app.help.annotation.WordAnnotationDensity
 import io.legado.app.help.annotation.WordAnnotationEligibility
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.ai.AiModel
@@ -2225,8 +2226,8 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
     private fun showWordAnnotationSettingsSheet() {
         val level = ReadBook.book?.getWordAnnotationLevel()
             ?: WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL
-        val hintCap = ReadBook.book?.getWordAnnotationHintCap()
-            ?: WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP
+        val density = ReadBook.book?.getWordAnnotationDensity()
+            ?: WordAnnotationDensity.STANDARD.storageValue
         val dialog = BottomSheetDialog(requireContext())
         dialog.setContentView(
             requireContext().createNgBottomDrawerComposeHost(
@@ -2235,7 +2236,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             ) {
                 WordAnnotationSettingsSheet(
                     level = level,
-                    hintCap = hintCap,
+                    density = density,
                     modelSummary = wordAnnotationModelSummaryText(),
                     bookActive = ReadBook.book?.let {
                         WordAnnotationEligibility.supports(it)
@@ -2252,8 +2253,8 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                         refreshMain()
                         dialog.dismiss()
                     },
-                    onHintCapSelected = { newCap ->
-                        ReadBook.book?.setWordAnnotationHintCap(newCap)
+                    onDensitySelected = { newDensity ->
+                        ReadBook.book?.setWordAnnotationDensity(newDensity)
                         ReadBook.saveWordAnnotationConfig()
                         if (ReadBook.book?.getWordAnnotationEnabled() == true) {
                             ReadBook.loadContent(false)

@@ -65,23 +65,21 @@ class WordAnnotationAnalyzerTest {
     }
 
     @Test
-    fun `generation cap is independent from the display cap`() {
-        assertEquals(60, WordAnnotationAnalyzer.generationCap(displayCap = 21))
-        assertEquals(89, WordAnnotationAnalyzer.generationCap(displayCap = 89))
-        assertEquals(15, WordAnnotationAnalyzer.perWindowCap(generationCap = 60, windowCount = 4))
-        assertEquals(23, WordAnnotationAnalyzer.perWindowCap(generationCap = 89, windowCount = 4))
+    fun `discovery per window budget is split across windows`() {
+        assertEquals(19, WordAnnotationAnalyzer.perWindowCap(discoveryTarget = 75, windowCount = 4))
+        assertEquals(19, WordAnnotationAnalyzer.perWindowCap(discoveryTarget = 300, windowCount = 16))
     }
 
     @Test
     fun `discovery windows cover the chapter and overlap at boundaries`() {
-        val paragraphs = (0 until 100).map {
-            WordAnnotationAnalyzer.CanonicalParagraph(it, "paragraph $it " + "x".repeat(1_000))
+        val paragraphs = (0 until 10).map {
+            WordAnnotationAnalyzer.CanonicalParagraph(it, "paragraph $it " + "x ".repeat(1_000))
         }
         val windows = WordAnnotationAnalyzer.discoveryWindows(paragraphs)
 
         assertEquals(4, windows.size)
         assertEquals(0, windows.first().startParagraph)
-        assertEquals(100, windows.last().endParagraph)
+        assertEquals(10, windows.last().endParagraph)
         assertEquals(0, windows.first().index)
         assertEquals(3, windows.last().index)
         windows.zipWithNext().forEach { (left, right) ->
@@ -102,10 +100,14 @@ class WordAnnotationAnalyzerTest {
     }
 
     @Test
-    fun `new book defaults to the current hint cap`() {
+    fun `new book defaults to the legacy cap value and standard density`() {
         assertEquals(
             WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP,
             Book().getWordAnnotationHintCap(),
+        )
+        assertEquals(
+            WordAnnotationDensity.STANDARD.storageValue,
+            Book().getWordAnnotationDensity(),
         )
     }
 
