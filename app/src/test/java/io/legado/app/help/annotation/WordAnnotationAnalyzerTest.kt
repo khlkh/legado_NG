@@ -3,6 +3,7 @@ package io.legado.app.help.annotation
 import io.legado.app.data.entities.Book
 import io.legado.app.help.book.BookContent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -76,5 +77,27 @@ class WordAnnotationAnalyzerTest {
             WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_HINT_CAP,
             Book().getWordAnnotationHintCap(),
         )
+    }
+
+    @Test
+    fun `word gloss is limited to latin script books`() {
+        assertTrue(WordAnnotationEligibility.supports("latin"))
+        assertFalse(WordAnnotationEligibility.supports("cjk"))
+        assertFalse(WordAnnotationEligibility.supports("other"))
+        // Unknown until the book is classified: keep the entry point visible.
+        assertTrue(WordAnnotationEligibility.supports(null))
+
+        val latin = "The quick brown fox jumps over the lazy dog."
+        val chinese = "这是一段足够长的中文文字，用来测试语言分类。"
+        val russian = "Это достаточно длинный русский текст для проверки сценария."
+
+        assertTrue(WordAnnotationEligibility.supportsPassage(null, latin))
+        assertFalse(WordAnnotationEligibility.supportsPassage(null, chinese))
+        assertFalse(WordAnnotationEligibility.supportsPassage(null, russian))
+        // A persisted non-Latin class is authoritative even if the sample is Latin.
+        assertFalse(WordAnnotationEligibility.supportsPassage("other", latin))
+
+        val otherBook = Book().apply { config.scriptClass = "other" }
+        assertFalse(WordAnnotationEligibility.supports(otherBook))
     }
 }

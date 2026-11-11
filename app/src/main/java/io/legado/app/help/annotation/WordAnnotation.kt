@@ -1,7 +1,7 @@
 package io.legado.app.help.annotation
 
 /**
- * Wave 1 data model for AI Word Wise.
+ * Wave 1 data model for AI Word Gloss.
  *
  * [WordAnnotationItem] is what the model returns: an exact surface string, the
  * 1-based occurrence of that string inside the requested passage, and a short
@@ -34,7 +34,7 @@ object WordAnnotationConfig {
 }
 
 /**
- * Five reader levels for Word Wise. One slider drives the soft floor: only
+ * Five reader levels for Word Gloss. One slider drives the soft floor: only
  * single-word hints whose rank is known and below the floor are dropped;
  * multiword expressions and unknown-rank words always stay eligible. The
  * per-chapter hint cap is a separate per-book setting.

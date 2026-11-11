@@ -30,6 +30,7 @@ import io.legado.app.data.appDb
 import io.legado.app.help.ai.AiConfig
 import io.legado.app.help.ai.AiManager
 import io.legado.app.help.annotation.WordAnnotationConfig
+import io.legado.app.help.annotation.WordAnnotationEligibility
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.ai.AiModel
 import io.legado.app.help.ai.AiModelAbility
@@ -2237,7 +2238,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                     hintCap = hintCap,
                     modelSummary = wordAnnotationModelSummaryText(),
                     bookActive = ReadBook.book?.let {
-                        it.config.scriptClass != "cjk"
+                        WordAnnotationEligibility.supports(it)
                     } == true,
                     onSelectModel = {
                         showComposeModelSelectionSheet(AiModelSelectionTarget.WORD_ANNOTATION)

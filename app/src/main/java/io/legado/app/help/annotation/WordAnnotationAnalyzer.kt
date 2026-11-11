@@ -14,8 +14,6 @@ import io.legado.app.help.ai.AiProviderStore
 import io.legado.app.help.ai.AiTextParams
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.BookHelp
-import io.legado.app.help.book.BookLanguageDetector
-import io.legado.app.help.book.BookScriptClass
 import io.legado.app.help.book.isEpub
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.entities.TextChapter
@@ -29,7 +27,7 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Word Wise book glossary, English/Latin books only.
+ * Word Gloss book glossary, Latin-script books only.
  *
  * Each chapter is analyzed with a small per-chapter call and its items are
  * appended to the book pool (deduped by surface, first hint wins, each item
@@ -86,18 +84,6 @@ object WordAnnotationAnalyzer {
             else -> Locale.getDefault().language == "zh"
         }
     }
-
-    /** True only for Latin-script books; CJK books get no hints in this slice. */
-    fun bookLanguage(passage: String, scriptClass: String?): WordAnnotationLanguage =
-        when (scriptClass) {
-            "cjk" -> WordAnnotationLanguage.CHINESE
-            "latin" -> WordAnnotationLanguage.ENGLISH
-            else -> if (BookLanguageDetector.classifyScript(passage) == BookScriptClass.Cjk) {
-                WordAnnotationLanguage.CHINESE
-            } else {
-                WordAnnotationLanguage.ENGLISH
-            }
-        }
 
     fun analysisConfig(book: Book, uiLocaleChinese: Boolean): AnalysisConfig {
         val providerId = AiConfig.wordAnnotationProviderId.ifBlank { AiProviderStore.activeProviderId() }
@@ -162,7 +148,7 @@ object WordAnnotationAnalyzer {
         val paragraphs = canonicalParagraphs(bookContent)
         if (paragraphs.isEmpty()) return false
         val passage = paragraphs.joinToString("\n") { it.text }
-        if (bookLanguage(passage, book.config.scriptClass) != WordAnnotationLanguage.ENGLISH) return false
+        if (!WordAnnotationEligibility.supportsPassage(book.config.scriptClass, passage)) return false
         val userCap = book.getWordAnnotationHintCap().coerceIn(
             WordAnnotationConfig.MIN_WORD_ANNOTATION_HINT_CAP,
             WordAnnotationConfig.MAX_WORD_ANNOTATION_HINT_CAP,
@@ -205,6 +191,10 @@ object WordAnnotationAnalyzer {
             AppLog.put("WordAnnotation skip: flag off")
             return
         }
+        if (!WordAnnotationEligibility.supports(book)) {
+            Log.d("WordAnnotation", "skip unsupported script")
+            return
+        }
         val paragraphs = canonicalParagraphs(bookContent)
         if (paragraphs.isEmpty()) {
             Log.d("WordAnnotation", "skip no paragraphs")
@@ -212,9 +202,10 @@ object WordAnnotationAnalyzer {
             return
         }
         val passage = paragraphs.joinToString("\n") { it.text }
-        // English/Latin books only; CJK books get no hints.
-        if (bookLanguage(passage, book.config.scriptClass) != WordAnnotationLanguage.ENGLISH) {
-            Log.d("WordAnnotation", "skip non-english book")
+        // Word Gloss is Latin-script only; unknown script classes are
+        // verified against the actual passage here.
+        if (!WordAnnotationEligibility.supportsPassage(book.config.scriptClass, passage)) {
+            Log.d("WordAnnotation", "skip non-latin book")
             return
         }
         val uiLocaleChinese = appUiLocaleChinese()

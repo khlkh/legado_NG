@@ -1,14 +1,14 @@
 package io.legado.app.help.annotation
 
 /**
- * Book-level Word Wise pool.
+ * Book-level Word Gloss pool.
  *
  * The pool grows incrementally: each chapter is analyzed with a small
  * per-chapter call and its items are appended to the book pool. Chapters then
  * resolve their annotations locally from the pool — no per-chapter cache. The
  * reader's level floor and per-book cap filter the resolved list locally.
  *
- * English/Latin books only; CJK books get no hints in this slice.
+ * Latin-script books only; CJK and other non-Latin books get no hints.
  */
 object WordAnnotationPoolConfig {
     /** The pool target is at least this many items. */

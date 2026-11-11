@@ -7,7 +7,7 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * File cache for the book-level Word Wise pool.
+ * File cache for the book-level Word Gloss pool.
  *
  * One file per book (`book_cache/<bookFolder>/wordwise-pool.json`). The JSON
  * stores the book identity, the sampled-passage hash, the prompt/schema and
@@ -17,6 +17,8 @@ import java.security.MessageDigest
  */
 object WordAnnotationPoolStore {
 
+    // Legacy working-name filename: keep it so existing per-book pools stay
+    // readable; the public feature name is Word Gloss.
     const val POOL_FILE_NAME = "wordwise-pool.json"
     const val TEMP_SUFFIX = ".tmp"
 

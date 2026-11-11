@@ -1767,7 +1767,10 @@
                     'transform-origin': '0 0', transform: 'none' });
                 style(body, { 'overflow-wrap': 'anywhere' });
                 var wordWiseBand = value.wordWiseStyle && Number.isFinite(value.wordWiseStyle.band) ? value.wordWiseStyle.band : 0;
-                if (wordWiseBand > 0) {
+                var wordWiseHorizontal = !window.__ngEpubContent ||
+                    typeof window.__ngEpubContent.wordWiseWritingSupported !== 'function' ||
+                    window.__ngEpubContent.wordWiseWritingSupported();
+                if (wordWiseBand > 0 && wordWiseHorizontal) {
                     // Extra line-height is split above and below the glyphs, so the
                     // first line of every column still needs this padding for the
                     // label that sits above the word.

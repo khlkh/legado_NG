@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 
 /**
- * Loads the generated Project Gutenberg rank asset used by the Word Wise fusion
+ * Loads the generated Project Gutenberg rank asset used by the Word Gloss fusion
  * prototype.
  *
  * The asset is generated from the canonical Wiktionary 2006/04 frequency list

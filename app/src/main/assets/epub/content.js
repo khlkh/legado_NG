@@ -125,7 +125,19 @@
                 width: size, height: size, touch: noteStyle.touch * scale };
         });
     }
+    function wordWiseWritingSupported() {
+        if (!document.body) return false;
+        var css = window.getComputedStyle(document.body);
+        var writing = css.writingMode || css.webkitWritingMode || '';
+        // Word Gloss geometry assumes horizontal LTR boxes. Vertical and RTL
+        // documents are out of scope; suppress the overlay rather than paint
+        // labels against the wrong axis.
+        return !/^(vertical|sideways)/.test(writing) && css.direction !== 'rtl';
+    }
     function setWordWise(values, style) {
+        // A vertical/RTL document must not reserve a first-line band or leave
+        // untappable fragments behind; treat it as an empty Word Gloss layer.
+        if (!wordWiseWritingSupported()) { values = []; style = null; }
         var signature = JSON.stringify([values || [], style || null]);
         if (signature === wordWiseSignature) return false;
         wordWiseFragments = (values || []).slice(); wordWiseStyle = style; wordWiseSignature = signature;
@@ -300,6 +312,7 @@
     function paintWordWiseCore() {
         if (wordWiseLayer) { wordWiseLayer.replaceChildren(); wordWiseLayer.__ngHits = []; }
         if (!wordWiseFragments.length || !document.body) return;
+        if (!wordWiseWritingSupported()) return;
         if (!wordWiseLayer) {
             wordWiseLayer = document.createElementNS('http://www.w3.org/1999/xhtml', 'ng-word-wise');
             wordWiseLayer.setAttribute('aria-hidden', 'true');
@@ -1078,7 +1091,8 @@
     window.__ngEpubContent = Object.freeze({ apply: apply, loadFonts: loadFonts, offset: offset, point: point, selection: selection,
         setAloud: setAloud,
         setNotes: setNotes, noteRects: noteRects,
-        setWordWise: setWordWise, wordWiseRects: wordWiseRects, wordWiseCount: function () { return wordWiseFragments.length; },
+        setWordWise: setWordWise, wordWiseWritingSupported: wordWiseWritingSupported,
+        wordWiseRects: wordWiseRects, wordWiseCount: function () { return wordWiseFragments.length; },
         paintWordWise: paintWordWise, clearWordWise: clearWordWise, hitWordWise: hitWordWise,
         setTitleSegments: setTitleSegments, titleHeadings: titleHeadings,
         ruleUnderlineRects: ruleUnderlineRects,
