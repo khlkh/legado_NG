@@ -297,7 +297,13 @@
         wordWiseMeasure.style.setProperty('font-size', fontSize + 'px', 'important');
         wordWiseMeasure.style.setProperty('line-height', (fontSize + 2) + 'px', 'important');
         wordWiseMeasure.textContent = text;
-        return wordWiseMeasure.offsetWidth;
+        // offsetWidth rounds down to an integer. CJK runs are often a
+        // fraction of a pixel wider, and CSS text-overflow then replaces the
+        // last glyph with an ellipsis even though the line has plenty of
+        // room. Measure fractionally and keep a 1px safety margin.
+        var measured = wordWiseMeasure.getBoundingClientRect().width;
+        if (!(measured > 0)) measured = wordWiseMeasure.offsetWidth;
+        return measured + 1;
     }
     function paintWordWise() {
         paintWordWiseCore();
