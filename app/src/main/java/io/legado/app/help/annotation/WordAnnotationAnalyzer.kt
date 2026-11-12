@@ -359,9 +359,11 @@ object WordAnnotationAnalyzer {
                     val frequencyIndex = WordFrequencyAssets.load(appCtx)
                     val known = chapter.items.mapTo(HashSet()) { it.surface }
                     val nextItems = ArrayList(chapter.items)
+                    val remaining = (discoveryTarget - chapter.items.size).coerceAtLeast(0)
+                    val windowLimit = minOf(perWindowCap, remaining)
                     var acceptedForWindow = 0
                     for (item in items) {
-                        if (acceptedForWindow >= perWindowCap) break
+                        if (acceptedForWindow >= windowLimit) break
                         if (!WordAnnotationResolver.hintWithinCap(
                                 item.hint,
                                 config.hintCharCap,
