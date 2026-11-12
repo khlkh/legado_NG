@@ -14,7 +14,7 @@ import io.legado.app.ui.design.components.compose.NgSettingsGroup
 import io.legado.app.ui.design.components.compose.NgSettingsItem
 
 /**
- * Word Gloss settings sheet: model, five-level vocabulary level, and density.
+ * Smart Glosses settings sheet: model, five-level vocabulary level, and density.
  * Display density is word-count based; the per-book on/off switch stays in the
  * reader.
  */

@@ -38,7 +38,7 @@ import io.legado.app.model.epub.EpubSpreadPage
 import io.legado.app.model.epub.EpubPageProgressionDirection
 import io.legado.app.model.epub.EpubResourceLink
 import io.legado.app.help.annotation.WordAnnotationLayout
-import io.legado.app.model.epub.EpubWordWiseFragments
+import io.legado.app.model.epub.EpubSmartGlossesFragments
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -84,7 +84,7 @@ internal class EpubLayoutController(
     private val neighboringChapters: () -> List<TextChapter>,
     private val selectionChanged: (JSONObject?, Boolean) -> Unit,
     private val highlightClick: (Bookmark, Float, Float, Float) -> Unit,
-    private val wordWiseClick: (String, Float, Float, Float) -> Unit = { _, _, _, _ -> },
+    private val smartGlossesClick: (String, Float, Float, Float) -> Unit = { _, _, _, _ -> },
     private val imageLongPress: (Float, Float, String) -> Unit = { _, _, _ -> },
     private val openingPreparation: () -> EpubOpeningPreparation? = { null },
     private val openingPreview: () -> EpubOpeningPreview? = { null },
@@ -481,18 +481,18 @@ internal class EpubLayoutController(
                             next.top + rect.optDouble("bottom").toFloat() * scale)
                         return@interactReady
                     }
-                    if (result.has("wordWise")) {
-                        val wordWiseId = result.optInt("wordWise")
-                        val wordWiseHint = documents.getOrNull(documentIndex)
-                            ?.chapter?.epubWordAnnotations?.getOrNull(wordWiseId)?.hint
+                    if (result.has("smartGlosses")) {
+                        val smartGlossesId = result.optInt("smartGlosses")
+                        val smartGlossesHint = documents.getOrNull(documentIndex)
+                            ?.chapter?.epubWordAnnotations?.getOrNull(smartGlossesId)?.hint
                             .orEmpty()
-                            .ifEmpty { result.optString("wordWiseHint") }
-                        if (wordWiseHint.isNotEmpty()) {
-                            val wordWiseRect = result.optJSONObject("wordWiseRect")
+                            .ifEmpty { result.optString("smartGlossesHint") }
+                        if (smartGlossesHint.isNotEmpty()) {
+                            val smartGlossesRect = result.optJSONObject("smartGlossesRect")
                             val scale = host.resources.displayMetrics.density
-                            val top = next.top + (wordWiseRect?.optDouble("top") ?: 0.0).toFloat() * scale
-                            val bottom = next.top + (wordWiseRect?.optDouble("bottom") ?: 0.0).toFloat() * scale
-                            wordWiseClick(wordWiseHint, x + next.left, top, bottom)
+                            val top = next.top + (smartGlossesRect?.optDouble("top") ?: 0.0).toFloat() * scale
+                            val bottom = next.top + (smartGlossesRect?.optDouble("bottom") ?: 0.0).toFloat() * scale
+                            smartGlossesClick(smartGlossesHint, x + next.left, top, bottom)
                             return@interactReady
                         }
                     }
@@ -1108,26 +1108,26 @@ internal class EpubLayoutController(
                 for (i in 0 until ranges.length()) put(ranges.getJSONObject(i))
             } })
         } }
-        val documentWordWise = documents[documentIndex].wordWise
-        val wordWise = JSONArray().apply {
+        val documentSmartGlosses = documents[documentIndex].smartGlosses
+        val smartGlosses = JSONArray().apply {
             // Hint text must come from the same document's chapter: preloaded
             // neighbours carry their own fragments and their own annotations.
             val chapterAnnotations = documents[documentIndex].chapter.epubWordAnnotations
-            documentWordWise.forEach { fragment ->
+            documentSmartGlosses.forEach { fragment ->
                 put(JSONObject().put("id", fragment.hintId)
                     .put("start", fragment.nativeStart).put("end", fragment.nativeEnd)
                     .put("hint", chapterAnnotations.getOrNull(fragment.hintId)?.hint ?: ""))
             }
         }
-        if (documentWordWise.isNotEmpty()) {
+        if (documentSmartGlosses.isNotEmpty()) {
             // Reserve vertical space above each line for hint labels, exactly like the
             // native hint band. Changing line-height re-paginates only when the feature
             // is toggled or annotations attach, never on ordinary style repaints.
             reader.put("lineHeight", reader.optDouble("lineHeight") + 16.0)
         }
         value.put("highlights", highlights).put("noteMarkers", notes).put("titleSegmentsByDocument", titleSegments)
-            .put("wordWise", wordWise)
-            .put("wordWiseStyle", if (wordWise.length() > 0) JSONObject()
+            .put("smartGlosses", smartGlosses)
+            .put("smartGlossesStyle", if (smartGlosses.length() > 0) JSONObject()
                 .put("color", EpubCharStyles.cssColor(ReadBookConfig.textAccentColor))
                 .put("fontSize", ChapterProvider.hintPaint.textSize / metrics.density)
                 .put("band", ChapterProvider.hintPaint.textSize / metrics.density +

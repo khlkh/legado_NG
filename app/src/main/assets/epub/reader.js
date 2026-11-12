@@ -400,7 +400,7 @@
         });
     }
     function paintHighlights() {
-        if (window.__ngEpubContent) window.__ngEpubContent.paintWordWise();
+        if (window.__ngEpubContent) window.__ngEpubContent.paintSmartGlosses();
         if (body === root) return;
         paintedHighlights = JSON.stringify(highlights);
         paintSelection();
@@ -464,11 +464,11 @@
         highlights = values || [];
         if (JSON.stringify(highlights) !== paintedHighlights) paintHighlights();
     }
-    function setWordWise(values, style) {
-        if (window.__ngEpubContent && window.__ngEpubContent.setWordWise(values || [], style || null)) {
+    function setSmartGlosses(values, style) {
+        if (window.__ngEpubContent && window.__ngEpubContent.setSmartGlosses(values || [], style || null)) {
             indexContentNodes();
             if (state.status === 'ready') {
-                window.__ngEpubContent.paintWordWise();
+                window.__ngEpubContent.paintSmartGlosses();
             }
         }
     }
@@ -744,7 +744,7 @@
     }
     function hasTapTargets() {
         return !!selectedRange || noteHitRects.length > 0 || highlightRects.length > 0 ||
-            (window.__ngEpubContent && window.__ngEpubContent.wordWiseCount() > 0) ||
+            (window.__ngEpubContent && window.__ngEpubContent.smartGlossesCount() > 0) ||
             triggerObservers.size > 0 || document.getElementsByTagNameNS('*', 'a').length > 0;
     }
     function interact(value) {
@@ -790,10 +790,10 @@
                 var mark = highlightRects.slice().reverse().find(function (h) { var r = h.rect; return value.x >= r.left && value.x <= r.right && value.y >= r.top && value.y <= r.bottom; });
                 if (mark) { var r = mark.rect; return { token: state.token, highlight: mark.value.id,
                     highlightRect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } }; }
-                var wordWise = window.__ngEpubContent && window.__ngEpubContent.hitWordWise(value.x, value.y);
-                if (wordWise) return { token: state.token, wordWise: wordWise.id,
-                    wordWiseHint: wordWise.hint || '',
-                    wordWiseRect: { left: wordWise.left, top: wordWise.top, right: wordWise.right, bottom: wordWise.bottom } };
+                var smartGlosses = window.__ngEpubContent && window.__ngEpubContent.hitSmartGlosses(value.x, value.y);
+                if (smartGlosses) return { token: state.token, smartGlosses: smartGlosses.id,
+                    smartGlossesHint: smartGlosses.hint || '',
+                    smartGlossesRect: { left: smartGlosses.left, top: smartGlosses.top, right: smartGlosses.right, bottom: smartGlosses.bottom } };
                 var hit = document.elementFromPoint(value.x, value.y);
                 var observer = hit;
                 while (observer && !triggerObservers.has(observer)) observer = observer.parentElement;
@@ -1557,7 +1557,7 @@
         if (window.__ngEpubContent && window.__ngEpubContent.setNotes(value.noteMarkers || [], value.noteMarkerStyle || null)) {
             indexContentNodes();
         }
-        if (window.__ngEpubContent && window.__ngEpubContent.setWordWise(value.wordWise || [], value.wordWiseStyle || null)) {
+        if (window.__ngEpubContent && window.__ngEpubContent.setSmartGlosses(value.smartGlosses || [], value.smartGlossesStyle || null)) {
             indexContentNodes();
         }
         if (window.__ngEpubContent) {
@@ -1766,15 +1766,15 @@
                     'column-fill': 'auto', overflow: 'visible', position: 'absolute', left: '0', top: topInset + 'px',
                     'transform-origin': '0 0', transform: 'none' });
                 style(body, { 'overflow-wrap': 'anywhere' });
-                var wordWiseBand = value.wordWiseStyle && Number.isFinite(value.wordWiseStyle.band) ? value.wordWiseStyle.band : 0;
-                var wordWiseHorizontal = !window.__ngEpubContent ||
-                    typeof window.__ngEpubContent.wordWiseWritingSupported !== 'function' ||
-                    window.__ngEpubContent.wordWiseWritingSupported();
-                if (wordWiseBand > 0 && wordWiseHorizontal) {
+                var smartGlossesBand = value.smartGlossesStyle && Number.isFinite(value.smartGlossesStyle.band) ? value.smartGlossesStyle.band : 0;
+                var smartGlossesHorizontal = !window.__ngEpubContent ||
+                    typeof window.__ngEpubContent.smartGlossesWritingSupported !== 'function' ||
+                    window.__ngEpubContent.smartGlossesWritingSupported();
+                if (smartGlossesBand > 0 && smartGlossesHorizontal) {
                     // Extra line-height is split above and below the glyphs, so the
                     // first line of every column still needs this padding for the
                     // label that sits above the word.
-                    style(body, { 'padding-top': ((parseFloat(window.getComputedStyle(body).paddingTop) || 0) + wordWiseBand) + 'px' });
+                    style(body, { 'padding-top': ((parseFloat(window.getComputedStyle(body).paddingTop) || 0) + smartGlossesBand) + 'px' });
                 }
                 if (state.scrolled) {
                     style(body, { 'column-width': 'auto', 'column-count': 'auto', 'column-gap': 'normal' });
@@ -1929,7 +1929,7 @@
         scrollBy: scrollBy,
         beginScroll: function () { state.scrollOvershoot = 0; },
         setHighlights: setHighlights,
-        setWordWise: setWordWise,
+        setSmartGlosses: setSmartGlosses,
         setSelectionTransparent: setSelectionTransparent,
         mediaOverlay: mediaOverlay,
         revealText: revealText,

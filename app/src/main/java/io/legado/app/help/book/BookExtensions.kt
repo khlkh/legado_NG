@@ -417,7 +417,7 @@ fun tryParesExportFileName(jsStr: String): Boolean {
 /**
  * Copies the live instance's readConfig into this (usually a freshly loaded or
  * to-be-saved copy) when both are the same book. Prevents an in-memory config
- * change (Word Gloss toggle, level, cap) from being overwritten by a Book row
+ * change (Smart Glosses toggle, level, cap) from being overwritten by a Book row
  * loaded or written before the change.
  */
 fun Book.carryReadConfigFrom(live: Book?) {

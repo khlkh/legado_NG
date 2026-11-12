@@ -6,7 +6,7 @@ import io.legado.app.help.book.BookScriptClass
 import io.legado.app.help.book.isImage
 
 /**
- * Word Gloss is limited to Latin-script books.
+ * Smart Glosses is limited to Latin-script books.
  *
  * The prompt, the Gutenberg rank gate, and the word-boundary rules are
  * English/Latin-specific. CJK is excluded, and other scripts (Cyrillic,
@@ -36,7 +36,7 @@ object WordAnnotationEligibility {
     }
 
     /**
-     * Whether the stored script class can use Word Gloss. `null` is
+     * Whether the stored script class can use Smart Glosses. `null` is
      * "unknown, keep visible"; the analyzer still checks the passage.
      */
     fun supports(scriptClass: String?): Boolean =

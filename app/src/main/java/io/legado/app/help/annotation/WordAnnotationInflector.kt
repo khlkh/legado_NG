@@ -7,7 +7,7 @@ import java.util.Locale
  *
  * Used by [WordAnnotationInflectionProbe] to test whether a model item that
  * failed exact matching could be recovered by a conservative forward
- * inflection. Production Word Gloss is exact-surface only; do not call this
+ * inflection. Production Smart Glosses is exact-surface only; do not call this
  * from the analyzer, the pool resolver, or the renderer.
  *
  * The model is still told to return the exact surface string. This engine

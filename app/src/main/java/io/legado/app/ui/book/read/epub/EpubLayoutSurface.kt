@@ -143,7 +143,7 @@ internal class EpubLayoutSurface(
             readyContentUrl != gateway.contentUrl() || readyReaderFontUrl != gateway.readerFontUrl() ||
             readyTitleFontUrl != gateway.titleFontUrl() ||
             options.optBoolean("fixed") || (options.optJSONArray("highlights")?.length() ?: 0) != 0 ||
-            (options.optJSONArray("wordWise")?.length() ?: 0) != 0) return false
+            (options.optJSONArray("smartGlosses")?.length() ?: 0) != 0) return false
         val aloud = options.optJSONObject("aloud")
         return aloud == null || aloud.isNull("range") && (aloud.optJSONArray("ranges")?.length() ?: 0) == 0
     }
@@ -831,8 +831,8 @@ internal class EpubLayoutSurface(
             // queried; the controller still rejects book/layout epoch changes.
             val capturedTap = action == "tap" && result != null && result.optString("token") == token &&
                 !result.optBoolean("handled") && !result.optBoolean("dismissed") && result.optString("highlight").isEmpty() &&
-                !result.has("wordWise") &&
-                result.optString("wordWiseHint").isEmpty() &&
+                !result.has("smartGlosses") &&
+                result.optString("smartGlossesHint").isEmpty() &&
                 (result.isNull("href") || result.optString("href").isEmpty())
             if (io.legado.app.BuildConfig.DEBUG && capturedTap && revision.toString() != token)
                 android.util.Log.d("EpubStartup", "tap-result-retained token=$token current=$revision")

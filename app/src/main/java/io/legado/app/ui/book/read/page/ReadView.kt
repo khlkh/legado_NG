@@ -255,7 +255,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
                     }
                 },
                 reportPage = { index, count, cover ->
-                    dismissWordWisePopup()
+                    dismissSmartGlossesPopup()
                     curPage.setLayoutPageLabel(index, count)
                     setEpubViewportFull(cover)
                     if (count > 0) { openingTiming?.mark("epub-ready"); openingTiming = null }
@@ -278,7 +278,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
                     pageDelegate is HorizontalPageDelegate && pageDelegate !is NoAnimPageDelegate },
                 autoPaging = { autoPager.isRunning },
                 isScroll = { isScroll },
-                scrollAnimationStart = { dismissWordWisePopup(); onScrollAnimStart() },
+                scrollAnimationStart = { dismissSmartGlossesPopup(); onScrollAnimStart() },
                 scrollAnimationStop = ::onScrollAnimStop,
                 publisherStyle = { EpubLayoutPreferences.read(ReadBook.book?.bookUrl).getValue(EpubLayoutPreferences.PUBLISHER) },
                 position = { ReadBook.durChapterPos },
@@ -292,7 +292,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
                     upProgress()
                 },
                 selectionChanged = { value, finished ->
-                    if (value != null) dismissWordWisePopup()
+                    if (value != null) dismissSmartGlossesPopup()
                     isTextSelected = value != null
                     if (value == null) callBack.onCancelSelect()
                     else {
@@ -311,8 +311,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 highlightClick = { bookmark, x, top, bottom ->
                     callBack.onTextHighlightClick(bookmark, x, top, bottom)
                 },
-                wordWiseClick = { hint, x, top, bottom ->
-                    showWordWisePopup(hint, x, top, bottom)
+                smartGlossesClick = { hint, x, top, bottom ->
+                    showSmartGlossesPopup(hint, x, top, bottom)
                 },
                 imageLongPress = { x, y, src -> (activity as? ReadBookActivity)?.onImageLongPress(x, y, src) },
                 openingPreparation = { (activity as? ReadBookActivity)?.epubOpeningPreparation },
@@ -328,10 +328,10 @@ class ReadView(context: Context, attrs: AttributeSet) :
         post { updateEpubViewport() }
     }
 
-    private var wordWisePopup: PopupWindow? = null
+    private var smartGlossesPopup: PopupWindow? = null
 
-    private fun showWordWisePopup(hint: String, x: Float, top: Float, bottom: Float) {
-        dismissWordWisePopup()
+    private fun showSmartGlossesPopup(hint: String, x: Float, top: Float, bottom: Float) {
+        dismissSmartGlossesPopup()
         val text = TextView(context).apply {
             text = hint
             setTextColor(Color.WHITE)
@@ -348,7 +348,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
             isOutsideTouchable = true
             elevation = 8f
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            setOnDismissListener { wordWisePopup = null }
+            setOnDismissListener { smartGlossesPopup = null }
         }
         text.measure(
             android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED),
@@ -359,12 +359,12 @@ class ReadView(context: Context, attrs: AttributeSet) :
         val px = x.coerceIn(0f, (this.width - width).coerceAtLeast(0).toFloat()).toInt()
         val py = (top - height - 16f).coerceAtLeast(0f).toInt()
         popup.showAtLocation(this, Gravity.NO_GRAVITY, px, py)
-        wordWisePopup = popup
+        smartGlossesPopup = popup
     }
 
-    private fun dismissWordWisePopup() {
-        wordWisePopup?.dismiss()
-        wordWisePopup = null
+    private fun dismissSmartGlossesPopup() {
+        smartGlossesPopup?.dismiss()
+        smartGlossesPopup = null
     }
 
     private fun setEpubViewportFull(full: Boolean) {

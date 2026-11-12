@@ -112,7 +112,7 @@ class WordAnnotationAnalyzerTest {
     }
 
     @Test
-    fun `word gloss is limited to latin script books`() {
+    fun `smart glosses is limited to latin script books`() {
         assertTrue(WordAnnotationEligibility.supports("latin"))
         assertFalse(WordAnnotationEligibility.supports("cjk"))
         assertFalse(WordAnnotationEligibility.supports("other"))

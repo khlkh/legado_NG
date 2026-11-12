@@ -23,7 +23,7 @@ enum class WordAnnotationDensity(
 }
 
 /**
- * Pure density policy for Word Gloss.
+ * Pure density policy for Smart Glosses.
  *
  * Display density is content-proportional:
  * `words / 350 * 1.5 * levelMultiplier * densityMultiplier`.
