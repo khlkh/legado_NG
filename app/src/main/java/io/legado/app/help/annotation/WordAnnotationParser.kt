@@ -17,14 +17,24 @@ import com.google.gson.JsonParser
  */
 object WordAnnotationParser {
 
-    fun parse(content: String): List<WordAnnotationItem>? {
+    data class ParsedAnnotations(
+        val items: List<WordAnnotationItem>,
+        val rawCount: Int,
+        val invalidCount: Int,
+    )
+
+    fun parse(content: String): List<WordAnnotationItem>? =
+        parseWithStats(content)?.items
+
+    fun parseWithStats(content: String): ParsedAnnotations? {
         val root = runCatching { JsonParser.parseString(content) }.getOrNull() ?: return null
         if (!root.isJsonObject) return null
         val annotations = root.asJsonObject.get("annotations") ?: return null
         if (!annotations.isJsonArray) return null
 
-        val items = ArrayList<WordAnnotationItem>(annotations.asJsonArray.size())
-        for (element in annotations.asJsonArray) {
+        val array = annotations.asJsonArray
+        val items = ArrayList<WordAnnotationItem>(array.size())
+        for (element in array) {
             if (!element.isJsonObject) continue
             val obj = element.asJsonObject
             val text = obj.stringField("text") ?: continue
@@ -39,7 +49,11 @@ object WordAnnotationParser {
                 contextual = obj.booleanField("contextual") == true,
             )
         }
-        return items
+        return ParsedAnnotations(
+            items = items,
+            rawCount = array.size(),
+            invalidCount = array.size() - items.size,
+        )
     }
 
     private fun com.google.gson.JsonObject.stringField(name: String): String? {

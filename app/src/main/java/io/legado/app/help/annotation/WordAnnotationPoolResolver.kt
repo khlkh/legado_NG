@@ -14,21 +14,55 @@ object WordAnnotationPoolResolver {
     /** Canonical chapter quartiles used only for display coverage. */
     const val COVERAGE_BUCKETS = 4
 
+    data class Stats(
+        val poolItems: Int = 0,
+        val floorRejected: Int = 0,
+        /** Exact matches before overlap resolution. */
+        val matchedOccurrences: Int = 0,
+        /** Exact matches surviving overlap resolution, before display filtering. */
+        val resolvedOccurrences: Int = 0,
+        val overlapRejected: Int = 0,
+        val filter: WordAnnotationFilter.Stats = WordAnnotationFilter.Stats(),
+    )
+
+    data class Result(
+        val annotations: List<WordAnnotation>,
+        val stats: Stats,
+    )
+
     fun resolveChapter(
         paragraphs: List<WordAnnotationAnalyzer.CanonicalParagraph>,
         items: List<WordAnnotationPoolItem>,
         level: Int,
         cap: Int,
         coverageBuckets: Int = COVERAGE_BUCKETS,
-    ): List<WordAnnotation> {
-        if (paragraphs.isEmpty() || items.isEmpty()) return emptyList()
+    ): List<WordAnnotation> = resolveChapterWithStats(
+        paragraphs = paragraphs,
+        items = items,
+        level = level,
+        cap = cap,
+        coverageBuckets = coverageBuckets,
+    ).annotations
+
+    fun resolveChapterWithStats(
+        paragraphs: List<WordAnnotationAnalyzer.CanonicalParagraph>,
+        items: List<WordAnnotationPoolItem>,
+        level: Int,
+        cap: Int,
+        coverageBuckets: Int = COVERAGE_BUCKETS,
+    ): Result {
+        val emptyStats = Stats(poolItems = items.size)
+        if (paragraphs.isEmpty() || items.isEmpty()) return Result(emptyList(), emptyStats)
         val floor = WordAnnotationLevels.floorFor(level)
         // Expand rarest first so the expansion budget cannot be consumed by a
         // common surface that happens to sit early in pool order.
         val eligible = items
             .filter { WordAnnotationFilter.passesFloor(it.surface, it.rank, floor) }
             .sortedWith(compareByDescending<WordAnnotationPoolItem> { it.rank ?: Int.MIN_VALUE })
-        if (eligible.isEmpty()) return emptyList()
+        val floorRejected = items.size - eligible.size
+        if (eligible.isEmpty()) {
+            return Result(emptyList(), emptyStats.copy(floorRejected = floorRejected))
+        }
         val windows = WordAnnotationResolver.paragraphWindows(paragraphs.map { it.text })
         val joined = windows.joinToString(separator = "\n") { it.text }
         val resolved = ArrayList<WordAnnotation>(eligible.size * 4)
@@ -65,13 +99,24 @@ object WordAnnotationPoolResolver {
         // equal length, before the cap.
         val overlapDropped = WordAnnotationResolver.overlappingIndices(resolved)
         val nonOverlapping = resolved.filterIndexed { index, _ -> index !in overlapDropped }
-        return WordAnnotationFilter.filter(
+        val filtered = WordAnnotationFilter.filterWithStats(
             annotations = nonOverlapping,
             level = level,
             cap = cap,
             coverageBuckets = coverageBuckets,
-        ).map { annotation ->
-            annotation.copy(paragraphIndex = paragraphs[annotation.paragraphIndex].sourceIndex)
-        }
+        )
+        return Result(
+            annotations = filtered.annotations.map { annotation ->
+                annotation.copy(paragraphIndex = paragraphs[annotation.paragraphIndex].sourceIndex)
+            },
+            stats = Stats(
+                poolItems = items.size,
+                floorRejected = floorRejected,
+                matchedOccurrences = resolved.size,
+                resolvedOccurrences = nonOverlapping.size,
+                overlapRejected = overlapDropped.size,
+                filter = filtered.stats,
+            ),
+        )
     }
 }

@@ -92,6 +92,23 @@ class WordAnnotationParserTest {
     }
 
     @Test
+    fun `parse stats report raw and invalid item counts`() {
+        val parsed = WordAnnotationParser.parseWithStats(
+            """
+            {
+              "annotations": [
+                {"text":"ok","occurrence":1,"hint":"fine"},
+                {"text":"","occurrence":1,"hint":"blank"}
+              ]
+            }
+            """
+        )
+        assertEquals(2, parsed!!.rawCount)
+        assertEquals(1, parsed.invalidCount)
+        assertEquals(1, parsed.items.size)
+    }
+
+    @Test
     fun `parses optional difficulty and contextual metadata`() {
         val parsed = WordAnnotationParser.parse(
             """{"annotations":[{"text":"a","occurrence":1,"hint":"x","difficulty":4,"contextual":true}]}"""

@@ -196,6 +196,12 @@ object WordAnnotationAnalyzer {
         if (chapter.items.isEmpty()) {
             textChapter.epubWordAnnotations = emptyList()
             textChapter.wordAnnotations = emptyList()
+            if (BuildConfig.DEBUG) {
+                AppLog.put(
+                    "WordAnnotation attach chapter=${bookChapter.index} level=${book.getWordAnnotationLevel()} " +
+                        "pool=0 resolved=0",
+                )
+            }
             return true
         }
         val words = WordAnnotationTargets.wordCount(paragraphs.map { it.text })
@@ -205,7 +211,7 @@ object WordAnnotationAnalyzer {
             level = book.getWordAnnotationLevel(),
             density = density,
         )
-        val resolved = WordAnnotationPoolResolver.resolveChapter(
+        val resolved = WordAnnotationPoolResolver.resolveChapterWithStats(
             paragraphs = paragraphs,
             items = chapter.items,
             level = book.getWordAnnotationLevel(),
@@ -215,10 +221,25 @@ object WordAnnotationAnalyzer {
         if (book.isEpub) {
             // The EPUB renderer draws hints from native fragments; the native
             // layout must not reserve hint bands for them.
-            textChapter.epubWordAnnotations = resolved
+            textChapter.epubWordAnnotations = resolved.annotations
             textChapter.wordAnnotations = emptyList()
         } else {
-            textChapter.wordAnnotations = resolved
+            textChapter.wordAnnotations = resolved.annotations
+        }
+        if (BuildConfig.DEBUG) {
+            val stats = resolved.stats
+            val filter = stats.filter
+            AppLog.put(
+                "WordAnnotation attach chapter=${bookChapter.index} " +
+                    "level=${book.getWordAnnotationLevel()} density=${density.storageValue} " +
+                    "target=$target pool=${stats.poolItems} floorRejected=${stats.floorRejected} " +
+                    "matchedOccurrences=${stats.matchedOccurrences} " +
+                    "resolvedOccurrences=${stats.resolvedOccurrences} " +
+                    "overlapRejected=${stats.overlapRejected} " +
+                    "displayCapRejected=${filter.capRejected} " +
+                    "occurrenceCapDropped=${filter.occurrenceCapDropped} " +
+                    "selectedSurfaces=${filter.selectedSurfaces} resolved=${resolved.annotations.size}",
+            )
         }
         return true
     }
@@ -283,6 +304,19 @@ object WordAnnotationAnalyzer {
         var added = 0
         var promptTokens = 0
         var completionTokens = 0
+        var aiRawCandidates = 0
+        var aiInvalidCandidates = 0
+        var aiValidCandidates = 0
+        var acceptedToPool = 0
+        var rejectedHintLength = 0
+        var rejectedNoExactOccurrence = 0
+        var rejectedDuplicateSurface = 0
+        var rejectedDiscoveryBudget = 0
+        // Reconciliation is over successfully parsed windows. JSON failures are
+        // counted as windows; a concurrently completed window is counted as
+        // skipped candidates rather than as a discovery-budget rejection.
+        var duplicateWindowSkipped = 0
+        var windowJsonFailures = 0
         try {
             AppLog.put(
                 "WordAnnotation discover chapter=${bookChapter.index} windows=${windows.size} " +
@@ -295,6 +329,7 @@ object WordAnnotationAnalyzer {
                     Log.d("WordAnnotation", "skip window cooldown ${bookChapter.index}/${window.index}")
                     continue
                 }
+                val startedAt = System.currentTimeMillis()
                 val result = try {
                     withContext(Dispatchers.IO) {
                         AiManager.generateText(
@@ -303,7 +338,6 @@ object WordAnnotationAnalyzer {
                                     AiMessage.Role.SYSTEM,
                                     WordAnnotationPrompt.system(
                                         uiLocaleChinese = uiLocaleChinese,
-                                        cap = perWindowCap,
                                         windowIndex = window.index,
                                         windowCount = windows.size,
                                     ),
@@ -325,15 +359,24 @@ object WordAnnotationAnalyzer {
                     )
                     continue
                 }
+                val latencyMs = System.currentTimeMillis() - startedAt
                 promptTokens += result.promptTokens ?: 0
                 completionTokens += result.completionTokens ?: 0
-                val items = WordAnnotationParser.parse(result.content)
-                if (items == null) {
+                val parsed = WordAnnotationParser.parseWithStats(result.content)
+                if (parsed == null) {
+                    windowJsonFailures++
                     recordFailure(windowKey)
                     Log.e("WordAnnotation", "invalid window json ${bookChapter.index}/${window.index}")
-                    AppLog.put("WordAnnotation invalid window json chapter=${bookChapter.index} window=${window.index}")
+                    AppLog.put(
+                        "WordAnnotation invalid window json chapter=${bookChapter.index} " +
+                            "window=${window.index} failures=$windowJsonFailures",
+                    )
                     continue
                 }
+                val items = parsed.items
+                aiRawCandidates += parsed.rawCount
+                aiInvalidCandidates += parsed.invalidCount
+                aiValidCandidates += items.size
                 val inflectionProbe = if (BuildConfig.DEBUG) {
                     val measured = items.filter {
                         WordAnnotationResolver.hintWithinCap(
@@ -348,12 +391,19 @@ object WordAnnotationAnalyzer {
                     Log.i("WordAnnotation", "inflection samples: ${inflectionProbe.detail()}")
                 }
                 var windowAdded = 0
+                var rejectedHintForWindow = 0
+                var rejectedOccurrenceForWindow = 0
+                var rejectedDuplicateForWindow = 0
+                var rejectedBudgetForWindow = 0
                 synchronized(lock) {
                     val state = readState(book, config) ?: WordAnnotationPoolState()
                     val chapter = state.chapters[bookChapter.index]?.takeIf { it.contentHash == hash }
                         ?: WordAnnotationChapterPool(bookChapter.index, hash)
                     if (window.index in chapter.completedWindows) {
                         // Another process completed it while this call was in flight.
+                        // These candidates were not budget-rejected; keep the
+                        // event separate so the reconciliation stays meaningful.
+                        duplicateWindowSkipped += items.size
                         return@synchronized
                     }
                     val frequencyIndex = WordFrequencyAssets.load(appCtx)
@@ -362,19 +412,31 @@ object WordAnnotationAnalyzer {
                     val remaining = (discoveryTarget - chapter.items.size).coerceAtLeast(0)
                     val windowLimit = minOf(perWindowCap, remaining)
                     var acceptedForWindow = 0
-                    for (item in items) {
-                        if (acceptedForWindow >= windowLimit) break
+                    for ((index, item) in items.withIndex()) {
+                        if (acceptedForWindow >= windowLimit) {
+                            rejectedBudgetForWindow += items.size - index
+                            break
+                        }
                         if (!WordAnnotationResolver.hintWithinCap(
                                 item.hint,
                                 config.hintCharCap,
                                 WordAnnotationConfig.MAX_HINT_WORDS,
                             )
-                        ) continue
+                        ) {
+                            rejectedHintForWindow++
+                            continue
+                        }
                         // Only keep a surface that occurs exactly in this window;
                         // the pool is still surface-keyed and layout resolves all
                         // occurrences later.
-                        if (WordAnnotationResolver.findOccurrence(window.text, item.text, 1) == null) continue
-                        if (!known.add(item.text)) continue
+                        if (WordAnnotationResolver.findOccurrence(window.text, item.text, 1) == null) {
+                            rejectedOccurrenceForWindow++
+                            continue
+                        }
+                        if (!known.add(item.text)) {
+                            rejectedDuplicateForWindow++
+                            continue
+                        }
                         nextItems += WordAnnotationPoolItem(
                             surface = item.text,
                             hint = item.hint,
@@ -397,10 +459,20 @@ object WordAnnotationAnalyzer {
                         return@synchronized
                     }
                     added += windowAdded
+                    acceptedToPool += acceptedForWindow
+                    rejectedHintLength += rejectedHintForWindow
+                    rejectedNoExactOccurrence += rejectedOccurrenceForWindow
+                    rejectedDuplicateSurface += rejectedDuplicateForWindow
+                    rejectedDiscoveryBudget += rejectedBudgetForWindow
                     AppLog.put(
                         "WordAnnotation window chapter=${bookChapter.index} window=${window.index} " +
-                            "items=${items.size} accepted=$acceptedForWindow added=$windowAdded " +
-                            "chapterPool=${nextItems.size}",
+                            "raw=${parsed.rawCount} invalid=${parsed.invalidCount} " +
+                            "valid=${items.size} accepted=$acceptedForWindow " +
+                            "rejectedHint=$rejectedHintForWindow " +
+                            "rejectedOccurrence=$rejectedOccurrenceForWindow " +
+                            "rejectedDuplicate=$rejectedDuplicateForWindow " +
+                            "rejectedBudget=$rejectedBudgetForWindow " +
+                            "chapterPool=${nextItems.size} latencyMs=$latencyMs",
                     )
                 }
             }
@@ -418,7 +490,14 @@ object WordAnnotationAnalyzer {
             AppLog.put(
                 "WordAnnotation chapter tokens=$promptTokens/$completionTokens " +
                     "windows=${windows.size} completed=${finalChapter?.completedWindows?.size ?: 0} " +
-                    "items=${finalChapter?.items?.size ?: 0} added=$added chapter=${bookChapter.index}",
+                    "items=${finalChapter?.items?.size ?: 0} added=$added " +
+                    "raw=$aiRawCandidates invalid=$aiInvalidCandidates valid=$aiValidCandidates " +
+                    "accepted=$acceptedToPool rejectedHint=$rejectedHintLength " +
+                    "rejectedOccurrence=$rejectedNoExactOccurrence " +
+                    "rejectedDuplicate=$rejectedDuplicateSurface " +
+                    "rejectedBudget=$rejectedDiscoveryBudget " +
+                    "duplicateWindowSkipped=$duplicateWindowSkipped " +
+                    "windowJsonFailures=$windowJsonFailures chapter=${bookChapter.index}",
             )
             val currentBook = ReadBook.book
             if (currentBook?.bookUrl == book.bookUrl && currentBook.getWordAnnotationEnabled()) {

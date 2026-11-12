@@ -148,6 +148,36 @@ class WordAnnotationFilterTest {
     }
 
     @Test
+    fun `filter stats separate floor and cap rejections`() {
+        val pool = listOf(
+            ann(surface = "common", rank = 100),
+            ann(surface = "mid", rank = 4_000),
+            ann(surface = "rare", rank = 20_000),
+        )
+        val result = WordAnnotationFilter.filterWithStats(pool, level = 4, cap = 1)
+        assertEquals(3, result.stats.inputAnnotations)
+        assertEquals(1, result.stats.floorRejected)
+        assertEquals(2, result.stats.uniqueSurfaces)
+        assertEquals(1, result.stats.capRejected)
+        assertEquals(1, result.stats.selectedSurfaces)
+        assertEquals(listOf("rare"), result.annotations.map { it.surface })
+    }
+
+    @Test
+    fun `filter stats count occurrence cap drops`() {
+        val pool = listOf(
+            ann(paragraphIndex = 0, start = 0, surface = "repeat", rank = 20_000),
+            ann(paragraphIndex = 0, start = 10, surface = "repeat", rank = 20_000),
+            ann(paragraphIndex = 0, start = 20, surface = "repeat", rank = 20_000),
+            ann(paragraphIndex = 1, start = 0, surface = "rare", rank = 30_000),
+        )
+        val result = WordAnnotationFilter.filterWithStats(pool, level = 4, cap = 2)
+        assertEquals(2, result.stats.selectedSurfaces)
+        assertEquals(1, result.stats.occurrenceCapDropped)
+        assertEquals(3, result.annotations.size)
+    }
+
+    @Test
     fun `level-aware ordering prefers difficulty near the configured level`() {
         val pool = listOf(
             ann(surface = "easy", rank = 20_000, difficulty = 1),
