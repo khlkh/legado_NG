@@ -10,6 +10,7 @@ import android.text.style.ImageSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.ReplacementSpan
 import android.text.style.URLSpan
+import io.legado.app.BuildConfig
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.constant.PageAnim
@@ -231,6 +232,7 @@ class TextChapterLayout(
         bookContent: BookContent,
     ) {
         startupTiming?.mark("layout-start")
+        if (BuildConfig.DEBUG) textChapter.canvasRenderedHintLabels = 0
         val contents = bookContent.textList
         prepareHighlightPositions(displayTitle, contents)
         val imageStyle = book.getImageStyle()
@@ -629,6 +631,13 @@ class TextChapterLayout(
             textPage.height += endPadding
         }
         textPage.text = stringBuilder.toString()
+        if (BuildConfig.DEBUG && textChapter.wordAnnotationPoolAttached) {
+            AppLog.put(
+                "WordAnnotation render canvas chapter=${bookChapter.index} " +
+                    "annotations=${textChapter.wordAnnotations.size} " +
+                    "labels=${textChapter.canvasRenderedHintLabels}",
+            )
+        }
         currentCoroutineContext().ensureActive()
         onPageCompleted()
         onCompleted()
@@ -1187,6 +1196,9 @@ class TextChapterLayout(
                 textLine.isLeftLine = absStartX < viewWidth / 2
             }
             calcTextLinePosition(textPages, textLine, stringBuilder.length)
+            if (BuildConfig.DEBUG && lineHints.isNotEmpty()) {
+                textChapter.canvasRenderedHintLabels += textLine.placedHintLabelCount()
+            }
             if (book.isEpub && lineIndex == 0) {
                 textChapter.highlightInputs.add(ReadHighlightInput(
                     textLine.chapterPosition, text, isTitle, highlightContext, highlightContextOffset,

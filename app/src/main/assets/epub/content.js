@@ -405,6 +405,9 @@
         }
         return hit ? { id: hit.id, hint: hit.hint, left: hit.left, top: hit.top, right: hit.right, bottom: hit.bottom } : null;
     }
+    function smartGlossesRenderedCount() {
+        return smartGlossesLayer && smartGlossesLayer.__ngHits ? smartGlossesLayer.__ngHits.length : 0;
+    }
     function clearSmartGlosses() {
         smartGlossesRectsCache = null;
         if (smartGlossesLayer) { smartGlossesLayer.replaceChildren(); smartGlossesLayer.__ngHits = []; }
@@ -1104,6 +1107,7 @@
         setSmartGlosses: setSmartGlosses, smartGlossesWritingSupported: smartGlossesWritingSupported,
         smartGlossesRects: smartGlossesRects, smartGlossesCount: function () { return smartGlossesFragments.length; },
         paintSmartGlosses: paintSmartGlosses, clearSmartGlosses: clearSmartGlosses, hitSmartGlosses: hitSmartGlosses,
+        smartGlossesRenderedCount: smartGlossesRenderedCount,
         setTitleSegments: setTitleSegments, titleHeadings: titleHeadings,
         ruleUnderlineRects: ruleUnderlineRects,
         justifyLines: justifyLines, clearLineBoxes: clearLineBoxes,

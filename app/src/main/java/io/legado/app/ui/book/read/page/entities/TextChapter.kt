@@ -64,6 +64,10 @@ data class TextChapter(
     @Transient
     var wordAnnotationPoolAttached: Boolean = false
 
+    /** Debug-only count of hint labels emitted by the canvas layout. */
+    @Transient
+    internal var canvasRenderedHintLabels: Int = 0
+
     /** EPUB-only resolved annotations; native layout must not draw hint bands for them. */
     @Transient
     var epubWordAnnotations: List<WordAnnotation> = emptyList()
