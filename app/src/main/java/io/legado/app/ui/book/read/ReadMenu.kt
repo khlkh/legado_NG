@@ -34,6 +34,7 @@ import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.databinding.ViewReadMenuBinding
+import io.legado.app.help.annotation.WordAnnotationDensity
 import io.legado.app.help.annotation.WordAnnotationEligibility
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -93,6 +94,9 @@ class ReadMenu @JvmOverloads constructor(
     private var floatingAutoPage by mutableStateOf(false)
     private var floatingThemeMode by mutableStateOf(ReadBookConfig.currentThemeMode())
     private var floatingWordAnnotationEnabled by mutableStateOf(ReadBook.book?.getWordAnnotationEnabled() == true)
+    private var floatingWordAnnotationDensity by mutableIntStateOf(
+        ReadBook.book?.getWordAnnotationDensity() ?: WordAnnotationDensity.DEFAULT.storageValue,
+    )
     private var floatingWordAnnotationVisible by mutableStateOf(
         ReadBook.book?.let { WordAnnotationEligibility.supports(it) } == true,
     )
@@ -291,6 +295,9 @@ class ReadMenu @JvmOverloads constructor(
 
     fun updateWordAnnotationState(enabled: Boolean) {
         floatingWordAnnotationEnabled = enabled
+        ReadBook.book?.let {
+            floatingWordAnnotationDensity = it.getWordAnnotationDensity()
+        }
         floatingWordAnnotationVisible = ReadBook.book?.let {
             WordAnnotationEligibility.supports(it)
         } == true
@@ -300,6 +307,8 @@ class ReadMenu @JvmOverloads constructor(
         ReadFloatingAppearanceState.refreshFromConfig()
         floatingThemeMode = ReadBookConfig.currentThemeMode()
         floatingWordAnnotationEnabled = ReadBook.book?.getWordAnnotationEnabled() == true
+        floatingWordAnnotationDensity = ReadBook.book?.getWordAnnotationDensity()
+            ?: WordAnnotationDensity.DEFAULT.storageValue
         floatingWordAnnotationVisible = ReadBook.book?.let {
             WordAnnotationEligibility.supports(it)
         } == true
@@ -449,6 +458,7 @@ class ReadMenu @JvmOverloads constructor(
                     },
                     wordAnnotationEnabled = floatingWordAnnotationEnabled,
                     wordAnnotationVisible = floatingWordAnnotationVisible,
+                    wordAnnotationDensity = floatingWordAnnotationDensity,
                     onWordAnnotation = {
                         floatingToolExpansion = null
                         ReadBook.book?.let {
@@ -456,6 +466,28 @@ class ReadMenu @JvmOverloads constructor(
                             floatingWordAnnotationEnabled = it.getWordAnnotationEnabled()
                             ReadBook.saveWordAnnotationConfig()
                             runMenuOut { ReadBook.loadContent(false) }
+                        }
+                    },
+                    onWordAnnotationEnabledChange = { enabled ->
+                        ReadBook.book?.let {
+                            if (it.getWordAnnotationEnabled() != enabled) {
+                                it.setWordAnnotationEnabled(enabled)
+                                floatingWordAnnotationEnabled = enabled
+                                ReadBook.saveWordAnnotationConfig()
+                                ReadBook.loadContent(false)
+                            }
+                        }
+                    },
+                    onWordAnnotationDensitySelected = { density ->
+                        ReadBook.book?.let {
+                            if (it.getWordAnnotationDensity() != density) {
+                                it.setWordAnnotationDensity(density)
+                                floatingWordAnnotationDensity = density
+                                ReadBook.saveWordAnnotationConfig()
+                                if (it.getWordAnnotationEnabled()) {
+                                    ReadBook.loadContent(false)
+                                }
+                            }
                         }
                     },
                     onToggleDockSide = {
@@ -804,6 +836,8 @@ class ReadMenu @JvmOverloads constructor(
         // Refresh the rail's Smart Glosses state from the live book; the View is
         // constructed before ReadBook.book is installed on a cold start.
         floatingWordAnnotationEnabled = ReadBook.book?.getWordAnnotationEnabled() == true
+        floatingWordAnnotationDensity = ReadBook.book?.getWordAnnotationDensity()
+            ?: WordAnnotationDensity.DEFAULT.storageValue
         floatingWordAnnotationVisible = ReadBook.book?.let {
             WordAnnotationEligibility.supports(it)
         } == true
