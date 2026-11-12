@@ -1,7 +1,7 @@
 package io.legado.app.help.annotation
 
 /**
- * Prompt construction for the Word Gloss book glossary (Latin-script books
+ * Prompt construction for the Smart Glosses book glossary (Latin-script books
  * only).
  *
  * The hint language follows the app UI locale: Simplified Chinese on a

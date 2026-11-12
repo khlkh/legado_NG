@@ -41,7 +41,7 @@ class WordAnnotationPoolStoreTest {
 
     @Before
     fun setUp() {
-        dir = File.createTempFile("wordwise-pool-test", ".dir").apply {
+        dir = File.createTempFile("smart-glosses-pool-test", ".dir").apply {
             delete()
             mkdirs()
         }
@@ -80,6 +80,15 @@ class WordAnnotationPoolStoreTest {
         val file = poolFile()
         assertTrue(WordAnnotationPoolStore.write(file, identity, WordAnnotationPoolState()))
         assertEquals(WordAnnotationPoolState(), WordAnnotationPoolStore.read(file, identity))
+    }
+
+    @Test
+    fun `legacy pool file is read and migrated`() {
+        val legacy = File(dir, WordAnnotationPoolStore.LEGACY_POOL_FILE_NAME)
+        assertTrue(WordAnnotationPoolStore.write(legacy, identity, state))
+        assertFalse(poolFile().exists())
+        assertEquals(state, WordAnnotationPoolStore.read(poolFile(), identity))
+        assertTrue(poolFile().isFile)
     }
 
     @Test

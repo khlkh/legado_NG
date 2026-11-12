@@ -3,7 +3,7 @@ package io.legado.app.model.epub
 import io.legado.app.help.annotation.WordAnnotation
 
 /** One hint span in one document's native coordinates, addressed to the renderer. */
-internal data class EpubWordWiseFragment(
+internal data class EpubSmartGlossesFragment(
     val document: Int,
     val element: String,
     val ordinal: Int,
@@ -18,13 +18,13 @@ internal data class EpubWordWiseFragment(
  * per-character source offset map. No text matching happens here: the map was
  * built by [EpubContentProjection.bindNativeContent].
  */
-internal object EpubWordWiseFragments {
+internal object EpubSmartGlossesFragments {
 
     fun resolve(
         paragraphs: List<String>,
         documents: List<EpubContentProjection.ProjectedDocument>,
         annotations: List<WordAnnotation>,
-    ): List<EpubWordWiseFragment> {
+    ): List<EpubSmartGlossesFragment> {
         if (paragraphs.isEmpty() || annotations.isEmpty()) return emptyList()
         val base = IntArray(paragraphs.size)
         var offset = 0
@@ -33,7 +33,7 @@ internal object EpubWordWiseFragments {
             offset += paragraphs[index].length + 1
         }
 
-        val result = ArrayList<EpubWordWiseFragment>()
+        val result = ArrayList<EpubSmartGlossesFragment>()
         annotations.forEachIndexed { hintId, annotation ->
             val paragraphBase = base.getOrNull(annotation.paragraphIndex) ?: return@forEachIndexed
             val rangeStart = paragraphBase + annotation.start
@@ -42,7 +42,7 @@ internal object EpubWordWiseFragments {
             val length = rangeEnd - rangeStart
             val found = BooleanArray(length)
             var complete = true
-            val fragments = ArrayList<EpubWordWiseFragment>()
+            val fragments = ArrayList<EpubSmartGlossesFragment>()
             documents.forEachIndexed { documentIndex, document ->
                 document.nodes.forEach { node ->
                     val size = node.sourceStarts.size
@@ -72,7 +72,7 @@ internal object EpubWordWiseFragments {
                         }
                         if (!complete) break
                         if (nativeStart != Int.MAX_VALUE) {
-                            fragments += EpubWordWiseFragment(
+                            fragments += EpubSmartGlossesFragment(
                                 documentIndex, node.element, node.ordinal,
                                 nativeStart, nativeEnd, hintId,
                             )

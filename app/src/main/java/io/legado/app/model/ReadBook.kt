@@ -1416,7 +1416,7 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     @Synchronized
-    /** Persists only the live book's ReadConfig column (Word Gloss flag/level/cap). */
+    /** Persists only the live book's ReadConfig column (Smart Glosses flag/level/cap). */
     fun saveWordAnnotationConfig() {
         val b = book ?: return
         appDb.bookDao.updateReadStyleConfig(b.bookUrl, b.config)

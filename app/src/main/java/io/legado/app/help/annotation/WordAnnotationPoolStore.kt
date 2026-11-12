@@ -7,9 +7,9 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * File cache for the book-level Word Gloss candidate inventory.
+ * File cache for the book-level Smart Glosses candidate inventory.
  *
- * One file per book (`book_cache/<bookFolder>/wordwise-pool.json`). The file
+ * One file per book (`book_cache/<bookFolder>/smart-glosses-pool.json`). The file
  * stores the book identity and one entry per analyzed chapter:
  *
  * ```
@@ -33,9 +33,13 @@ import java.security.MessageDigest
  */
 object WordAnnotationPoolStore {
 
-    // Legacy working-name filename: keep it so existing per-book pools stay
-    // readable; the public feature name is Word Gloss.
-    const val POOL_FILE_NAME = "wordwise-pool.json"
+    const val POOL_FILE_NAME = "smart-glosses-pool.json"
+
+    /**
+     * The working-name file. It is read once and migrated to [POOL_FILE_NAME]
+     * so existing per-book candidate inventories are not thrown away.
+     */
+    const val LEGACY_POOL_FILE_NAME = "wordwise-pool.json"
     const val TEMP_SUFFIX = ".tmp"
 
     fun canonicalHash(
@@ -51,6 +55,14 @@ object WordAnnotationPoolStore {
     }
 
     fun read(file: File, identity: WordAnnotationPoolIdentity): WordAnnotationPoolState? {
+        readFrom(file, identity)?.let { return it }
+        val legacy = File(file.parentFile ?: return null, LEGACY_POOL_FILE_NAME)
+        val state = readFrom(legacy, identity) ?: return null
+        runCatching { write(file, identity, state) }
+        return state
+    }
+
+    private fun readFrom(file: File, identity: WordAnnotationPoolIdentity): WordAnnotationPoolState? {
         if (!file.exists() || !file.isFile) return null
         val json = runCatching { file.readText() }.getOrNull() ?: return null
         if (json.isBlank()) return null

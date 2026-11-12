@@ -1,6 +1,6 @@
 # Word annotation frequency asset
 
-This directory holds the developer-side generator for the Word Gloss fusion
+This directory holds the developer-side generator for the Smart Glosses fusion
 prototype's frequency-rank prior. The raw source pages are **not** committed to
 the repository; only the derived rank asset under
 `app/src/main/assets/word_annotation/` is.

@@ -10,8 +10,8 @@ import io.legado.app.model.epub.EpubSingleDocumentSource
 import io.legado.app.model.epub.EpubSourceChapter
 import io.legado.app.model.epub.EpubResourceLink
 import io.legado.app.model.epub.EpubPageSize
-import io.legado.app.model.epub.EpubWordWiseFragment
-import io.legado.app.model.epub.EpubWordWiseFragments
+import io.legado.app.model.epub.EpubSmartGlossesFragment
+import io.legado.app.model.epub.EpubSmartGlossesFragments
 import io.legado.app.model.epub.bindNativeContent
 import io.legado.app.model.localBook.EpubFile
 import io.legado.app.ui.book.read.page.entities.TextChapter
@@ -35,7 +35,7 @@ internal class EpubPreparedContent private constructor(
     // Include both the payload graph estimate and its retained serialized snapshot.
     fun estimatedBytes(): Long = mapped.text.length * 2L + documents.sumOf {
         it.html.length * 2L + it.payloadJson.length * 4L + it.styleFonts.values.sumOf { font -> font.size.toLong() } +
-            it.wordWise.size * 32L
+            it.smartGlosses.size * 32L
     } + mapped.documents.sumOf { document -> document.nodes.sumOf { (it.starts.size + it.ends.size + it.sourceStarts.size) * 4L } } +
         chapter.highlightInputs.asSequence().mapNotNull { it.context }.distinct().sumOf { it.text.length * 2L }
     /** Called only after the owner accepts this chapter; speculative work has no publication side effects. */
@@ -49,7 +49,7 @@ internal class EpubPreparedContent private constructor(
                         val nineSlices: Map<String, io.legado.app.model.epub.EpubNineSliceImage> = emptyMap(),
                         val backgrounds: Map<String, io.legado.app.model.epub.EpubBackgroundImage> = emptyMap(),
                         val titles: List<EpubTitleProjection> = emptyList(),
-                        val wordWise: List<EpubWordWiseFragment> = emptyList()) {
+                        val smartGlosses: List<EpubSmartGlossesFragment> = emptyList()) {
         // Projection payloads are immutable after preparation. A style copy supplies a
         // new payload and computes its own snapshot before it reaches either surface.
         val payloadJson: String = payload.toString()
@@ -135,7 +135,7 @@ internal class EpubPreparedContent private constructor(
             var last = 0
             var nextOccurrence = 0
             val titleLines = chapter.pages.flatMap { it.lines }.filter { it.isTitle }
-            val wordWiseByDocument = EpubWordWiseFragments.resolve(
+            val smartGlossesByDocument = EpubSmartGlossesFragments.resolve(
                 chapter.sourceParagraphs, mapped.documents, chapter.epubWordAnnotations,
             ).groupBy { it.document }
             val documents = mapped.documents.mapIndexed { index, document ->
@@ -161,7 +161,7 @@ internal class EpubPreparedContent private constructor(
                     first, end, if (index == mapped.documents.lastIndex) chapter.chapter.endFragmentId else null,
                     spineIndex, chapter, mapped.text, svgSize, charStyles.fonts, charStyles.nineSlices, charStyles.backgrounds,
                     EpubTitleProjection.from(document, titleLines),
-                    wordWiseByDocument[index].orEmpty())
+                    smartGlossesByDocument[index].orEmpty())
             }
             check(documents.isNotEmpty()) { "EPUB 章节没有正文文档" }
             startup.mark("payload-ready")

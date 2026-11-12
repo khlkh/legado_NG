@@ -801,7 +801,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun upBookView() {
-        // Refresh the rail's Word Gloss state from the live book; the View is
+        // Refresh the rail's Smart Glosses state from the live book; the View is
         // constructed before ReadBook.book is installed on a cold start.
         floatingWordAnnotationEnabled = ReadBook.book?.getWordAnnotationEnabled() == true
         floatingWordAnnotationVisible = ReadBook.book?.let {

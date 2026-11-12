@@ -15,8 +15,8 @@
     var fontCache = new Map();
     var lastStylePayload = null, aloud = null, nightMode = false;
     var noteMarkers = [], noteElements = [], noteStyle = null, noteSignature = '[[],null]', noteImage = null;
-    var wordWiseFragments = [], wordWiseStyle = null, wordWiseSignature = '[[],null]', wordWiseLayer = null;
-    var wordWiseRectsCache = null, wordWiseMeasure = null;
+    var smartGlossesFragments = [], smartGlossesStyle = null, smartGlossesSignature = '[[],null]', smartGlossesLayer = null;
+    var smartGlossesRectsCache = null, smartGlossesMeasure = null;
     var titleSegments = [], titleStyle = null, titleSignature = '[[],null]';
     function palette(value) { return nightMode && value.nightCharStyles ? value.nightCharStyles : value.charStyles || []; }
     function paintRanges(value) { return nightMode && value.nightStyleRanges ? value.nightStyleRanges : value.styleRanges || []; }
@@ -125,30 +125,30 @@
                 width: size, height: size, touch: noteStyle.touch * scale };
         });
     }
-    function wordWiseWritingSupported() {
+    function smartGlossesWritingSupported() {
         if (!document.body) return false;
         var css = window.getComputedStyle(document.body);
         var writing = css.writingMode || css.webkitWritingMode || '';
-        // Word Gloss geometry assumes horizontal LTR boxes. Vertical and RTL
+        // Smart Glosses geometry assumes horizontal LTR boxes. Vertical and RTL
         // documents are out of scope; suppress the overlay rather than paint
         // labels against the wrong axis.
         return !/^(vertical|sideways)/.test(writing) && css.direction !== 'rtl';
     }
-    function setWordWise(values, style) {
+    function setSmartGlosses(values, style) {
         // A vertical/RTL document must not reserve a first-line band or leave
-        // untappable fragments behind; treat it as an empty Word Gloss layer.
-        if (!wordWiseWritingSupported()) { values = []; style = null; }
+        // untappable fragments behind; treat it as an empty Smart Glosses layer.
+        if (!smartGlossesWritingSupported()) { values = []; style = null; }
         var signature = JSON.stringify([values || [], style || null]);
-        if (signature === wordWiseSignature) return false;
-        wordWiseFragments = (values || []).slice(); wordWiseStyle = style; wordWiseSignature = signature;
-        wordWiseRectsCache = null;
-        paintWordWise();
+        if (signature === smartGlossesSignature) return false;
+        smartGlossesFragments = (values || []).slice(); smartGlossesStyle = style; smartGlossesSignature = signature;
+        smartGlossesRectsCache = null;
+        paintSmartGlosses();
         return true;
     }
-    function computeWordWiseRects() {
-        if (!wordWiseFragments.length) return [];
+    function computeSmartGlossesRects() {
+        if (!smartGlossesFragments.length) return [];
         var result = [];
-        wordWiseFragments.forEach(function (fragment) {
+        smartGlossesFragments.forEach(function (fragment) {
             // Native positions are unique across the chapter text, so iterate the
             // runs map directly instead of matching projected element/ordinal ids,
             // which change after line fragmentation.
@@ -164,9 +164,9 @@
         });
         return result;
     }
-    function wordWiseRects() {
-        if (!wordWiseRectsCache) wordWiseRectsCache = computeWordWiseRects();
-        return wordWiseRectsCache;
+    function smartGlossesRects() {
+        if (!smartGlossesRectsCache) smartGlossesRectsCache = computeSmartGlossesRects();
+        return smartGlossesRectsCache;
     }
     function rangeForEntry(entry, nativeStart, nativeEnd) {
         var node = entry.node, runs = entry.runs;
@@ -186,7 +186,7 @@
         range.setEnd(node, charEnd);
         return range;
     }
-    var wordWiseRafPending = false;
+    var smartGlossesRafPending = false;
     var LABEL_GAP = 6, LABEL_MIN_WIDTH = 4, LABEL_ABOVE = 4, LABEL_COLUMN_INSET = 8;
     function sameLine(a, b) {
         var overlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
@@ -286,54 +286,54 @@
         return placed;
     }
     function hintWidth(text, fontSize) {
-        if (!wordWiseMeasure) {
-            wordWiseMeasure = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
-            wordWiseMeasure.setAttribute('aria-hidden', 'true');
+        if (!smartGlossesMeasure) {
+            smartGlossesMeasure = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+            smartGlossesMeasure.setAttribute('aria-hidden', 'true');
             var measureStyle = { position: 'absolute', visibility: 'hidden', 'white-space': 'nowrap',
                 margin: '0', padding: '0', border: '0', left: '0', top: '0', 'pointer-events': 'none' };
-            Object.keys(measureStyle).forEach(function (name) { wordWiseMeasure.style.setProperty(name, measureStyle[name], 'important'); });
-            document.documentElement.appendChild(wordWiseMeasure);
+            Object.keys(measureStyle).forEach(function (name) { smartGlossesMeasure.style.setProperty(name, measureStyle[name], 'important'); });
+            document.documentElement.appendChild(smartGlossesMeasure);
         }
-        wordWiseMeasure.style.setProperty('font-size', fontSize + 'px', 'important');
-        wordWiseMeasure.style.setProperty('line-height', (fontSize + 2) + 'px', 'important');
-        wordWiseMeasure.textContent = text;
+        smartGlossesMeasure.style.setProperty('font-size', fontSize + 'px', 'important');
+        smartGlossesMeasure.style.setProperty('line-height', (fontSize + 2) + 'px', 'important');
+        smartGlossesMeasure.textContent = text;
         // offsetWidth rounds down to an integer. CJK runs are often a
         // fraction of a pixel wider, and CSS text-overflow then replaces the
         // last glyph with an ellipsis even though the line has plenty of
         // room. Measure fractionally and keep a 1px safety margin.
-        var measured = wordWiseMeasure.getBoundingClientRect().width;
-        if (!(measured > 0)) measured = wordWiseMeasure.offsetWidth;
+        var measured = smartGlossesMeasure.getBoundingClientRect().width;
+        if (!(measured > 0)) measured = smartGlossesMeasure.offsetWidth;
         return measured + 1;
     }
-    function paintWordWise() {
-        paintWordWiseCore();
+    function paintSmartGlosses() {
+        paintSmartGlossesCore();
         // The page move transform may settle one frame after ready; repaint once
         // so labels track the final viewport position instead of freezing.
-        if (!wordWiseRafPending) {
-            wordWiseRafPending = true;
+        if (!smartGlossesRafPending) {
+            smartGlossesRafPending = true;
             window.requestAnimationFrame(function () {
-                wordWiseRafPending = false;
-                paintWordWiseCore();
+                smartGlossesRafPending = false;
+                paintSmartGlossesCore();
             });
         }
     }
-    function paintWordWiseCore() {
-        if (wordWiseLayer) { wordWiseLayer.replaceChildren(); wordWiseLayer.__ngHits = []; }
-        if (!wordWiseFragments.length || !document.body) return;
-        if (!wordWiseWritingSupported()) return;
-        if (!wordWiseLayer) {
-            wordWiseLayer = document.createElementNS('http://www.w3.org/1999/xhtml', 'ng-word-wise');
-            wordWiseLayer.setAttribute('aria-hidden', 'true');
+    function paintSmartGlossesCore() {
+        if (smartGlossesLayer) { smartGlossesLayer.replaceChildren(); smartGlossesLayer.__ngHits = []; }
+        if (!smartGlossesFragments.length || !document.body) return;
+        if (!smartGlossesWritingSupported()) return;
+        if (!smartGlossesLayer) {
+            smartGlossesLayer = document.createElementNS('http://www.w3.org/1999/xhtml', 'ng-smart-glosses');
+            smartGlossesLayer.setAttribute('aria-hidden', 'true');
             var layerStyle = { position: 'fixed', inset: '0', 'pointer-events': 'none',
                 'z-index': '2147483638', overflow: 'hidden', 'user-select': 'none' };
-            Object.keys(layerStyle).forEach(function (name) { wordWiseLayer.style.setProperty(name, layerStyle[name], 'important'); });
-            document.documentElement.appendChild(wordWiseLayer);
+            Object.keys(layerStyle).forEach(function (name) { smartGlossesLayer.style.setProperty(name, layerStyle[name], 'important'); });
+            document.documentElement.appendChild(smartGlossesLayer);
         }
-        var color = wordWiseStyle && wordWiseStyle.color ? wordWiseStyle.color : '#00A8FF';
-        var labelSize = wordWiseStyle && wordWiseStyle.fontSize ? wordWiseStyle.fontSize : 11;
+        var color = smartGlossesStyle && smartGlossesStyle.color ? smartGlossesStyle.color : '#00A8FF';
+        var labelSize = smartGlossesStyle && smartGlossesStyle.fontSize ? smartGlossesStyle.fontSize : 11;
         var byId = new Map();
-        wordWiseRectsCache = computeWordWiseRects();
-        wordWiseRectsCache.forEach(function (rect) {
+        smartGlossesRectsCache = computeSmartGlossesRects();
+        smartGlossesRectsCache.forEach(function (rect) {
             if (!byId.has(rect.id)) byId.set(rect.id, []);
             byId.get(rect.id).push(rect);
         });
@@ -349,7 +349,7 @@
                     width: (rect.right - rect.left) + 'px', height: (rect.bottom - rect.top) + 'px',
                     'background-color': color, opacity: '0.18' };
                 Object.keys(properties).forEach(function (name) { div.style.setProperty(name, properties[name], 'important'); });
-                wordWiseLayer.appendChild(div);
+                smartGlossesLayer.appendChild(div);
             });
         });
         // One label per hint id on this page. Wrapped fragments share that id;
@@ -380,17 +380,17 @@
                 width: item.maxWidth + 'px', 'max-width': item.maxWidth + 'px',
                 left: item.left + 'px', top: top + 'px' };
             Object.keys(labelStyle).forEach(function (name) { label.style.setProperty(name, labelStyle[name], 'important'); });
-            wordWiseLayer.appendChild(label);
+            smartGlossesLayer.appendChild(label);
             var drawn = Math.min(label.offsetWidth || item.maxWidth, item.maxWidth);
             hits.push({ id: item.id, hint: item.hint, left: item.left, top: top,
                 right: item.left + drawn, bottom: top + labelSize + 2,
                 segLeft: item.segment.left, segTop: item.segment.top,
                 segRight: item.segment.right, segBottom: item.segment.bottom });
         });
-        wordWiseLayer.__ngHits = hits;
+        smartGlossesLayer.__ngHits = hits;
     }
-    function hitWordWise(x, y) {
-        var hits = wordWiseLayer && wordWiseLayer.__ngHits || [];
+    function hitSmartGlosses(x, y) {
+        var hits = smartGlossesLayer && smartGlossesLayer.__ngHits || [];
         var i, hit = null;
         for (i = 0; i < hits.length; i++) {
             var label = hits[i];
@@ -398,16 +398,16 @@
         }
         if (hit) return { id: hit.id, hint: hit.hint, left: hit.segLeft, top: hit.segTop,
             right: hit.segRight, bottom: hit.segBottom };
-        var rects = wordWiseRects();
+        var rects = smartGlossesRects();
         for (i = 0; i < rects.length; i++) {
             var box = rects[i];
             if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) hit = box;
         }
         return hit ? { id: hit.id, hint: hit.hint, left: hit.left, top: hit.top, right: hit.right, bottom: hit.bottom } : null;
     }
-    function clearWordWise() {
-        wordWiseRectsCache = null;
-        if (wordWiseLayer) { wordWiseLayer.replaceChildren(); wordWiseLayer.__ngHits = []; }
+    function clearSmartGlosses() {
+        smartGlossesRectsCache = null;
+        if (smartGlossesLayer) { smartGlossesLayer.replaceChildren(); smartGlossesLayer.__ngHits = []; }
     }
     function applyStyles(value) {
         lastStylePayload = value;
@@ -607,7 +607,7 @@
         nodeEntries = new WeakMap(); entries.forEach(function (entry) { nodeEntries.set(entry.node, entry); });
     }
     function clearLineBoxes() {
-        wordWiseRectsCache = null;
+        smartGlossesRectsCache = null;
         var restored = window.__ngEpubLines && window.__ngEpubLines.clear();
         if (!restored) return false;
         entries = restored; styleElements = lineStyleElements; lineStyleElements = null; indexEntries();
@@ -966,8 +966,8 @@
         if (!value || value.version !== 1 || !Array.isArray(value.nodes)) throw new Error('EPUB 正文位置数据无效');
         nightMode = !!isNight;
         if (key === value.key) return updateStyles(value).changed;
-        wordWiseRectsCache = null;
-        clearWordWise();
+        smartGlossesRectsCache = null;
+        clearSmartGlosses();
         clearStyleImages(); imagePlans.clear();
         noteMarkers = []; noteElements = []; noteStyle = null; noteSignature = '[[],null]';
         titleSegments = []; titleStyle = null; titleSignature = '[[],null]';
@@ -1101,9 +1101,9 @@
     window.__ngEpubContent = Object.freeze({ apply: apply, loadFonts: loadFonts, offset: offset, point: point, selection: selection,
         setAloud: setAloud,
         setNotes: setNotes, noteRects: noteRects,
-        setWordWise: setWordWise, wordWiseWritingSupported: wordWiseWritingSupported,
-        wordWiseRects: wordWiseRects, wordWiseCount: function () { return wordWiseFragments.length; },
-        paintWordWise: paintWordWise, clearWordWise: clearWordWise, hitWordWise: hitWordWise,
+        setSmartGlosses: setSmartGlosses, smartGlossesWritingSupported: smartGlossesWritingSupported,
+        smartGlossesRects: smartGlossesRects, smartGlossesCount: function () { return smartGlossesFragments.length; },
+        paintSmartGlosses: paintSmartGlosses, clearSmartGlosses: clearSmartGlosses, hitSmartGlosses: hitSmartGlosses,
         setTitleSegments: setTitleSegments, titleHeadings: titleHeadings,
         ruleUnderlineRects: ruleUnderlineRects,
         justifyLines: justifyLines, clearLineBoxes: clearLineBoxes,

@@ -4,7 +4,7 @@ import io.legado.app.help.annotation.WordAnnotation
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class EpubWordWiseFragmentsTest {
+class EpubSmartGlossesFragmentsTest {
 
     private fun node(
         element: String,
@@ -47,7 +47,7 @@ class EpubWordWiseFragmentsTest {
             node("em", 0, "came to", sourceStart = 4, nativeStart = 10),
             node("em", 1, " terms with", sourceStart = 11, nativeStart = 20),
         )
-        val fragments = EpubWordWiseFragments.resolve(
+        val fragments = EpubSmartGlossesFragments.resolve(
             paragraphs,
             listOf(doc(0, *nodes.toTypedArray())),
             listOf(WordAnnotation(paragraphIndex = 0, start = 4, end = 21, surface = "came to terms with", hint = "accepted")),
@@ -61,7 +61,7 @@ class EpubWordWiseFragmentsTest {
     @Test
     fun `annotation only resolves its exact source range`() {
         val paragraphs = listOf("untenable and untenable")
-        val fragments = EpubWordWiseFragments.resolve(
+        val fragments = EpubSmartGlossesFragments.resolve(
             paragraphs,
             listOf(
                 doc(
@@ -82,7 +82,7 @@ class EpubWordWiseFragmentsTest {
     fun `partially represented annotation is dropped`() {
         val paragraphs = listOf("the quick brown fox")
         // "brown fox" (10..18) is missing the "fox" tail.
-        val fragments = EpubWordWiseFragments.resolve(
+        val fragments = EpubSmartGlossesFragments.resolve(
             paragraphs,
             listOf(
                 doc(0, node("span", 0, "brown", sourceStart = 10, nativeStart = 5)),
@@ -96,7 +96,7 @@ class EpubWordWiseFragmentsTest {
     fun `surrogate pair spans two utf16 units and resolves`() {
         val paragraphs = listOf("a 𐍈 b")
         // "a" at 0, space 1, "𐍈" at 2..3, space 4, "b" 5
-        val fragments = EpubWordWiseFragments.resolve(
+        val fragments = EpubSmartGlossesFragments.resolve(
             paragraphs,
             listOf(
                 doc(0, node("span", 0, "𐍈", sourceStart = 2, nativeStart = 7)),

@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.ceil
 
 /**
- * Word Gloss candidate discovery and chapter attachment.
+ * Smart Glosses candidate discovery and chapter attachment.
  *
  * Discovery is windowed: a chapter is split into paragraph-aligned,
  * overlapping sections, and each section gets its own model budget. The

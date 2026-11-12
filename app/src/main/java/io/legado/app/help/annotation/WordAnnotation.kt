@@ -1,7 +1,7 @@
 package io.legado.app.help.annotation
 
 /**
- * Wave 1 data model for AI Word Gloss.
+ * Wave 1 data model for Smart Glosses.
  *
  * [WordAnnotationItem] is what the model returns: an exact surface string, the
  * 1-based occurrence of that string inside the requested passage, and a short
@@ -39,7 +39,7 @@ object WordAnnotationConfig {
 }
 
 /**
- * Five reader levels for Word Gloss. The Gutenberg floor is a safety filter;
+ * Five reader levels for Smart Glosses. The Gutenberg floor is a safety filter;
  * model difficulty (when present) is the primary level signal. Multiword
  * expressions and unknown-rank words stay eligible. The per-book display cap
  * is separate.

@@ -1,7 +1,7 @@
 package io.legado.app.help.annotation
 
 /**
- * Candidate inventory for the book-level Word Gloss glossary.
+ * Candidate inventory for the book-level Smart Glosses glossary.
  *
  * Candidates are stored per chapter and per discovery window. A chapter entry
  * is keyed by its canonical content hash; changing the chapter text invalidates
