@@ -106,7 +106,7 @@ class WordAnnotationAnalyzerTest {
             Book().getWordAnnotationHintCap(),
         )
         assertEquals(
-            WordAnnotationDensity.STANDARD.storageValue,
+            WordAnnotationDensity.DEFAULT.storageValue,
             Book().getWordAnnotationDensity(),
         )
     }

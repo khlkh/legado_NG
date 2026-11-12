@@ -106,6 +106,8 @@ private fun levelLabelRes(level: Int): Int = when (level) {
 
 private fun densityLabelRes(density: WordAnnotationDensity): Int = when (density) {
     WordAnnotationDensity.SPARSE -> R.string.ai_word_annotation_density_sparse
+    WordAnnotationDensity.LIGHT -> R.string.ai_word_annotation_density_light
     WordAnnotationDensity.STANDARD -> R.string.ai_word_annotation_density_standard
     WordAnnotationDensity.DENSE -> R.string.ai_word_annotation_density_dense
+    WordAnnotationDensity.RICH -> R.string.ai_word_annotation_density_rich
 }

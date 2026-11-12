@@ -7,22 +7,21 @@ class WordAnnotationTargetsTest {
 
     @Test
     fun `display target follows word count and level multiplier`() {
-        assertEquals(9, WordAnnotationTargets.displayTarget(2_000, 3, WordAnnotationDensity.STANDARD))
-        assertEquals(43, WordAnnotationTargets.displayTarget(10_000, 3, WordAnnotationDensity.STANDARD))
-        assertEquals(34, WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.STANDARD))
-        assertEquals(56, WordAnnotationTargets.displayTarget(10_000, 1, WordAnnotationDensity.STANDARD))
-        assertEquals(26, WordAnnotationTargets.displayTarget(10_000, 5, WordAnnotationDensity.STANDARD))
-        assertEquals(171, WordAnnotationTargets.displayTarget(50_000, 4, WordAnnotationDensity.STANDARD))
+        assertEquals(9, WordAnnotationTargets.displayTarget(2_000, 3, WordAnnotationDensity.LIGHT))
+        assertEquals(43, WordAnnotationTargets.displayTarget(10_000, 3, WordAnnotationDensity.LIGHT))
+        assertEquals(34, WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.LIGHT))
+        assertEquals(56, WordAnnotationTargets.displayTarget(10_000, 1, WordAnnotationDensity.LIGHT))
+        assertEquals(26, WordAnnotationTargets.displayTarget(10_000, 5, WordAnnotationDensity.LIGHT))
+        assertEquals(171, WordAnnotationTargets.displayTarget(50_000, 4, WordAnnotationDensity.LIGHT))
     }
 
     @Test
     fun `density profile changes quantity independently of level`() {
-        val sparse = WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.SPARSE)
-        val standard = WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.STANDARD)
-        val dense = WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.DENSE)
-        assertEquals(standard, 34)
-        assertEquals(sparse, 26)
-        assertEquals(dense, 43)
+        assertEquals(26, WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.SPARSE))
+        assertEquals(34, WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.LIGHT))
+        assertEquals(43, WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.STANDARD))
+        assertEquals(51, WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.DENSE))
+        assertEquals(60, WordAnnotationTargets.displayTarget(10_000, 4, WordAnnotationDensity.RICH))
     }
 
     @Test
