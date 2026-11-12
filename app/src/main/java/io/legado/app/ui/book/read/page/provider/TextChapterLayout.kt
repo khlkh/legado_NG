@@ -631,7 +631,7 @@ class TextChapterLayout(
             textPage.height += endPadding
         }
         textPage.text = stringBuilder.toString()
-        if (BuildConfig.DEBUG && textChapter.wordAnnotationPoolAttached) {
+        if (BuildConfig.DEBUG && !book.isEpub && textChapter.wordAnnotationPoolAttached) {
             AppLog.put(
                 "WordAnnotation render canvas chapter=${bookChapter.index} " +
                     "annotations=${textChapter.wordAnnotations.size} " +
