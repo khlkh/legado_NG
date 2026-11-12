@@ -840,19 +840,6 @@ internal class EpubLayoutSurface(
         }
     }
 
-    /** Debug-only count of hint labels painted by the current EPUB page. */
-    fun smartGlossesRenderedCount(callback: (Int) -> Unit) {
-        if (closed || !loaded) {
-            callback(0)
-            return
-        }
-        webView.evaluateJavascript(
-            "$api && $api.smartGlossesRenderedCount ? $api.smartGlossesRenderedCount() : 0"
-        ) { raw ->
-            callback(raw?.trim()?.trim('"')?.toIntOrNull() ?: 0)
-        }
-    }
-
     fun resolve(url: String): EpubResourceLink? = gateway.resolve(url)
 
     fun setHighlights(values: JSONArray) {

@@ -1376,6 +1376,7 @@
                 if (mine !== generation) return { cancelled: true };
                 justifyPageLines(); readingAnchor = locationAnchor(location);
                 window.__ngEpubContent.prepareUnderlines(); prepareFullLineUnderlines(); paintHighlights(); state.status = 'ready';
+                state.smartGlossesRendered = window.__ngEpubContent.smartGlossesRenderedCount();
             }
             if (mine !== generation) return { cancelled: true };
             styleUpdatePending = false; styleReflowPending = false;
@@ -1872,6 +1873,7 @@
               prepareFullLineUnderlines();
               state.status = 'ready';
               paintHighlights();
+              state.smartGlossesRendered = window.__ngEpubContent ? window.__ngEpubContent.smartGlossesRenderedCount() : 0;
         } catch (error) {
             if (mine === generation) state = { status: 'error', token: value.token, error: String(error.message || error) };
         }
@@ -1916,6 +1918,7 @@
                 state.timings = layoutTimings(frameTiming, 0, performance.now() - began);
                   state.status = 'ready';
                   paintHighlights();
+                  state.smartGlossesRendered = window.__ngEpubContent ? window.__ngEpubContent.smartGlossesRenderedCount() : 0;
                 if (trace) {
                     try { window.console.debug('EpubAloudTrace ' + JSON.stringify({ event: 'js-ready', token: value.token,
                         page: state.pageIndex, capturedOffset: sourceLocation().textOffset })); } catch (_) {}

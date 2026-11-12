@@ -449,16 +449,11 @@ internal class EpubLayoutController(
                 if (io.legado.app.BuildConfig.DEBUG &&
                     documents.getOrNull(documentIndex)?.chapter?.epubWordAnnotations?.isNotEmpty() == true
                 ) {
-                    val renderedSurface = surface
                     val chapterIndex = textChapter?.chapter?.index ?: -1
                     val page = state.optInt("pageIndex", -1)
-                    host.postDelayed({
-                        renderedSurface?.smartGlossesRenderedCount { labels ->
-                            AppLog.put(
-                                "WordAnnotation render epub chapter=$chapterIndex page=$page labels=$labels",
-                            )
-                        }
-                    }, 80L)
+                    AppLog.put(
+                        "WordAnnotation render epub chapter=$chapterIndex page=$page labels=${state.optInt("smartGlossesRendered", -1)}",
+                    )
                 }
             }
         lateinit var next: EpubLayoutSurface
