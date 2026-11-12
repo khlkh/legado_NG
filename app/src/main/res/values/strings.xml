@@ -473,6 +473,11 @@
     <string name="ai_word_annotation_density_standard">Standard · 1.25×</string>
     <string name="ai_word_annotation_density_dense">Dense · 1.50×</string>
     <string name="ai_word_annotation_density_rich">Rich · 1.75×</string>
+    <string name="word_annotation_density_short_sparse">Sparse</string>
+    <string name="word_annotation_density_short_light">Light</string>
+    <string name="word_annotation_density_short_standard">Standard</string>
+    <string name="word_annotation_density_short_dense">Dense</string>
+    <string name="word_annotation_density_short_rich">Rich</string>
     <string name="ai_word_annotation_note">Rank gate applies to English only · Gutenberg 2006/04</string>
     <string name="ai_purify_model_not_selected">Not selected</string>
     <string name="ai_purify_model_unavailable">Selected model is unavailable</string>

@@ -5,10 +5,13 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -36,17 +39,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.R
+import io.legado.app.help.annotation.WordAnnotationDensity
 import io.legado.app.help.config.ReadThemeMode
 import io.legado.app.ui.design.components.compose.NgGlassSurface
 import io.legado.app.ui.design.components.compose.NgSlider
 import io.legado.app.ui.design.components.compose.NgSliderVariant
+import io.legado.app.ui.design.components.compose.NgSwitchControl
+import io.legado.app.ui.design.components.compose.NgSwitchControlVariant
 import io.legado.app.ui.design.theme.NgTheme
 import kotlin.math.roundToInt
 
 internal enum class ReadFloatingToolExpansion {
     BRIGHTNESS,
     THEME,
-    AI
+    AI,
+    WORD_ANNOTATION
 }
 
 internal enum class ReadFloatingToolDock {
@@ -86,7 +93,10 @@ internal fun ReadFloatingToolRail(
     onAiSettings: () -> Unit,
     wordAnnotationEnabled: Boolean,
     wordAnnotationVisible: Boolean,
+    wordAnnotationDensity: Int,
     onWordAnnotation: () -> Unit,
+    onWordAnnotationEnabledChange: (Boolean) -> Unit,
+    onWordAnnotationDensitySelected: (Int) -> Unit,
     onToggleDockSide: () -> Unit
 ) {
     val dockRight = dockSide.isRight
@@ -105,7 +115,11 @@ internal fun ReadFloatingToolRail(
                 themeMode = themeMode,
                 onThemeModeSelected = onThemeModeSelected,
                 onAiPurify = onAiPurify,
-                onAiSettings = onAiSettings
+                onAiSettings = onAiSettings,
+                wordAnnotationEnabled = wordAnnotationEnabled,
+                wordAnnotationDensity = wordAnnotationDensity,
+                onWordAnnotationEnabledChange = onWordAnnotationEnabledChange,
+                onWordAnnotationDensitySelected = onWordAnnotationDensitySelected,
             )
             if (panelVisible) Spacer(Modifier.width(8.dp))
         }
@@ -138,7 +152,11 @@ internal fun ReadFloatingToolRail(
                 themeMode = themeMode,
                 onThemeModeSelected = onThemeModeSelected,
                 onAiPurify = onAiPurify,
-                onAiSettings = onAiSettings
+                onAiSettings = onAiSettings,
+                wordAnnotationEnabled = wordAnnotationEnabled,
+                wordAnnotationDensity = wordAnnotationDensity,
+                onWordAnnotationEnabledChange = onWordAnnotationEnabledChange,
+                onWordAnnotationDensitySelected = onWordAnnotationDensitySelected,
             )
         }
     }
@@ -217,8 +235,14 @@ private fun ToolRail(
                 iconRes = R.drawable.ic_translate,
                 labelRes = R.string.word_annotation,
                 iconSize = 20.dp,
-                selected = wordAnnotationEnabled,
-                onClick = onWordAnnotation
+                selected = wordAnnotationEnabled ||
+                    expansion == ReadFloatingToolExpansion.WORD_ANNOTATION,
+                onClick = onWordAnnotation,
+                onLongClick = {
+                    onExpansionChange(
+                        expansion.toggle(ReadFloatingToolExpansion.WORD_ANNOTATION)
+                    )
+                },
             )
         }
         HorizontalDivider(
@@ -233,11 +257,13 @@ private fun ToolRail(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ToolButton(
     @DrawableRes iconRes: Int,
     @StringRes labelRes: Int,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     iconSize: Dp = 22.dp,
     selected: Boolean = false
 ) {
@@ -255,7 +281,11 @@ private fun ToolButton(
         modifier = Modifier
             .width(44.dp)
             .height(48.dp)
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                role = Role.Button,
+                onLongClick = onLongClick,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center
     ) {
         Box(
@@ -288,7 +318,11 @@ private fun ToolExpansion(
     themeMode: ReadThemeMode,
     onThemeModeSelected: (ReadThemeMode) -> Unit,
     onAiPurify: () -> Unit,
-    onAiSettings: () -> Unit
+    onAiSettings: () -> Unit,
+    wordAnnotationEnabled: Boolean,
+    wordAnnotationDensity: Int,
+    onWordAnnotationEnabledChange: (Boolean) -> Unit,
+    onWordAnnotationDensitySelected: (Int) -> Unit,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -302,7 +336,8 @@ private fun ToolExpansion(
         Box(
             modifier = Modifier.height(357.dp),
             contentAlignment = when (expansion) {
-                ReadFloatingToolExpansion.AI -> Alignment.BottomCenter
+                ReadFloatingToolExpansion.AI,
+                ReadFloatingToolExpansion.WORD_ANNOTATION -> Alignment.BottomCenter
                 else -> Alignment.TopCenter
             }
         ) {
@@ -325,6 +360,14 @@ private fun ToolExpansion(
                     onAiPurify = onAiPurify,
                     onAiSettings = onAiSettings,
                     modifier = Modifier.padding(bottom = 32.dp)
+                )
+
+                ReadFloatingToolExpansion.WORD_ANNOTATION -> WordAnnotationQuickPanel(
+                    enabled = wordAnnotationEnabled,
+                    density = wordAnnotationDensity,
+                    onEnabledChange = onWordAnnotationEnabledChange,
+                    onDensitySelected = onWordAnnotationDensitySelected,
+                    modifier = Modifier.padding(bottom = 60.dp),
                 )
 
                 null -> Unit
@@ -527,6 +570,107 @@ private fun AiPanel(
             onClick = onAiSettings
         )
     }
+}
+
+@Composable
+private fun WordAnnotationQuickPanel(
+    enabled: Boolean,
+    density: Int,
+    onEnabledChange: (Boolean) -> Unit,
+    onDensitySelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectedDensity = WordAnnotationDensity.fromStorage(density)
+    NgGlassSurface(
+        modifier = modifier.width(260.dp),
+        shape = RoundedCornerShape(12.dp),
+        style = readFloatingGlassStyle(),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(40.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.word_annotation),
+                    modifier = Modifier.weight(1f),
+                    color = Color(NgTheme.colors.onSurface),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                NgSwitchControl(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange,
+                    variant = NgSwitchControlVariant.COMPACT,
+                )
+            }
+            Text(
+                text = stringResource(R.string.ai_word_annotation_density),
+                modifier = Modifier.padding(top = 2.dp, bottom = 5.dp),
+                color = Color(NgTheme.colors.onSurfaceVariant),
+                fontSize = 11.sp,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().height(32.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                WordAnnotationDensity.entries.forEach { value ->
+                    DensityQuickOption(
+                        label = stringResource(densityShortLabelRes(value)),
+                        selected = value == selectedDensity,
+                        onClick = { onDensitySelected(value.storageValue) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DensityQuickOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val contentColor = Color(
+        if (selected) NgTheme.colors.primary else NgTheme.colors.onSurface,
+    )
+    Box(
+        modifier = modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(
+                if (selected) {
+                    Color(NgTheme.colors.selectedContainer).copy(alpha = 0.88f)
+                } else {
+                    Color.Transparent
+                }
+            )
+            .clickable(role = Role.RadioButton, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = contentColor,
+            fontSize = 10.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun densityShortLabelRes(density: WordAnnotationDensity): Int = when (density) {
+    WordAnnotationDensity.SPARSE -> R.string.word_annotation_density_short_sparse
+    WordAnnotationDensity.LIGHT -> R.string.word_annotation_density_short_light
+    WordAnnotationDensity.STANDARD -> R.string.word_annotation_density_short_standard
+    WordAnnotationDensity.DENSE -> R.string.word_annotation_density_short_dense
+    WordAnnotationDensity.RICH -> R.string.word_annotation_density_short_rich
 }
 
 @Composable
