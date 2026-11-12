@@ -65,9 +65,10 @@ class WordAnnotationAnalyzerTest {
     }
 
     @Test
-    fun `discovery per window budget is split across windows`() {
-        assertEquals(19, WordAnnotationAnalyzer.perWindowCap(discoveryTarget = 75, windowCount = 4))
-        assertEquals(19, WordAnnotationAnalyzer.perWindowCap(discoveryTarget = 300, windowCount = 16))
+    fun `pool capacity is split across windows`() {
+        assertEquals(600, WordAnnotationAnalyzer.perWindowCapacity(poolCapacity = 600, windowCount = 1))
+        assertEquals(150, WordAnnotationAnalyzer.perWindowCapacity(poolCapacity = 600, windowCount = 4))
+        assertEquals(38, WordAnnotationAnalyzer.perWindowCapacity(poolCapacity = 600, windowCount = 16))
     }
 
     @Test

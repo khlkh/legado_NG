@@ -28,20 +28,19 @@ enum class WordAnnotationDensity(
  * Display density is content-proportional:
  * `words / 350 * 1.5 * levelMultiplier * densityMultiplier`.
  *
- * Discovery is deliberately larger than display and independent of the
- * current level/density, so changing either setting can re-select from the
- * existing candidates without another model call. Windows are word-based and
- * capped for request cost; the safety ceilings are engineering guards, not
- * reader-facing density settings.
+ * Discovery retains a broad, reusable candidate pool up to a fixed safety
+ * ceiling. It is independent of the current reading level and display density,
+ * so changing either setting re-selects from the existing pool without another
+ * model call. Windows are word-based and capped for request cost; the safety
+ * ceiling is an engineering guard, not a reader-facing density setting.
  */
 object WordAnnotationTargets {
 
     const val WORDS_PER_HINT = 350.0
     const val BASE_HINTS_PER_350 = 1.5
-    const val DISCOVERY_FACTOR = 1.75
 
-    const val MIN_DISCOVERY = 30
-    const val MAX_DISCOVERY = 600
+    /** Safety ceiling for one chapter's retained candidate pool. */
+    const val MAX_POOL_CANDIDATES = 600
     const val MAX_DISPLAY = 300
 
     const val TARGET_WORDS_PER_WINDOW = 3_000
@@ -73,14 +72,6 @@ object WordAnnotationTargets {
         return (base * levelMultiplier(level) * density.multiplier)
             .roundToInt()
             .coerceIn(1, MAX_DISPLAY)
-    }
-
-    fun discoveryTarget(words: Int): Int {
-        if (words <= 0) return 0
-        val base = words / WORDS_PER_HINT * BASE_HINTS_PER_350
-        return ceil(base * DISCOVERY_FACTOR)
-            .toInt()
-            .coerceIn(MIN_DISCOVERY, MAX_DISCOVERY)
     }
 
     fun windowCount(words: Int): Int =
