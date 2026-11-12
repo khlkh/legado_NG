@@ -244,18 +244,7 @@ data class TextLine(
         paint.color = ReadBookConfig.textAccentColor
         val band = WordAnnotationLayout.bandHeight(ChapterProvider.contentPaintTextHeight, hasHints = true)
         val baseline = band - paint.fontMetrics.descent - 1.dpToPx()
-        val anchors = hintRuns.sortedBy { it.start }.mapNotNull { run ->
-            val span = hintRunXSpan(run) ?: return@mapNotNull null
-            WordAnnotationLayout.HintSegment(
-                id = 0,
-                hint = run.hint,
-                left = span.first,
-                right = span.second,
-                top = 0f,
-                bottom = band,
-            ) to paint.measureText(run.hint)
-        }
-        val placed = WordAnnotationLayout.packHintLabels(anchors, lineStart, lineEnd)
+        val placed = WordAnnotationLayout.packHintLabels(hintAnchors(paint, band), lineStart, lineEnd)
         placed.forEach { label ->
             val hintText = TextUtils.ellipsize(
                 label.hint,
@@ -270,6 +259,42 @@ data class TextLine(
         }
         PaintPool.recycle(paint)
     }
+
+    /** Debug-only count of labels the draw path would place on this line. */
+    internal fun placedHintLabelCount(): Int {
+        if (hintRuns.isEmpty()) return 0
+        val paint = PaintPool.obtain()
+        return try {
+            paint.set(ChapterProvider.hintPaint)
+            val band = WordAnnotationLayout.bandHeight(
+                ChapterProvider.contentPaintTextHeight,
+                hasHints = true,
+            )
+            WordAnnotationLayout.packHintLabels(
+                hintAnchors(paint, band),
+                lineStart,
+                lineEnd,
+            ).size
+        } finally {
+            PaintPool.recycle(paint)
+        }
+    }
+
+    private fun hintAnchors(
+        paint: Paint,
+        band: Float,
+    ): List<Pair<WordAnnotationLayout.HintSegment, Float>> =
+        hintRuns.sortedBy { it.start }.mapNotNull { run ->
+            val span = hintRunXSpan(run) ?: return@mapNotNull null
+            WordAnnotationLayout.HintSegment(
+                id = 0,
+                hint = run.hint,
+                left = span.first,
+                right = span.second,
+                top = 0f,
+                bottom = band,
+            ) to paint.measureText(run.hint)
+        }
 
     /**
      * X-span of a line-local hint run, from the charData walk: summing column

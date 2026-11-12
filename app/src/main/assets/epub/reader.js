@@ -1930,6 +1930,10 @@
         beginScroll: function () { state.scrollOvershoot = 0; },
         setHighlights: setHighlights,
         setSmartGlosses: setSmartGlosses,
+        smartGlossesRenderedCount: function () {
+            return window.__ngEpubContent && window.__ngEpubContent.smartGlossesRenderedCount
+                ? window.__ngEpubContent.smartGlossesRenderedCount() : 0;
+        },
         setSelectionTransparent: setSelectionTransparent,
         mediaOverlay: mediaOverlay,
         revealText: revealText,
