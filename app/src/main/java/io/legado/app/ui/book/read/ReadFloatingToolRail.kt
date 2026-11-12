@@ -85,7 +85,7 @@ internal fun ReadFloatingToolRail(
     onAiPurify: () -> Unit,
     onAiSettings: () -> Unit,
     wordAnnotationEnabled: Boolean,
-    wordAnnotationVisible: Boolean = true,
+    wordAnnotationVisible: Boolean,
     onWordAnnotation: () -> Unit,
     onToggleDockSide: () -> Unit
 ) {
@@ -119,6 +119,7 @@ internal fun ReadFloatingToolRail(
             onReplace = onReplace,
             onAutoPage = onAutoPage,
             wordAnnotationEnabled = wordAnnotationEnabled,
+            wordAnnotationVisible = wordAnnotationVisible,
             onWordAnnotation = onWordAnnotation,
             onToggleDockSide = onToggleDockSide
         )
@@ -153,7 +154,7 @@ private fun ToolRail(
     onReplace: () -> Unit,
     onAutoPage: () -> Unit,
     wordAnnotationEnabled: Boolean,
-    wordAnnotationVisible: Boolean = true,
+    wordAnnotationVisible: Boolean,
     onWordAnnotation: () -> Unit,
     onToggleDockSide: () -> Unit
 ) {
