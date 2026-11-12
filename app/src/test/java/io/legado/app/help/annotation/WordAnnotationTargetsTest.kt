@@ -1,6 +1,7 @@
 package io.legado.app.help.annotation
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WordAnnotationTargetsTest {
@@ -25,10 +26,9 @@ class WordAnnotationTargetsTest {
     }
 
     @Test
-    fun `discovery target is larger than display and independent of level`() {
-        assertEquals(30, WordAnnotationTargets.discoveryTarget(2_000))
-        assertEquals(75, WordAnnotationTargets.discoveryTarget(10_000))
-        assertEquals(375, WordAnnotationTargets.discoveryTarget(50_000))
+    fun `candidate pool has a fixed safety ceiling independent of density`() {
+        assertEquals(600, WordAnnotationTargets.MAX_POOL_CANDIDATES)
+        assertTrue(WordAnnotationTargets.MAX_POOL_CANDIDATES > WordAnnotationTargets.MAX_DISPLAY)
     }
 
     @Test

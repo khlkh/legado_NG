@@ -17,9 +17,10 @@ object WordAnnotationConfig {
      * part of the cache key. 9 introduced per-chapter windowed discovery;
      * 10 added model difficulty/contextual metadata; 11 moved to word-based
      * density targets and windows; 12 rewrote the selection prompt for
-     * contextual value and conservative annotations.
+     * contextual value and conservative annotations; 13 decoupled the retained
+     * candidate pool from display density with a fixed safety ceiling.
      */
-    const val SCHEMA_VERSION = 12
+    const val SCHEMA_VERSION = 13
 
     const val MIN_WORD_ANNOTATION_HINT_CAP = 8
     const val MAX_WORD_ANNOTATION_HINT_CAP = 144
