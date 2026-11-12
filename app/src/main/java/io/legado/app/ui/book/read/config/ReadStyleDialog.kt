@@ -1065,7 +1065,9 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
     private fun openEditor(index: Int, isNew: Boolean = false) {
         latestPresetNameDraft = null
         creatingPreset = isNew
-        if (editorSession.presetMode == null) editorSession.presetMode = ReadAppearanceMode.current()
+        // A ViewModel survives the previous edit session; always start from the
+        // reader's real current mode instead of a stale preview slot.
+        editorSession.selectPresetMode(ReadAppearanceMode.current())
         currentPage = ReadStylePage.EDIT
         changeBgTextConfig(index)
         page = ReadStylePage.EDIT
@@ -1074,8 +1076,14 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
     }
 
     private fun toggleEditorThemeMode() {
-        val currentNight = ReadBookConfig.isNightTheme
-        ReadBookConfig.setNightThemeOverride(!currentNight)
+        // E-ink takes precedence in ReadAppearanceMode.current(); a day/night
+        // override cannot change the slot being edited there.
+        if (AppConfig.isEInkMode) return
+        val nextNight = !ReadBookConfig.isNightTheme
+        ReadBookConfig.setNightThemeOverride(nextNight)
+        editorSession.selectPresetMode(
+            if (nextNight) ReadAppearanceMode.NIGHT else ReadAppearanceMode.DAY
+        )
         refreshUi()
         postEditorThemePreviewChanged()
     }

@@ -165,6 +165,7 @@ internal fun NgColorPickerContent(
     modifier: Modifier = Modifier,
     showAlphaSlider: Boolean = true,
     visualHeight: Dp = 168.dp,
+    fixedGraphicHeight: Dp? = null,
     previewRole: NgColorPreviewRole? = null,
     previewBackground: Int = 0,
     previewForeground: Int = 0,
@@ -191,7 +192,10 @@ internal fun NgColorPickerContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (previewRole != null) Modifier.fillMaxHeight() else Modifier),
+            .then(
+                if (previewRole != null && fixedGraphicHeight == null) Modifier.fillMaxHeight()
+                else Modifier
+            ),
     ) {
         NgSegmentDock(
             labels = modeLabels,
@@ -211,6 +215,7 @@ internal fun NgColorPickerContent(
                 change = change,
                 showAlphaSlider = showAlphaSlider,
                 originalColor = originalColor,
+                fixedGraphicHeight = fixedGraphicHeight,
                 previewRole = previewRole,
                 previewBackground = previewBackground,
                 previewForeground = previewForeground,
@@ -224,6 +229,7 @@ internal fun NgColorPickerContent(
                 change = change,
                 showAlphaSlider = showAlphaSlider,
                 visualHeight = visualHeight,
+                fixedGraphicHeight = fixedGraphicHeight,
                 originalColor = originalColor,
                 hexLabel = hexLabel,
                 colors = colors,
@@ -232,13 +238,17 @@ internal fun NgColorPickerContent(
     }
 }
 
-/** Editor page: the graphic fills leftover space. The sample bar, opacity, and saved colors stay one line each. */
+/**
+ * Editor page. With [fixedGraphicHeight] the swatch canvas keeps its target size
+ * and the drawer scrolls below it; otherwise the graphic fills leftover space.
+ */
 @Composable
 private fun NgColorEditorBody(
     state: NgColorPickerState,
     change: (() -> Unit) -> Unit,
     showAlphaSlider: Boolean,
     originalColor: Int,
+    fixedGraphicHeight: Dp?,
     previewRole: NgColorPreviewRole,
     previewBackground: Int,
     previewForeground: Int,
@@ -246,10 +256,21 @@ private fun NgColorEditorBody(
     hexLabel: String,
     colors: NgColorScheme,
 ) {
-    Column(Modifier.fillMaxSize()) {
-        val graphicModifier = Modifier.fillMaxWidth().weight(1f)
+    Column(
+        if (fixedGraphicHeight != null) Modifier.fillMaxWidth() else Modifier.fillMaxSize()
+    ) {
+        val graphicModifier = if (fixedGraphicHeight != null) {
+            Modifier.fillMaxWidth().height(fixedGraphicHeight)
+        } else {
+            Modifier.fillMaxWidth().weight(1f)
+        }
         if (state.mode == NgColorPickerMode.RGB) {
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+            val rgbModifier = if (fixedGraphicHeight != null) {
+                Modifier.fillMaxWidth().height(fixedGraphicHeight)
+            } else {
+                Modifier.fillMaxWidth().weight(1f)
+            }
+            Column(rgbModifier.verticalScroll(rememberScrollState())) {
                 NgPickerSliders(state, change, Modifier.fillMaxWidth())
                 if (showAlphaSlider) {
                     Spacer(Modifier.height(4.dp))
@@ -261,7 +282,12 @@ private fun NgColorEditorBody(
                 NgColorPickerMode.GRID -> NgPickerGrid(
                     state = state,
                     change = change,
-                    modifier = graphicModifier,
+                    modifier = if (fixedGraphicHeight != null) {
+                        Modifier.fillMaxWidth()
+                    } else {
+                        graphicModifier
+                    },
+                    canvasHeight = fixedGraphicHeight,
                     previewRole = previewRole,
                     previewForeground = previewForeground,
                     previewBackground = previewBackground,
@@ -329,18 +355,37 @@ private fun NgColorLooseBody(
     change: (() -> Unit) -> Unit,
     showAlphaSlider: Boolean,
     visualHeight: Dp,
+    fixedGraphicHeight: Dp?,
     originalColor: Int,
     hexLabel: String,
     colors: NgColorScheme,
 ) {
+    val graphicHeight = fixedGraphicHeight ?: visualHeight
     when (state.mode) {
-        NgColorPickerMode.GRID -> NgPickerGrid(state, change, Modifier.fillMaxWidth().height(visualHeight))
-        NgColorPickerMode.SPECTRUM -> NgPickerSpectrum(state, change, Modifier.fillMaxWidth().height(visualHeight))
-        NgColorPickerMode.WHEEL -> NgPickerWheel(state, change, Modifier.fillMaxWidth().height(visualHeight))
+        NgColorPickerMode.GRID -> NgPickerGrid(
+            state = state,
+            change = change,
+            modifier = if (fixedGraphicHeight != null) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier.fillMaxWidth().height(visualHeight)
+            },
+            canvasHeight = fixedGraphicHeight,
+        )
+        NgColorPickerMode.SPECTRUM -> NgPickerSpectrum(
+            state,
+            change,
+            Modifier.fillMaxWidth().height(graphicHeight),
+        )
+        NgColorPickerMode.WHEEL -> NgPickerWheel(
+            state,
+            change,
+            Modifier.fillMaxWidth().height(graphicHeight),
+        )
         NgColorPickerMode.RGB -> NgPickerSliders(
             state,
             change,
-            Modifier.fillMaxWidth().height(visualHeight).verticalScroll(rememberScrollState()),
+            Modifier.fillMaxWidth().height(graphicHeight).verticalScroll(rememberScrollState()),
         )
     }
     Spacer(Modifier.height(10.dp))
@@ -616,6 +661,7 @@ private fun NgPickerGrid(
     state: NgColorPickerState,
     change: (() -> Unit) -> Unit,
     modifier: Modifier = Modifier,
+    canvasHeight: Dp? = null,
     previewRole: NgColorPreviewRole? = null,
     previewForeground: Int = 0,
     previewBackground: Int = 0,
@@ -681,7 +727,10 @@ private fun NgPickerGrid(
             previewRole = previewRole,
             previewForeground = previewForeground,
             previewBackground = previewBackground,
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            modifier = Modifier.fillMaxWidth().then(
+                if (canvasHeight != null) Modifier.height(canvasHeight)
+                else Modifier.weight(1f)
+            ),
         )
     }
 }

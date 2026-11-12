@@ -61,6 +61,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -94,6 +95,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.R
 import io.legado.app.help.book.BookScriptClass
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadHighlightRule
 import io.legado.app.help.config.ReadFloatingAppearanceConfig
 import io.legado.app.help.config.ReadFloatingColorStyle
@@ -154,6 +156,36 @@ internal enum class ReadStylePage {
     NEW_BOOK_PRESET,
     EDIT_AI_THEME,
 
+}
+
+/**
+ * The preset session bar belongs to pages that edit the preset session itself.
+ * Focused sub-editors already own Back/Save/Reset, and draft editors can lose
+ * local work if the global Done button is mistaken for their Save button.
+ */
+internal enum class ReadStyleSessionBarMode {
+    FULL,
+    DONE_ONLY,
+    HIDDEN,
+}
+
+internal fun ReadStylePage.sessionBarMode(): ReadStyleSessionBarMode = when (this) {
+    ReadStylePage.EDIT_TEXT_COLOR,
+    ReadStylePage.EDIT_BACKGROUND_COLOR,
+    ReadStylePage.EDIT_ACCENT_COLOR,
+    ReadStylePage.EDIT_AI_THEME,
+    ReadStylePage.EDIT_UNDERLINE_COLOR,
+    ReadStylePage.HIGHLIGHT_EDIT,
+    ReadStylePage.HIGHLIGHT_NINE_SLICE,
+    ReadStylePage.HIGHLIGHT_TEXT_COLOR,
+    ReadStylePage.HIGHLIGHT_BACKGROUND_COLOR,
+    ReadStylePage.HIGHLIGHT_UNDERLINE_COLOR -> ReadStyleSessionBarMode.HIDDEN
+
+    // Highlight rules are global and written immediately; the preset-session
+    // Discard button cannot undo them. Keep only an explicit close action.
+    ReadStylePage.HIGHLIGHT -> ReadStyleSessionBarMode.DONE_ONLY
+
+    else -> ReadStyleSessionBarMode.FULL
 }
 
 internal fun editorColorClusterIndex(page: ReadStylePage): Int = when (page) {
@@ -621,12 +653,24 @@ internal fun ReadStyleScreen(
                 )
             }
 
-            ReadStyleSessionBar(
-                hasUnsavedChanges = state.hasUnsavedChanges,
-                contentColor = contentColor,
-                onDiscard = actions.onDiscard,
-                onDone = actions.onDone,
-            )
+            when (page.sessionBarMode()) {
+                ReadStyleSessionBarMode.FULL -> ReadStyleSessionBar(
+                    hasUnsavedChanges = state.hasUnsavedChanges,
+                    contentColor = contentColor,
+                    onDiscard = actions.onDiscard,
+                    onDone = actions.onDone,
+                )
+
+                ReadStyleSessionBarMode.DONE_ONLY -> ReadStyleSessionBar(
+                    hasUnsavedChanges = state.hasUnsavedChanges,
+                    contentColor = contentColor,
+                    showDiscard = false,
+                    onDiscard = actions.onDiscard,
+                    onDone = actions.onDone,
+                )
+
+                ReadStyleSessionBarMode.HIDDEN -> Unit
+            }
         }
     }
 }
@@ -635,6 +679,7 @@ internal fun ReadStyleScreen(
 private fun ReadStyleSessionBar(
     hasUnsavedChanges: Boolean,
     contentColor: Color,
+    showDiscard: Boolean = true,
     onDiscard: () -> Unit,
     onDone: () -> Unit,
 ) {
@@ -654,13 +699,15 @@ private fun ReadStyleSessionBar(
         } else {
             Spacer(Modifier.weight(1f))
         }
-        NgFormActionButton(
-            text = stringResource(R.string.read_style_discard_changes),
-            onClick = onDiscard,
-            enabled = hasUnsavedChanges,
-            variant = NgButtonVariant.OUTLINE,
-        )
-        Spacer(Modifier.width(10.dp))
+        if (showDiscard) {
+            NgFormActionButton(
+                text = stringResource(R.string.read_style_discard_changes),
+                onClick = onDiscard,
+                enabled = hasUnsavedChanges,
+                variant = NgButtonVariant.OUTLINE,
+            )
+            Spacer(Modifier.width(10.dp))
+        }
         NgFormActionButton(
             text = stringResource(R.string.read_style_done),
             onClick = onDone,
@@ -1624,6 +1671,7 @@ private fun EditorPage(
             creatingPreset = state.creatingPreset,
             mode = state.editorMode,
             modeLabel = state.editorModeLabel,
+            modeToggleEnabled = !AppConfig.isEInkMode,
             contentColor = contentColor,
             accentColor = accentColor,
             onBack = actions.onBack,
@@ -1817,6 +1865,7 @@ private fun EditorHeader(
     creatingPreset: Boolean,
     mode: Int,
     modeLabel: String,
+    modeToggleEnabled: Boolean,
     contentColor: Color,
     accentColor: Color,
     onBack: () -> Unit,
@@ -1855,10 +1904,12 @@ private fun EditorHeader(
         Row(
             modifier = Modifier
                 .padding(start = 12.dp)
+                .alpha(if (modeToggleEnabled) 1f else 0.55f)
                 .clip(RoundedCornerShape(14.dp))
                 .background(Color(NgTheme.colors.surface).copy(alpha = 0.34f))
                 .toggleable(
                     value = mode == 1,
+                    enabled = modeToggleEnabled,
                     role = Role.Switch,
                 ) {
                     onModeToggle()
@@ -2365,6 +2416,7 @@ private fun EditorColorPage(
             title = stringResource(R.string.read_style_section_colors),
             initialColor = currentColor,
             backgroundRenderer = ::renderCurrentReadBackground,
+            expandedEditor = true,
             onBack = actions.onBack,
             onColorChanged = onColorChanged,
             onReset = actions.onResetEditorColor,

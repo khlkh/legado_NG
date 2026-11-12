@@ -16,6 +16,35 @@ class NgColorDrawerTest {
     }
 
     @Test
+    fun expandedEditorCapLeavesRoomForTheMatrix() {
+        assertEquals(0.78f, colorDrawerExpandedHeightFraction(portrait = true))
+        assertEquals(0.92f, colorDrawerExpandedHeightFraction(portrait = false))
+    }
+
+    @Test
+    fun fixedVisualKeepsTheMatrixAndScrollsOnlyWhenTheChromeOverflows() {
+        val fits = measureFixedVisualDrawer(
+            capPx = 640,
+            headerPx = 52,
+            naturalBodyPx = 480,
+            fixedVisualPx = 240,
+        )
+        assertFalse(fits.scroll)
+        assertEquals(532, fits.heightPx)
+        assertEquals(240, fits.visualPx)
+
+        val overflows = measureFixedVisualDrawer(
+            capPx = 420,
+            headerPx = 52,
+            naturalBodyPx = 480,
+            fixedVisualPx = 240,
+        )
+        assertTrue(overflows.scroll)
+        assertEquals(420, overflows.heightPx)
+        assertEquals(240, overflows.visualPx)
+    }
+
+    @Test
     fun drawerShrinksToContentWhenTheGraphicFits() {
         val plan = measureColorDrawer(
             capPx = 800,

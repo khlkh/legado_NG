@@ -916,6 +916,7 @@ internal fun AdvancedColorPage(
             title = title,
             initialColor = initialColor,
             backgroundRenderer = backgroundRenderer,
+            expandedEditor = true,
             onBack = onBack,
             onColorChanged = onColorChanged,
             onReset = onReset,

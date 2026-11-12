@@ -16,6 +16,10 @@ internal class ReadStyleEditorSession : ViewModel() {
         presetMode = it
     }
 
+    fun selectPresetMode(mode: ReadAppearanceMode): ReadAppearanceMode = mode.also {
+        presetMode = it
+    }
+
     fun selectHighlightMode(index: Int): Int = index.coerceIn(0, 1).also {
         highlightMode = it
     }
