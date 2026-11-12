@@ -1931,8 +1931,25 @@
         setHighlights: setHighlights,
         setSmartGlosses: setSmartGlosses,
         smartGlossesRenderedCount: function () {
-            return window.__ngEpubContent && window.__ngEpubContent.smartGlossesRenderedCount
-                ? window.__ngEpubContent.smartGlossesRenderedCount() : 0;
+            var total = 0;
+            var frames = document.querySelectorAll('iframe');
+            for (var i = 0; i < frames.length; i++) {
+                var frame = frames[i];
+                if (frame.getAttribute('aria-hidden') === 'true') continue;
+                var style = window.getComputedStyle(frame);
+                if (style.display === 'none' || style.visibility === 'hidden' ||
+                    parseFloat(style.opacity || '1') <= 0) continue;
+                try {
+                    var content = frame.contentWindow && frame.contentWindow.__ngEpubContent;
+                    if (content && content.smartGlossesRenderedCount) {
+                        total += content.smartGlossesRenderedCount();
+                    }
+                } catch (_) {}
+            }
+            if (total === 0 && window.__ngEpubContent && window.__ngEpubContent.smartGlossesRenderedCount) {
+                total = window.__ngEpubContent.smartGlossesRenderedCount();
+            }
+            return total;
         },
         setSelectionTransparent: setSelectionTransparent,
         mediaOverlay: mediaOverlay,
