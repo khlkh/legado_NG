@@ -16,9 +16,10 @@ object WordAnnotationConfig {
      * Bump when the prompt, JSON contract, or candidate organization changes;
      * part of the cache key. 9 introduced per-chapter windowed discovery;
      * 10 added model difficulty/contextual metadata; 11 moved to word-based
-     * density targets and windows.
+     * density targets and windows; 12 rewrote the selection prompt for
+     * contextual value and conservative annotations.
      */
-    const val SCHEMA_VERSION = 11
+    const val SCHEMA_VERSION = 12
 
     const val MIN_WORD_ANNOTATION_HINT_CAP = 8
     const val MAX_WORD_ANNOTATION_HINT_CAP = 144
@@ -60,20 +61,6 @@ object WordAnnotationLevels {
     )
 
     fun floorFor(level: Int): Int = FLOORS[normalize(level)] ?: FLOORS.getValue(4)
-
-    /**
-     * Level-independent selection for the book glossary: the model returns a
-     * broad pool spanning common through rare; the reader filters locally by
-     * level floor and per-book cap, so the prompt must not pre-filter by level.
-     */
-    fun supersetGuidance(uiLocaleChinese: Boolean): String = if (uiLocaleChinese) {
-        "覆盖从常见日常词汇到高级、生僻词汇、习语和短语动词的广泛范围。" +
-            "读者稍后会按难度筛选，因此不要因为一个词太常见就跳过它。"
-    } else {
-        "Cover a broad range from common everyday words through advanced and rare " +
-            "vocabulary, idioms, and phrasal verbs. The reader filters by difficulty " +
-            "later, so do not skip an item only because it is common."
-    }
 }
 
 data class WordAnnotationItem(

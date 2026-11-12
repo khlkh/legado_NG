@@ -17,6 +17,26 @@ import kotlin.math.ceil
  */
 object WordAnnotationFilter {
 
+    data class Stats(
+        val inputAnnotations: Int = 0,
+        /**
+         * Normally zero when called through [WordAnnotationPoolResolver],
+         * which already applies the same floor before expanding occurrences.
+         * The authoritative floor count is [WordAnnotationPoolResolver.Stats.floorRejected].
+         */
+        val floorRejected: Int = 0,
+        val uniqueSurfaces: Int = 0,
+        val coverageQuotaSelected: Int = 0,
+        val selectedSurfaces: Int = 0,
+        val capRejected: Int = 0,
+        val occurrenceCapDropped: Int = 0,
+    )
+
+    data class Result(
+        val annotations: List<WordAnnotation>,
+        val stats: Stats,
+    )
+
     private val SINGLE_TOKEN = Regex("^[A-Za-z]+(?:['’][A-Za-z]+)?$")
 
     private data class SurfaceGroup(
@@ -35,13 +55,33 @@ object WordAnnotationFilter {
         cap: Int,
         maxOccurrencesPerSurface: Int = DEFAULT_OCCURRENCES_PER_SURFACE,
         coverageBuckets: Int = 0,
-    ): List<WordAnnotation> {
-        if (annotations.isEmpty()) return emptyList()
+    ): List<WordAnnotation> = filterWithStats(
+        annotations = annotations,
+        level = level,
+        cap = cap,
+        maxOccurrencesPerSurface = maxOccurrencesPerSurface,
+        coverageBuckets = coverageBuckets,
+    ).annotations
+
+    fun filterWithStats(
+        annotations: List<WordAnnotation>,
+        level: Int,
+        cap: Int,
+        maxOccurrencesPerSurface: Int = DEFAULT_OCCURRENCES_PER_SURFACE,
+        coverageBuckets: Int = 0,
+    ): Result {
+        val inputStats = Stats(inputAnnotations = annotations.size)
+        if (annotations.isEmpty()) return Result(emptyList(), inputStats)
         val limitedCap = cap.coerceAtLeast(1)
         val occurrenceCap = maxOccurrencesPerSurface.coerceAtLeast(1)
         val floor = WordAnnotationLevels.floorFor(level)
+        // Defensive recheck. In the normal resolver path this is already true;
+        // count the authoritative floor loss in resolver stats, not here.
         val survivors = annotations.filter { passesFloor(it.surface, it.rank, floor) }
-        if (survivors.isEmpty()) return emptyList()
+        val floorRejected = annotations.size - survivors.size
+        if (survivors.isEmpty()) {
+            return Result(emptyList(), inputStats.copy(floorRejected = floorRejected))
+        }
 
         val groups = survivors
             .groupBy { it.surface }
@@ -77,6 +117,7 @@ object WordAnnotationFilter {
                     .forEach { selected[it.surface] = bucket }
             }
         }
+        val coverageQuotaSelected = selected.size
         if (selected.size < limitedCap) {
             groups.asSequence()
                 .filter { it.surface !in selected }
@@ -85,9 +126,24 @@ object WordAnnotationFilter {
                 .forEach { selected[it.surface] = it.first.coverageBucket }
         }
 
-        return selected.flatMap { (surface, bucket) ->
+        val chosen = selected.flatMap { (surface, bucket) ->
             chooseOccurrences(bySurface.getValue(surface).annotations, occurrenceCap, bucket)
-        }.sortedWith(compareBy({ it.paragraphIndex }, { it.start }))
+        }
+        val selectedAnnotationCount = selected.keys.sumOf {
+            bySurface.getValue(it).annotations.size
+        }
+        return Result(
+            annotations = chosen.sortedWith(compareBy({ it.paragraphIndex }, { it.start })),
+            stats = Stats(
+                inputAnnotations = annotations.size,
+                floorRejected = floorRejected,
+                uniqueSurfaces = groups.size,
+                coverageQuotaSelected = coverageQuotaSelected,
+                selectedSurfaces = selected.size,
+                capRejected = (groups.size - selected.size).coerceAtLeast(0),
+                occurrenceCapDropped = (selectedAnnotationCount - chosen.size).coerceAtLeast(0),
+            ),
+        )
     }
 
     /**
