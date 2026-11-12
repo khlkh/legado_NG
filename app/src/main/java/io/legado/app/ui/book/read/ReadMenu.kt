@@ -93,6 +93,9 @@ class ReadMenu @JvmOverloads constructor(
     private var floatingAutoPage by mutableStateOf(false)
     private var floatingThemeMode by mutableStateOf(ReadBookConfig.currentThemeMode())
     private var floatingWordAnnotationEnabled by mutableStateOf(ReadBook.book?.getWordAnnotationEnabled() == true)
+    private var floatingWordAnnotationVisible by mutableStateOf(
+        ReadBook.book?.let { WordAnnotationEligibility.supports(it) } == true,
+    )
     private var floatingToolDock by mutableStateOf(
         ReadFloatingToolDock.fromStoredRight(AppConfig.brightnessVwPos)
     )
@@ -288,12 +291,18 @@ class ReadMenu @JvmOverloads constructor(
 
     fun updateWordAnnotationState(enabled: Boolean) {
         floatingWordAnnotationEnabled = enabled
+        floatingWordAnnotationVisible = ReadBook.book?.let {
+            WordAnnotationEligibility.supports(it)
+        } == true
     }
 
     fun reset() {
         ReadFloatingAppearanceState.refreshFromConfig()
         floatingThemeMode = ReadBookConfig.currentThemeMode()
         floatingWordAnnotationEnabled = ReadBook.book?.getWordAnnotationEnabled() == true
+        floatingWordAnnotationVisible = ReadBook.book?.let {
+            WordAnnotationEligibility.supports(it)
+        } == true
         readMenuThemeSnapshot = resolveReadMenuThemeSnapshot()
         upColorConfig()
         initGlassSurfaces()
@@ -439,9 +448,7 @@ class ReadMenu @JvmOverloads constructor(
                         runMenuOut { callBack.onOpenAiPurifySettings() }
                     },
                     wordAnnotationEnabled = floatingWordAnnotationEnabled,
-                    wordAnnotationVisible = ReadBook.book?.let {
-                        WordAnnotationEligibility.supports(it)
-                    } == true,
+                    wordAnnotationVisible = floatingWordAnnotationVisible,
                     onWordAnnotation = {
                         floatingToolExpansion = null
                         ReadBook.book?.let {
@@ -797,6 +804,9 @@ class ReadMenu @JvmOverloads constructor(
         // Refresh the rail's Word Gloss state from the live book; the View is
         // constructed before ReadBook.book is installed on a cold start.
         floatingWordAnnotationEnabled = ReadBook.book?.getWordAnnotationEnabled() == true
+        floatingWordAnnotationVisible = ReadBook.book?.let {
+            WordAnnotationEligibility.supports(it)
+        } == true
         binding.titleBar.title = null
         updateHeaderActionMode()
         binding.tvBookTitle.text = ReadBook.book?.name.orEmpty()
