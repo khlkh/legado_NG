@@ -19,7 +19,20 @@ object WordAnnotationEligibility {
 
     fun supports(book: Book): Boolean {
         if (book.isImage) return false
-        return supports(book.config.scriptClass)
+        when (BookScriptClass.fromStorage(book.config.scriptClass)) {
+            BookScriptClass.Latin -> return true
+            BookScriptClass.Cjk, BookScriptClass.Other -> return false
+            null -> Unit
+        }
+        // The stored class is assigned from content on open, but a cold start
+        // can reach the menu before that happens. Use metadata as a cheap
+        // fallback; a fully unknown book keeps the entry visible until the
+        // passage is classified.
+        return when (BookLanguageDetector.detect(book)) {
+            BookScriptClass.Latin -> true
+            BookScriptClass.Cjk, BookScriptClass.Other -> false
+            null -> true
+        }
     }
 
     /**

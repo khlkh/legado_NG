@@ -131,5 +131,14 @@ class WordAnnotationAnalyzerTest {
 
         val otherBook = Book().apply { config.scriptClass = "other" }
         assertFalse(WordAnnotationEligibility.supports(otherBook))
+
+        val cjkMetadata = Book(
+            name = "中文书名",
+            author = "作者",
+            intro = "这是一段足够长的中文简介，用来判断语言类别。",
+        )
+        assertFalse(WordAnnotationEligibility.supports(cjkMetadata))
+        val latinMetadata = Book(name = "The English Book", author = "An Author")
+        assertTrue(WordAnnotationEligibility.supports(latinMetadata))
     }
 }
