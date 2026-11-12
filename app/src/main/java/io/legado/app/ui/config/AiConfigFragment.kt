@@ -2227,7 +2227,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         val level = ReadBook.book?.getWordAnnotationLevel()
             ?: WordAnnotationConfig.DEFAULT_WORD_ANNOTATION_LEVEL
         val density = ReadBook.book?.getWordAnnotationDensity()
-            ?: WordAnnotationDensity.STANDARD.storageValue
+            ?: WordAnnotationDensity.DEFAULT.storageValue
         val dialog = BottomSheetDialog(requireContext())
         dialog.setContentView(
             requireContext().createNgBottomDrawerComposeHost(

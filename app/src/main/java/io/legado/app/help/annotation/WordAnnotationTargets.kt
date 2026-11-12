@@ -9,12 +9,16 @@ enum class WordAnnotationDensity(
     val multiplier: Double,
 ) {
     SPARSE(0, 0.75),
-    STANDARD(1, 1.0),
-    DENSE(2, 1.25);
+    LIGHT(1, 1.00),
+    STANDARD(2, 1.25),
+    DENSE(3, 1.50),
+    RICH(4, 1.75);
 
     companion object {
+        val DEFAULT = DENSE
+
         fun fromStorage(value: Int?): WordAnnotationDensity =
-            entries.firstOrNull { it.storageValue == value } ?: STANDARD
+            entries.firstOrNull { it.storageValue == value } ?: DEFAULT
     }
 }
 

@@ -536,7 +536,7 @@ data class Book(
         // field is kept only so old ReadConfig JSON stays readable.
         var wordAnnotationHintCap: Int = 34,
         @SerializedName("wordAnnotationDensity")
-        var wordAnnotationDensity: Int = WordAnnotationDensity.STANDARD.storageValue,
+        var wordAnnotationDensity: Int = WordAnnotationDensity.DEFAULT.storageValue,
     ) : Parcelable
 
     class Converters {
