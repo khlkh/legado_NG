@@ -184,27 +184,26 @@ object ReadBookConfig {
             overrides?.basePreset?.mode == BookBasePreset.MODE_PINNED ||
             (overrides == null && legacy != null)
         ) legacy?.textFont else null
-        val globalDefaultFont = pinnedBookDefault ?: selectedPreset.textFont
+        val presetDefaultFont = pinnedBookDefault ?: selectedPreset.textFont
         val context = BookReadStyleCompatibility.contextFor(
             scope = scope,
             overrides = overrides,
             legacyConfig = legacy,
             presetScriptFont = selectedPreset.scriptFonts?.forScope(scope),
+            presetDefaultFont = presetDefaultFont,
             globalScriptFont = ReadScriptTypographyStore.font(scope),
-            globalDefaultFont = globalDefaultFont,
-            epub = scriptTypographyEpubContext(),
+            globalDefaultFont = selectedPreset.textFont,
+            // 原书字体优先级由 EPUB CSS 级联处理：respect 时 authored font-family 在元素上胜出，
+            // 未声明字体的元素仍应能使用 App 的脚本字体。这里不把 publisher 当作全局胜出值。
+            epub = null,
         )
         return EffectiveReadValueResolverContract.resolve(context)
     }
 
-    private fun scriptTypographyEpubContext(): ReadEpubContext? {
-        val book = boundBook.takeIf { it.isEpub } ?: return null
-        val respectFont = EpubLayoutPreferences.read(book.bookUrl)["font"] == true
-        return if (respectFont) {
-            ReadEpubContext(rule = ReadEpubRule.RESPECT, publisherFont = "publisher")
-        } else {
-            null
-        }
+    /** EPUB 是否选择了「尊重原书字体」。用于 UI 说明，不参与字体解析。 */
+    fun isEpubPublisherFontRespected(): Boolean {
+        val book = boundBook.takeIf { it.isEpub } ?: return false
+        return EpubLayoutPreferences.read(book.bookUrl)["font"] == true
     }
 
     /**
@@ -238,7 +237,7 @@ object ReadBookConfig {
         2 to "/system/fonts/DroidSansMono.ttf",
     )
 
-    private fun systemFontFile(value: String?): String? = value
+    internal fun systemFontFile(value: String?): String? = value
         ?.removePrefix("system:")
         ?.toIntOrNull()
         ?.let { systemFontFiles[it] }
@@ -504,7 +503,11 @@ object ReadBookConfig {
         }
         if (configList.size <= 1) return false
         val removeIndex = styleSelect.takeIf(configList.indices::contains) ?: 0
+        val removedName = configList[removeIndex].name
         configList.removeAt(removeIndex)
+        val bindings = ReadStyleLanguageMap.current()
+        val nextBindings = bindings.withoutName(removedName)
+        if (nextBindings != bindings) ReadStyleLanguageMap.update(nextBindings)
         readStyleSelect = 0
         comicStyleSelect = 0
         return true

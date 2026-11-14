@@ -498,16 +498,20 @@ internal class EpubLayoutSurface(
         val token = begin()
         startup?.mark("configure-${width}x$height")
         populateLayoutOptions(options, token)
+        // Script font URLs change independently of the document URL. Refresh them before the
+        // same-document early return, otherwise a font selected after the first configure never
+        // reaches reader.js until the WebView is recreated.
+        val scriptFonts = listOf("latin", "cjk", "other").mapNotNull { scope ->
+            gateway.scriptFontUrl(scope)?.let { scope to it }
+        }.toMap()
+        if (scriptFonts.isNotEmpty()) options.put("scriptFonts", JSONObject(scriptFonts))
+        else options.remove("scriptFonts")
         val documentUrl = loadUrl ?: return
         if (runtimeDocumentUrl == documentUrl) {
             webView.evaluateJavascript("$api.configure($options)", null)
             awaitLayout(token)
             return
         }
-        val scriptFonts = listOf("latin", "cjk", "other").mapNotNull { scope ->
-            gateway.scriptFontUrl(scope)?.let { scope to it }
-        }.toMap()
-        if (scriptFonts.isNotEmpty()) options.put("scriptFonts", JSONObject(scriptFonts))
         webView.evaluateJavascript(EpubWebViewCapabilities.CHECK) { supported ->
             if (closed || revision.toString() != token) return@evaluateJavascript
             if (supported != "true") {

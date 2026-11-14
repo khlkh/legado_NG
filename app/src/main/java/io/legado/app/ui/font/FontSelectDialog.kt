@@ -107,6 +107,14 @@ class FontSelectDialog : BaseComposeDialogFragment() {
     private val isReaderBodyFont: Boolean
         get() = arguments?.getBoolean(ARG_READER_BODY_FONT) == true
 
+    /**
+     * 语言字体（脚本维度）不再提供“系统字体”选项：系统族无法在 EPUB 里按脚本
+     * unicode-range 作用域，而映射到任意 TTF 又会假装 CJK 覆盖。脚本字体只接受
+     * 自定义字体文件或“跟随默认”。正文字体/标题字体仍保留系统族。
+     */
+    private val allowSystemFonts: Boolean
+        get() = callBack?.isBodyFontDialog != false
+
     private val fontRegex = Regex("(?i).*\\.[ot]tf")
     private lateinit var composeView: ComposeView
     private var fontMode by mutableIntStateOf(MODE_SYSTEM)
@@ -174,7 +182,7 @@ class FontSelectDialog : BaseComposeDialogFragment() {
             callBack?.curFontPath.orEmpty()
         }
         selectedSystemFont = AppConfig.systemTypefaces
-        fontMode = if (selectedFontPath.isEmpty()) MODE_SYSTEM else MODE_CUSTOM
+        fontMode = if (allowSystemFonts && selectedFontPath.isEmpty()) MODE_SYSTEM else MODE_CUSTOM
         composeView.setViewCompositionStrategy(
             ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
         )
@@ -257,17 +265,19 @@ class FontSelectDialog : BaseComposeDialogFragment() {
                 ReadConfigDialogTitle(callBack?.fontTitle?.takeIf { it.isNotBlank() } ?: getString(R.string.body_font))
             }
             Spacer(Modifier.height(8.dp))
-            ReadConfigDock(
-                labels = listOf(
-                    getString(R.string.font_mode_system),
-                    getString(R.string.font_mode_custom),
-                ),
-                selectedIndex = fontMode,
-                onSelected = { fontMode = it },
-                accessibilityLabel = fontTitle,
-            )
-            Spacer(Modifier.height(8.dp))
-            if (fontMode == MODE_CUSTOM) {
+            if (allowSystemFonts) {
+                ReadConfigDock(
+                    labels = listOf(
+                        getString(R.string.font_mode_system),
+                        getString(R.string.font_mode_custom),
+                    ),
+                    selectedIndex = fontMode,
+                    onSelected = { fontMode = it },
+                    accessibilityLabel = fontTitle,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            if (!allowSystemFonts || fontMode == MODE_CUSTOM) {
                 FontDirectoryRow(onClick = ::openFolder)
             }
             Box(
@@ -275,7 +285,7 @@ class FontSelectDialog : BaseComposeDialogFragment() {
                     .fillMaxWidth()
                     .weight(1f),
             ) {
-                if (fontMode == MODE_SYSTEM) {
+                if (allowSystemFonts && fontMode == MODE_SYSTEM) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(vertical = 6.dp),

@@ -140,6 +140,7 @@ internal class EpubLayoutController(
     private var titleFontPath = ""
     private var scriptFontBytes: Map<String, ByteArray> = emptyMap()
     private var scriptFontPaths: Map<String, String> = emptyMap()
+    private var scriptFontVersions: Map<String, Long> = emptyMap()
     private var styleGeneration = 0L
     private var readerInsets = JSONObject()
     private var chromeInsets = JSONObject()
@@ -266,6 +267,7 @@ internal class EpubLayoutController(
             val fontPath = ReadBookConfig.textFont
             val titlePath = ReadBookConfig.titleFont.ifBlank { fontPath }
             val scriptPaths = scriptFontSources()
+            val scriptVersions = scriptFontVersions(scriptPaths)
             loading = true
             val startup = EpubStartupTiming("open")
             startup.mark("bound")
@@ -301,6 +303,7 @@ internal class EpubLayoutController(
                         titleFontPath = titlePath
                         titleFontBytes = font.second
                         scriptFontPaths = scriptPaths
+                        scriptFontVersions = scriptVersions
                         scriptFontBytes = font.third
                     }
                     snapshot = opened
@@ -1761,6 +1764,15 @@ internal class EpubLayoutController(
         ReadBookConfig.scriptFontPath(scope)?.takeIf { it.isNotBlank() }?.let { key to it }
     }.toMap()
 
+    /** 字体文件可能被同名覆盖：把 mtime+大小并入重载键；content:// 无法廉价 stat。 */
+    private fun scriptFontVersions(sources: Map<String, String>): Map<String, Long> =
+        sources.mapValues { (_, path) ->
+            runCatching {
+                val file = java.io.File(path)
+                file.lastModified() xor file.length()
+            }.getOrDefault(0L)
+        }
+
     fun restyle() {
         stopSelectionDrag()
         if (!loading) contentSlot.clear()
@@ -1769,7 +1781,9 @@ internal class EpubLayoutController(
         val path = ReadBookConfig.textFont
         val titlePath = ReadBookConfig.titleFont.ifBlank { path }
         val scriptPaths = scriptFontSources()
-        if (readerFontPath != path || titleFontPath != titlePath || scriptFontPaths != scriptPaths) {
+        val scriptVersions = scriptFontVersions(scriptPaths)
+        if (readerFontPath != path || titleFontPath != titlePath ||
+            scriptFontPaths != scriptPaths || scriptFontVersions != scriptVersions) {
             scope.launch {
                 val (font, titleFont, scripts) = withContext(Dispatchers.IO) {
                     val bodyFont = runCatching { readEpubReaderFont(host.context, path) }.getOrNull()
@@ -1786,6 +1800,7 @@ internal class EpubLayoutController(
                 titleFontPath = titlePath
                 titleFontBytes = titleFont
                 scriptFontPaths = scriptPaths
+                scriptFontVersions = scriptVersions
                 scriptFontBytes = scripts
                 surface?.readerFont(font)
                 surface?.titleFont(titleFont)
@@ -2765,6 +2780,7 @@ internal class EpubLayoutController(
         titleFontPath = ""
         scriptFontBytes = emptyMap()
         scriptFontPaths = emptyMap()
+        scriptFontVersions = emptyMap()
         EpubScriptFontHealth.clear()
         documents = emptyList()
         active = false

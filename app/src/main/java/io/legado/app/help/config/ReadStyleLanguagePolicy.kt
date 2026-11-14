@@ -6,6 +6,7 @@ import io.legado.app.help.book.BookScriptClass
 data class ReadStyleLanguageDecision(
     val styleNameToSelect: String,
     val scriptClass: BookScriptClass? = null,
+    /** 旧契约字段；生产 ReadStyleLanguageBinder 不再自动 pin，只有显式选预设才写 readStyleName。 */
     val commitRememberedStyle: Boolean = false,
 )
 
@@ -17,9 +18,10 @@ object ReadStyleLanguagePolicy {
         existingStyleNames: List<String>,
         currentStyleName: String,
         bindings: LanguageStyleBindings,
+        fallbackScriptClass: BookScriptClass? = null,
     ): ReadStyleLanguageDecision {
         val remembered = rememberedStyleName?.trim()?.takeIf { it.isNotEmpty() }
-        val script = BookLanguageDetector.detect(languageHint, sampleTexts)
+        val script = BookLanguageDetector.detect(languageHint, sampleTexts) ?: fallbackScriptClass
         if (remembered != null) {
             val target = remembered.takeIf { it in existingStyleNames } ?: currentStyleName
             return ReadStyleLanguageDecision(

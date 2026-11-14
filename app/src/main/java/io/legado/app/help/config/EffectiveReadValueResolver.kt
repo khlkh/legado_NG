@@ -14,6 +14,7 @@ package io.legado.app.help.config
  *   book.overrides[scope]       -> ThisBook   （本书 DEFAULT 覆盖）
  *   book.overrides[default]     -> ThisBook   （本书 default 字体覆盖）
  *   book.basePreset.default     -> Preset     （pinned 快照 defaultFont）
+ *   preset.default              -> Preset     （选中预设 textFont）
  *   FOLLOW_GLOBAL + global.default -> Preset  （当前预设 textFont；值同全局、标签有意不同）
  *   global.default              -> Global     （无 follow_global 基准时）
  *   platform fallback           -> Platform   （非空，保证解析是全函数）
@@ -23,13 +24,17 @@ package io.legado.app.help.config
  *   book.basePreset.scripts[scope] -> Preset  （pinned 快照脚本字体；FOLLOW_GLOBAL 为透明层）
  *   preset.scripts[scope]       -> Preset     （选中预设的脚本字体覆盖）
  *   global.scripts[scope]       -> Global
+ *   book.default                -> ThisBook   （本书正文默认字体，脚本桶的最终回退）
+ *   preset.default              -> Preset     （选中预设 textFont，脚本桶的默认回退）
  *   global.default              -> Global     （含 FOLLOW_GLOBAL 回落到 global.default）
  *   platform fallback           -> Platform   （非空，保证解析是全函数）
  *
- * 关键不变量：本书 default 字体只作用于 DEFAULT 维度，不拦截 LATIN/CJK/OTHER 脚本桶。
+ * 关键不变量：显式脚本字体（本书/基准/预设/全局）优先于任何 default；本书 default
+ * 只作为脚本维度的回退，不再被旧的 pinned/预设默认挡住。
  * follow_global：DEFAULT 的 global.default 标 Preset；脚本桶来源如实标 Global。
  *
- * EPUB 规则为 respect 且原书声明了该属性：publisher 值直接胜出（source = Publisher）。
+ * EPUB 规则为 respect 且调用方明确声明原书声明了该属性：publisher 值直接胜出
+ * （source = Publisher）。生产字体加载不传 publisher，原书字体优先级由 CSS 级联处理。
  */
 
 /** 值作用于哪个脚本维度；Appearance 不参与脚本维度。 */
@@ -78,6 +83,8 @@ data class ReadValueContext(
     val basePreset: ReadBasePreset? = null,
     /** 选中预设的脚本字体覆盖（preset.scripts[scope]），介于 basePreset 与 global 之间。 */
     val presetScriptFont: String? = null,
+    /** 选中预设的默认字体（textFont）；比 global.default 高一层，来源标 Preset。 */
+    val presetDefaultFont: String? = null,
     val globalScriptFont: String? = null,
     val globalDefaultFont: String? = null,
     /** 平台兜底字体。非空，由类型保证解析是全函数。 */
@@ -131,8 +138,22 @@ object EffectiveReadValueResolverContract : EffectiveReadValueResolver {
         // 2b. 选中预设的脚本字体覆盖（preset.scripts[scope]）
         context.presetScriptFont?.let { return ResolvedReadValue(it, ReadValueSource.PRESET, scope) }
 
-        // 3. 全局脚本档案 → 4. 全局/当前预设 default → 5. platform（非空兜底，全函数）
+        // 3. 全局脚本档案
         context.globalScriptFont?.let { return ResolvedReadValue(it, ReadValueSource.GLOBAL, scope) }
+        // 3b. 本书默认字体是脚本维度的最终回退：显式脚本字体（本书/基准/预设/全局）仍优先，
+        // 但没有脚本覆盖时，本书正文默认字体应同时作为 CJK/Latin/Other 的回退，而不是被
+        // 旧的 pinned/预设默认挡住。DEFAULT 维度的优先级已在 1b 处理。
+        if (scope != ReadValueScope.DEFAULT) {
+            context.bookDefaultFont?.let {
+                return ResolvedReadValue(it, ReadValueSource.THIS_BOOK, scope)
+            }
+        }
+        // 3c. 选中预设的默认字体。它是 App 链里真正生效的正文默认，来源应标 Preset；
+        // 之前把它塞进 globalDefaultFont 会让 UI 显示“跟随默认/全局”，与预设层不一致。
+        context.presetDefaultFont?.let {
+            return ResolvedReadValue(it, ReadValueSource.PRESET, scope)
+        }
+        // 4. 全局/当前预设 default
         context.globalDefaultFont?.let {
             val followGlobalDefault = scope == ReadValueScope.DEFAULT &&
                 context.basePreset?.mode == ReadBasePresetMode.FOLLOW_GLOBAL

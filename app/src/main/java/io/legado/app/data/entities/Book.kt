@@ -486,6 +486,8 @@ data class Book(
         var scriptClass: String? = null,
         @SerializedName("readStyleName")
         var readStyleName: String? = null,
+        @SerializedName("readStyleBinding")
+        var readStyleBinding: String? = null,
         @SerializedName("independentReadStyle")
         var independentReadStyle: String? = null,
         @SerializedName("customBookType")

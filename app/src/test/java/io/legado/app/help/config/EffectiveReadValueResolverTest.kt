@@ -77,6 +77,54 @@ class EffectiveReadValueResolverTest {
         assertEquals(ResolvedReadValue("C", ReadValueSource.GLOBAL, ReadValueScope.CJK), result)
     }
 
+    @Test
+    fun `18b book default is the script fallback without a script override`() {
+        val result = resolver.resolve(
+            ReadValueContext(
+                scope = ReadValueScope.CJK,
+                bookDefaultFont = "X",
+                globalDefaultFont = "A",
+            )
+        )
+        assertEquals(ResolvedReadValue("X", ReadValueSource.THIS_BOOK, ReadValueScope.CJK), result)
+    }
+
+    @Test
+    fun `18c latin falls back to book default without a script override`() {
+        val result = resolver.resolve(
+            ReadValueContext(
+                scope = ReadValueScope.LATIN,
+                bookDefaultFont = "X",
+                globalDefaultFont = "A",
+            )
+        )
+        assertEquals(ResolvedReadValue("X", ReadValueSource.THIS_BOOK, ReadValueScope.LATIN), result)
+    }
+
+    @Test
+    fun `18d selected preset default fills script fallback and keeps Preset source`() {
+        val result = resolver.resolve(
+            ReadValueContext(
+                scope = ReadValueScope.CJK,
+                presetDefaultFont = "P",
+                globalDefaultFont = "A",
+            )
+        )
+        assertEquals(ResolvedReadValue("P", ReadValueSource.PRESET, ReadValueScope.CJK), result)
+    }
+
+    @Test
+    fun `18e book default beats selected preset default for scripts`() {
+        val result = resolver.resolve(
+            ReadValueContext(
+                scope = ReadValueScope.CJK,
+                bookDefaultFont = "X",
+                presetDefaultFont = "P",
+            )
+        )
+        assertEquals(ResolvedReadValue("X", ReadValueSource.THIS_BOOK, ReadValueScope.CJK), result)
+    }
+
     // endregion
 
     // region EPUB precedence

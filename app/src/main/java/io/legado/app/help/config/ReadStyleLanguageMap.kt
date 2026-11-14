@@ -34,6 +34,13 @@ data class LanguageStyleBindings(
         if (raw.isEmpty()) return null
         return raw.takeIf { it in existingNames }
     }
+
+    /** 预设被删除时清除指向它的语言默认映射。 */
+    fun withoutName(name: String?): LanguageStyleBindings {
+        val target = name?.trim()?.takeIf { it.isNotEmpty() } ?: return this
+        fun clear(value: String?): String? = value?.takeUnless { it.trim() == target }
+        return copy(cjk = clear(cjk), latin = clear(latin), other = clear(other))
+    }
 }
 
 object ReadStyleLanguageMap {

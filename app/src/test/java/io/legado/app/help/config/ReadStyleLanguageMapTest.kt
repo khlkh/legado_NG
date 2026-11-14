@@ -47,4 +47,19 @@ class ReadStyleLanguageMapTest {
         val bindings = LanguageStyleBindings(cjk = "秋山书意").with(BookScriptClass.Cjk, "  ")
         assertNull(bindings.cjk)
     }
+
+    @Test
+    fun withoutNameClearsAllMatchingScripts() {
+        val bindings = LanguageStyleBindings(
+            cjk = "Eng",
+            latin = "Eng",
+            other = "秋山书意",
+        )
+        val cleared = bindings.withoutName("Eng")
+        assertNull(cleared.cjk)
+        assertNull(cleared.latin)
+        assertEquals("秋山书意", cleared.other)
+        assertEquals(bindings, bindings.withoutName("  "))
+        assertEquals(bindings, bindings.withoutName("missing"))
+    }
 }

@@ -125,4 +125,19 @@ class ReadStyleLanguagePolicyTest {
         assertEquals(BookScriptClass.Latin, decision.scriptClass)
         assertTrue(decision.commitRememberedStyle)
     }
+
+    @Test
+    fun knownScriptClassMapsWhenLanguageDetectionHasNoSample() {
+        val decision = ReadStyleLanguagePolicy.decide(
+            rememberedStyleName = null,
+            languageHint = null,
+            sampleTexts = emptyList(),
+            existingStyleNames = names,
+            currentStyleName = "暖纸书香",
+            bindings = bindings,
+            fallbackScriptClass = BookScriptClass.Cjk,
+        )
+        assertEquals("秋山书意", decision.styleNameToSelect)
+        assertEquals(BookScriptClass.Cjk, decision.scriptClass)
+    }
 }

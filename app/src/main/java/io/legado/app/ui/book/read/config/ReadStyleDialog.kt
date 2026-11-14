@@ -48,6 +48,8 @@ import io.legado.app.help.config.ReadValueScope
 import io.legado.app.help.config.ReadValueSource
 import io.legado.app.help.config.ReadStyleLanguageBinder
 import io.legado.app.help.config.ReadStyleLanguageMap
+import io.legado.app.help.config.ReadStyleBinding
+import io.legado.app.help.config.readStyleBindingOrDefault
 import io.legado.app.help.config.ReadStylePackageManager
 import io.legado.app.help.config.LatinOpticalScale
 import io.legado.app.help.config.LatinOpticalScaleStore
@@ -387,6 +389,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
             refreshUi()
             notifyPresetRestored()
         },
+        onFollowLanguageDefault = ::followLanguageDefault,
         onShareLayoutChanged = { checked ->
             ReadBookConfig.shareLayout = checked
             refreshUi()
@@ -399,6 +402,15 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
         },
         onLanguagePresetChanged = { script, name ->
             ReadStyleLanguageMap.set(script, name)
+            val book = ReadBook.book
+            if (book != null &&
+                book.config.readStyleBindingOrDefault() == ReadStyleBinding.FOLLOW_LANGUAGE_DEFAULT &&
+                ReadStyleLanguageBinder.apply(book)
+            ) {
+                ReadFloatingAppearanceState.refreshFromConfig()
+                postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
+                notifyFloatingAppearanceChanged()
+            }
             refreshUi()
         },
         onImportHighlights = {
@@ -842,7 +854,11 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
             ),
             shareLayout = ReadBookConfig.shareLayout,
             isEpub = ReadBook.book?.isEpub == true,
+            publisherFontRespected = ReadBookConfig.isEpubPublisherFontRespected(),
             onlyThisBook = ReadBookConfig.onlyThisBook,
+            followsLanguageDefault = ReadBook.book?.config?.readStyleBindingOrDefault() ==
+                ReadStyleBinding.FOLLOW_LANGUAGE_DEFAULT,
+            boundPresetName = ReadBook.book?.config?.readStyleName.orEmpty(),
             canUseBookStyle = ReadBookConfig.canUseBookStyle,
 
             globalFloatingFollowApp = ReadBookConfig.floatingColorManagedGlobally,
@@ -920,6 +936,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
                 val resolved = ReadBookConfig.scriptFont(scope)
                 val hasThisLayerOverride = ReadBookConfig.hasScriptFontOverride(scope)
                 val hasPresetOverride = ReadBookConfig.durConfig.scriptFonts?.forScope(scope) != null
+                val hasGlobalScriptOverride = ReadScriptTypographyStore.font(scope) != null
                 ReadScriptFontUi(
                     scope = scope,
                     label = getString(
@@ -933,7 +950,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
                     source = resolved.source,
                     canReset = hasThisLayerOverride,
                     isInherited = resolved.source != ReadValueSource.PUBLISHER &&
-                        !hasThisLayerOverride && !hasPresetOverride,
+                        !hasThisLayerOverride && !hasPresetOverride && !hasGlobalScriptOverride,
                     unavailable = EpubScriptFontHealth.isFailed(scope.name.lowercase()),
                 )
             },
@@ -955,6 +972,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
                     font = presetFont,
                     source = if (presetFont.isBlank()) ReadValueSource.PLATFORM else ReadValueSource.PRESET,
                     canReset = presetFont.isNotBlank(),
+                    unavailable = EpubScriptFontHealth.isFailed(scope.name.lowercase()),
                 )
             },
             latinScale = LatinOpticalScaleStore.manual(),
@@ -964,7 +982,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
     private fun currentRules(): List<ReadHighlightRule> =
         ReadHighlightRuleStore.allRules().sortedBy(ReadHighlightRule::position)
 
-    private fun changeBgTextConfig(index: Int) {
+    private fun changeBgTextConfig(index: Int, pinBook: Boolean = true) {
         val oldIndex = ReadBookConfig.styleSelect
         if (index !in ReadBookConfig.configList.indices) return
         if (index != oldIndex) {
@@ -974,7 +992,19 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
             postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
             notifyFloatingAppearanceChanged()
         }
-        ReadBook.book?.let(ReadStyleLanguageBinder::rememberCurrentStyle)
+        ReadBook.book?.let { book ->
+            if (pinBook) ReadStyleLanguageBinder.pinCurrentStyle(book)
+            refreshUi()
+        }
+    }
+
+    private fun followLanguageDefault() {
+        val book = ReadBook.book ?: return
+        ReadStyleLanguageBinder.followLanguageDefault(book)
+        ReadFloatingAppearanceState.refreshFromConfig()
+        refreshUi()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
+        notifyFloatingAppearanceChanged()
     }
 
     private fun promptNewPreset() {
@@ -1014,7 +1044,6 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
             ReadFloatingAppearanceState.refreshFromConfig()
             notifyPresetRestored()
         }
-        ReadBook.book?.let(ReadStyleLanguageBinder::rememberCurrentStyle)
     }
 
     /** 离开编辑或关闭界面时才收名字。空名字不写入：已有名字的预设保持原名。 */
@@ -1069,7 +1098,7 @@ class ReadStyleDialog : BaseComposeDialogFragment(), FontSelectDialog.CallBack {
         // reader's real current mode instead of a stale preview slot.
         editorSession.selectPresetMode(ReadAppearanceMode.current())
         currentPage = ReadStylePage.EDIT
-        changeBgTextConfig(index)
+        changeBgTextConfig(index, pinBook = false)
         page = ReadStylePage.EDIT
         ReadBookConfig.setNightThemeOverride(null)
         refreshUi()

@@ -106,6 +106,7 @@ object BookReadStyleCompatibility {
         platformFont: String = "platform",
         epub: ReadEpubContext? = null,
         presetScriptFont: String? = null,
+        presetDefaultFont: String? = null,
     ): ReadValueContext {
         if (overrides != null || legacyConfig != null) {
             return ReadValueContext(
@@ -123,6 +124,7 @@ object BookReadStyleCompatibility {
                         )
                     },
                 presetScriptFont = presetScriptFont,
+                presetDefaultFont = presetDefaultFont,
                 globalScriptFont = globalScriptFont,
                 globalDefaultFont = globalDefaultFont,
                 platformFont = platformFont,
@@ -132,6 +134,7 @@ object BookReadStyleCompatibility {
         return ReadValueContext(
             scope = scope,
             presetScriptFont = presetScriptFont,
+            presetDefaultFont = presetDefaultFont,
             globalScriptFont = globalScriptFont,
             globalDefaultFont = globalDefaultFont,
             platformFont = platformFont,

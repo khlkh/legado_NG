@@ -56,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
@@ -101,6 +102,8 @@ import io.legado.app.help.config.ReadFloatingAppearanceConfig
 import io.legado.app.help.config.ReadFloatingColorStyle
 import io.legado.app.help.config.LatinOpticalScale
 import io.legado.app.help.config.ReadValueScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.legado.app.help.config.ReadValueSource
 import io.legado.app.ui.book.read.ReadDrawerStyle
 import io.legado.app.ui.book.read.readFloatingGlassStyle
@@ -249,8 +252,11 @@ internal data class ReadStyleUiState(
     val canRestoreCurrentDefault: Boolean,
     val highlightSummary: String,
     val isEpub: Boolean,
+    val publisherFontRespected: Boolean = false,
     val onlyThisBook: Boolean,
     val followsGlobal: Boolean = false,
+    val followsLanguageDefault: Boolean = false,
+    val boundPresetName: String = "",
     val canUseBookStyle: Boolean,
     val shareLayout: Boolean,
     val globalFloatingFollowApp: Boolean,
@@ -339,6 +345,7 @@ internal data class ReadStyleActions(
     val onRestoreAllPresets: () -> Unit,
     val onOpenEpubSettings: () -> Unit,
     val onOnlyThisBookChanged: (Boolean) -> Unit,
+    val onFollowLanguageDefault: () -> Unit,
     val onShareLayoutChanged: (Boolean) -> Unit,
     val onGlobalFloatingFollowAppChanged: (Boolean) -> Unit,
     val onLanguagePresetChanged: (BookScriptClass, String?) -> Unit,
@@ -857,6 +864,39 @@ private fun PresetPage(
         onDelete = actions.onDeletePreset,
     )
 
+    if (!state.onlyThisBook) {
+        Row(
+            Modifier.fillMaxWidth().height(56.dp)
+                .clickable(role = Role.Button, onClick = actions.onFollowLanguageDefault)
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.read_style_follow_language_default),
+                color = if (state.followsLanguageDefault) accentColor else contentColor,
+                fontSize = 15.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = if (state.followsLanguageDefault) {
+                    stringResource(
+                        R.string.read_style_follow_language_default_summary,
+                        state.selectedPresetName,
+                    )
+                } else {
+                    stringResource(
+                        R.string.read_style_pinned_preset_summary,
+                        state.boundPresetName.ifBlank { state.selectedPresetName },
+                    )
+                },
+                color = contentColor.copy(alpha = 0.72f),
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        ReadDivider(contentColor)
+    }
     if (state.canUseBookStyle) {
         PresetSwitchRow(
             title = stringResource(R.string.read_style_only_this_book),
@@ -962,6 +1002,22 @@ private fun LanguageFontsPage(
     contentColor: Color,
     actions: ReadStyleActions,
 ) {
+    val coverage by produceState<Map<ReadValueScope, Boolean?>>(
+        initialValue = emptyMap(),
+        state.languageFonts,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            state.languageFonts.associate { item ->
+                item.scope to ReadFontCoverage.covers(item.font, item.scope)
+            }
+        }
+    }
+    val primaryScope = when (state.detectedScriptClass) {
+        "cjk" -> ReadValueScope.CJK
+        "latin" -> ReadValueScope.LATIN
+        "other" -> ReadValueScope.OTHER
+        else -> null
+    }
     Column(Modifier.fillMaxWidth().fillMaxHeight()) {
         StyleSubpageHeader(
             title = stringResource(R.string.read_style_language_fonts),
@@ -975,7 +1031,65 @@ private fun LanguageFontsPage(
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
+            if (state.publisherFontRespected) {
+                Text(
+                    text = stringResource(R.string.read_style_publisher_font_note),
+                    color = contentColor.copy(alpha = 0.72f),
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                )
+                ReadDivider(contentColor)
+            }
+            if (primaryScope?.let { coverage[it] } == false) {
+                Text(
+                    text = stringResource(R.string.read_style_font_missing_glyphs_note),
+                    color = contentColor.copy(alpha = 0.82f),
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                )
+                ReadDivider(contentColor)
+            }
             state.languageFonts.forEach { item ->
+                val missingGlyphs = coverage[item.scope] == false
+                val legacySystem = !item.isInherited && item.font.startsWith("system:")
+                val missingLabel = stringResource(R.string.read_style_font_missing_glyphs)
+                val legacyLabel = stringResource(R.string.read_style_legacy_system_font)
+                val valueText = when {
+                    item.source == ReadValueSource.PUBLISHER ->
+                        stringResource(R.string.read_style_publisher_css_active)
+                    item.isInherited -> when (item.source) {
+                        ReadValueSource.THIS_BOOK ->
+                            stringResource(R.string.read_style_follow_book)
+                        ReadValueSource.GLOBAL ->
+                            stringResource(R.string.read_style_follow_global_font)
+                        ReadValueSource.PLATFORM ->
+                            stringResource(R.string.read_style_source_system)
+                        else -> if (state.selectedPresetName.isNotBlank()) {
+                            stringResource(
+                                R.string.read_style_follow_preset_named,
+                                state.selectedPresetName,
+                            )
+                        } else {
+                            stringResource(R.string.read_style_follow_preset)
+                        }
+                    }
+                    else -> fontDisplayName(item.font).ifBlank { item.font } +
+                        " · " + stringResource(
+                            when (item.source) {
+                                ReadValueSource.THIS_BOOK -> R.string.read_style_source_this_book
+                                ReadValueSource.PRESET -> if (state.followsGlobal) {
+                                    R.string.read_style_follow_global
+                                } else {
+                                    R.string.read_style_source_preset
+                                }
+                                ReadValueSource.GLOBAL -> R.string.read_style_source_global
+                                ReadValueSource.PUBLISHER -> R.string.read_style_source_publisher
+                                ReadValueSource.PLATFORM -> R.string.read_style_source_system
+                            }
+                        )
+                }
                 Row(
                     Modifier.fillMaxWidth().height(56.dp)
                         .clickable(role = Role.Button, onClick = { actions.onSelectScriptFont(item.scope) })
@@ -989,25 +1103,10 @@ private fun LanguageFontsPage(
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = when {
-                            item.source == ReadValueSource.PUBLISHER ->
-                                stringResource(R.string.read_style_publisher_css_active)
-                            item.isInherited ->
-                                stringResource(R.string.read_style_follow_preset)
-                            else -> fontDisplayName(item.font).ifBlank { item.font } +
-                                " · " + stringResource(
-                                    when (item.source) {
-                                        ReadValueSource.THIS_BOOK -> R.string.read_style_source_this_book
-                                        ReadValueSource.PRESET -> if (state.followsGlobal) {
-                                            R.string.read_style_follow_global
-                                        } else {
-                                            R.string.read_style_source_preset
-                                        }
-                                        ReadValueSource.GLOBAL -> R.string.read_style_source_global
-                                        ReadValueSource.PUBLISHER -> R.string.read_style_source_publisher
-                                        ReadValueSource.PLATFORM -> R.string.read_style_source_system
-                                    }
-                                )
+                        text = buildString {
+                            append(valueText)
+                            if (legacySystem) append(" · $legacyLabel")
+                            if (missingGlyphs) append(" · $missingLabel")
                         },
                         color = contentColor.copy(alpha = 0.72f),
                         fontSize = 13.sp,
@@ -1804,6 +1903,15 @@ private fun EditorPage(
                 Spacer(Modifier.height(14.dp))
                 ReadDivider(contentColor, horizontalPadding = 0.dp)
                 EditorSectionLabel(stringResource(R.string.read_style_language_fonts), accentColor)
+                if (state.publisherFontRespected) {
+                    Text(
+                        text = stringResource(R.string.read_style_publisher_font_note),
+                        color = contentColor.copy(alpha = 0.72f),
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.padding(vertical = 6.dp),
+                    )
+                }
                 state.editorScriptFonts.forEach { script ->
                     Row(
                         Modifier.fillMaxWidth().height(52.dp)
@@ -1827,6 +1935,7 @@ private fun EditorPage(
                             fontSize = 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            textDecoration = if (script.unavailable) TextDecoration.LineThrough else TextDecoration.None,
                             modifier = Modifier.weight(1.4f, fill = false),
                         )
                         if (script.canReset) {

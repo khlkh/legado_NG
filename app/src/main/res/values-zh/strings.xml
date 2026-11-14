@@ -2382,6 +2382,16 @@
     <string name="read_style_script_cjk">中日韩</string>
     <string name="read_style_script_other">其他文字</string>
     <string name="read_style_follow_preset">跟随预设</string>
+    <string name="read_style_follow_preset_named">跟随预设（%1$s）</string>
+    <string name="read_style_follow_book">跟随本书</string>
+    <string name="read_style_follow_global_font">跟随默认</string>
+    <string name="read_style_publisher_font_note">已尊重原书字体：原书声明字体的位置优先，其余位置使用以下字体。</string>
+    <string name="read_style_font_missing_glyphs">缺字形</string>
+    <string name="read_style_legacy_system_font">旧系统字体</string>
+    <string name="read_style_font_missing_glyphs_note">当前字体不包含该文字的字形，实际会回退系统字体。请选择覆盖该文字的字体。</string>
+    <string name="read_style_follow_language_default">跟随语言默认</string>
+    <string name="read_style_follow_language_default_summary">当前：%1$s</string>
+    <string name="read_style_pinned_preset_summary">固定预设 · %1$s</string>
     <string name="read_style_source_preset_scripts">本预设</string>
     <string name="read_style_language_fonts_subtitle">新预设或未自定义的预设会继承这些字体</string>
     <string name="read_style_latin_scale">西文比例</string>
@@ -2452,7 +2462,7 @@
     <string name="read_style_floating_follow_app_summary">仅浮动窗颜色，不改正文</string>
     <string name="read_style_floating_follow_app_book_locked">本书正用本书或预设的浮动窗颜色</string>
     <string name="read_style_new_book_preset">新书预设</string>
-    <string name="read_style_new_book_preset_summary">只在这本书还没有记过你选的预设时生效</string>
+    <string name="read_style_new_book_preset_summary">作用于跟随语言默认的书；已固定预设的书保持不变</string>
     <string name="read_style_new_book_cjk">中文书</string>
     <string name="read_style_new_book_latin">西文书</string>
     <string name="read_style_new_book_other">其他语言</string>
