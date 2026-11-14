@@ -39,6 +39,8 @@ class NativeBookTest {
             "setUseReplaceRule", "setDelTag", "setTtsEngine", "setSplitLongChapter", "setReadSimulating",
             "setStartDate", "setStartChapter", "setDailyChapters", "setOpenCredits", "setCloseCredits",
             "setPlayMode", "setPlaySpeed", "setIndependentReadStyle", "setCustomBookType", "setMangaReadingStyle",
+            "setLanguageHint", "setScriptClass", "setReadStyleName", "setReadStyleBinding",
+            "setIndependentOverrides",
         ), Book.ReadConfig::class.java.methods.filter { it.name.startsWith("set") }.map { it.name }.toSet())
     }
 
