@@ -41,6 +41,8 @@ class NativeBookTest {
             "setPlayMode", "setPlaySpeed", "setIndependentReadStyle", "setCustomBookType", "setMangaReadingStyle",
             "setLanguageHint", "setScriptClass", "setReadStyleName", "setReadStyleBinding",
             "setIndependentOverrides",
+            "setWordAnnotationDensity", "setWordAnnotationEnabled", "setWordAnnotationHintCap",
+            "setWordAnnotationLevel",
         ), Book.ReadConfig::class.java.methods.filter { it.name.startsWith("set") }.map { it.name }.toSet())
     }
 
@@ -331,6 +333,10 @@ class NativeBookTest {
             "setType",
             "setUseReplaceRule",
             "setVariable",
+            "setWordAnnotationDensity",
+            "setWordAnnotationEnabled",
+            "setWordAnnotationHintCap",
+            "setWordAnnotationLevel",
             "setWordCount",
             "upCustomIntro",
             "writeToParcel"
